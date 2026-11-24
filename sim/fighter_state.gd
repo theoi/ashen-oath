@@ -183,6 +183,8 @@ var grab_tech_left: int = 0
 var carried_ticks: int = 0
 var carried_by: int = -1
 
+## Where the last teleport started (EffectData.Anchor.TELEPORT_ORIGIN).
+var teleport_from: Vector3i = Vector3i.ZERO
 ## Frames left rooted (HitData.root_frames).
 var rooted: int = 0
 ## Channel-break gauge points left and its size (MoveData.channel_gauge; 0 = none showing).

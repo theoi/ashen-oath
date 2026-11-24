@@ -353,6 +353,8 @@ func _telegraph_base(f: FighterState, move: MoveData, first: int) -> Vector3i:
 
 
 func _effect_spawn_point(f: FighterState, move: MoveData, ed: EffectData) -> Vector3i:
+	if ed.anchor == EffectData.Anchor.TELEPORT_ORIGIN:
+		return f.teleport_from + Fx.rotate(Fx.v3(ed.offset), f.facing)
 	if ed.anchor != EffectData.Anchor.TARGET:
 		return f.pos + Fx.rotate(Fx.v3(ed.offset), f.facing)
 	var origin := Vector3i(f.pos.x, 0, f.pos.z)
@@ -369,7 +371,11 @@ func _effect_spawn_point(f: FighterState, move: MoveData, ed: EffectData) -> Vec
 
 func _effect_shape(t: SimTelegraph, ed: EffectData, angle: int) -> void:
 	t.radius = Fx.m(ed.radius)
-	if ed.speed <= 0.0:
+	if ed.length > 0.0:
+		t.shape = SimTelegraph.Shape.CAPSULE
+		t.to = t.from + Fx.dir(angle, Fx.m(ed.length))
+		return
+	if ed.speed <= 0.0 or ed.attach_to_owner:
 		t.shape = SimTelegraph.Shape.CIRCLE
 		return
 	t.shape = SimTelegraph.Shape.LINE
@@ -1541,6 +1547,7 @@ func _tracking_of(move: MoveData) -> int:
 
 func _teleport(f: FighterState, tp: TeleportData) -> void:
 	var from := f.pos
+	f.teleport_from = from
 	match tp.mode:
 		TeleportData.Mode.STICK:
 			var angle := _stick_angle(f) if _stick_active(f) else f.facing
@@ -1569,7 +1576,9 @@ func _spawn_move_effect(f: FighterState, move: MoveData, effect_index: int) -> v
 	var ed := move.effects[effect_index]
 	var base := f.pos
 	var offset := Fx.rotate(Fx.v3(ed.offset), f.facing)
-	if ed.anchor == EffectData.Anchor.TARGET:
+	if ed.anchor == EffectData.Anchor.TELEPORT_ORIGIN:
+		base = f.teleport_from
+	elif ed.anchor == EffectData.Anchor.TARGET:
 		var target := _target_of(f)
 		var max_range := Fx.m(ed.max_range)
 		var origin := Vector3i(f.pos.x, 0, f.pos.z)
@@ -2216,6 +2225,12 @@ func _update_effects() -> void:
 		var ed := effect_data(e)
 		if ed.delay > 0 and e.age == ed.delay + 1:
 			_emit(EventType.EFFECT_ACTIVE, e.owner, -1, ed.id, e.pos, e.id)
+		if ed.attach_to_owner:
+			if not _follow_owner(e, ed):
+				_kill_effect(e, false)
+				continue
+		elif ed.homing_turn_rate > 0.0 and e.age > ed.delay:
+			_home(e, ed)
 		if e.age <= ed.delay:
 			continue
 		e.pos += e.vel
@@ -2227,6 +2242,44 @@ func _update_effects() -> void:
 		elif (ed.travel > 0.0 and e.traveled >= Fx.m(ed.travel)) or e.age > ed.delay + ed.lifetime:
 			_kill_effect(e, false)
 	_remove_dead_effects()
+
+
+## Keeps an attached effect on its owner and turned toward the aim. False once the cast
+## that spawned it is over.
+func _follow_owner(e: EffectState, ed: EffectData) -> bool:
+	var owner := state.fighters[e.owner]
+	if owner.ko or owner.action != Action.ATTACK or owner.move_cast != e.cast:
+		return false
+	if ed.aim_turn_rate > 0.0:
+		e.facing = Fx.turn_toward(e.facing, aim_angle(owner), Fx.deg(ed.aim_turn_rate))
+	else:
+		e.facing = owner.facing
+	e.vel = Vector3i.ZERO
+	e.pos = owner.pos + Fx.rotate(Fx.v3(ed.offset), e.facing)
+	return true
+
+
+## Turns a moving effect toward the owner's target (else the nearest enemy).
+func _home(e: EffectState, ed: EffectData) -> void:
+	var owner := state.fighters[e.owner]
+	var target: FighterState = null
+	if owner.target >= 0 and not state.fighters[owner.target].ko and state.fighters[owner.target].team != e.team:
+		target = state.fighters[owner.target]
+	else:
+		var best := -1
+		for v in state.fighters:
+			if v.team == e.team or v.ko:
+				continue
+			var d := Fx.dist2_xz(e.pos, v.pos)
+			if best < 0 or d < best:
+				best = d
+				target = v
+	if target == null:
+		return
+	var to := Fx.angle_of(target.pos.x - e.pos.x, target.pos.z - e.pos.z)
+	e.facing = Fx.turn_toward(e.facing, to, Fx.deg(ed.homing_turn_rate))
+	var v := Fx.dir(e.facing, Fx.mps(ed.speed))
+	e.vel = Vector3i(v.x, e.vel.y, v.z)
 
 
 func _kill_effect(e: EffectState, destroyed: bool) -> void:
@@ -2379,7 +2432,11 @@ func _hitbox_overlaps(a: FighterState, hb: HitboxData, v: FighterState) -> bool:
 	var p1 := a.pos + Fx.rotate(Fx.v3(hb.offset), a.facing)
 	if not hb.capsule:
 		return _sphere_hits_body(p1, r, v)
-	var p2 := a.pos + Fx.rotate(Fx.v3(hb.offset_end), a.facing)
+	return _capsule_hits_body(p1, a.pos + Fx.rotate(Fx.v3(hb.offset_end), a.facing), r, v)
+
+
+## Capsule p1-p2 of radius r against a fighter body (sampled every radius).
+func _capsule_hits_body(p1: Vector3i, p2: Vector3i, r: int, v: FighterState) -> bool:
 	var d := p2 - p1
 	var length := Fx.isqrt(d.x * d.x + d.y * d.y + d.z * d.z)
 	var steps := maxi(1, length / maxi(1, r))
@@ -2502,7 +2559,10 @@ func _collect_effect_contacts(contacts: Array[Contact]) -> void:
 				continue
 			if e.hit_counts[v.slot] > 0 and state.tick - e.last_hit_tick[v.slot] < ed.hit_interval:
 				continue
-			if not _cylinder_hits_body(e.pos, e.radius, height, v):
+			if ed.length > 0.0:
+				if not _capsule_hits_body(e.pos, e.pos + Fx.dir(e.facing, Fx.m(ed.length)), e.radius, v):
+					continue
+			elif not _cylinder_hits_body(e.pos, e.radius, height, v):
 				continue
 			if not _can_be_hit(v, ed.hit, ed.projectile, e.owner):
 				continue

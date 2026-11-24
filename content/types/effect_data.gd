@@ -9,6 +9,8 @@ enum Anchor {
 	OWNER,
 	## Spawns under the owner's current target (clamped to `max_range` from the owner).
 	TARGET,
+	## Spawns at `offset` from where the owner's last teleport started (Grave Echo).
+	TELEPORT_ORIGIN,
 }
 
 @export var id: StringName = &""
@@ -33,6 +35,18 @@ enum Anchor {
 ## Maximum travel in meters (0 = limited by lifetime only).
 @export var travel: float = 0.0
 @export var hit: HitData
+## Beams: the hit shape is a horizontal capsule `radius` thick running `length` meters
+## from the effect position along its facing (0 = the vertical capsule above).
+@export var length: float = 0.0
+## Stays on its owner: every tick it moves to the owner's position + `offset` (rotated by
+## the effect's facing) and ends when the cast that spawned it ends. `speed` is ignored.
+@export var attach_to_owner: bool = false
+## Attached effects turn toward the owner's aim at this many degrees per frame (0 = follow
+## the owner's facing).
+@export var aim_turn_rate: float = 0.0
+## Moving effects turn toward the owner's target (else the nearest enemy) at this many
+## degrees per frame (awakening lances). 0 = straight.
+@export var homing_turn_rate: float = 0.0
 ## Spawns only after a perfect charge release.
 @export var requires_perfect: bool = false
 ## Hits per target; each target is hit at most this many times, `hit_interval` frames apart.
