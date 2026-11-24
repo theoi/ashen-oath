@@ -1,0 +1,27 @@
+[gd_resource type="Resource" script_class="AiDifficulty" format=3]
+
+[ext_resource type="Script" path="res://ai/ai_difficulty.gd" id="1_78t7g"]
+
+[resource]
+script = ExtResource("1_78t7g")
+level = 0
+display_name = "Easy"
+reaction_delay = 30
+reaction_jitter = 8
+defend_chance = 25
+parry_percent = 0
+dodge_percent = 20
+anticipate_guard_percent = 10
+hold_guard_percent = 30
+tech_chance = 0
+punish_chance = 10
+combo_level = 0
+super_use = 0
+burst_chance = 0
+attack_gap = 60
+aggression = 70
+strategy_period = 12
+hesitation_percent = 35
+hesitation_ticks = 40
+whiff_percent = 20
+aim_noise_degrees = 35

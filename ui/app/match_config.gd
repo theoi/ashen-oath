@@ -21,6 +21,10 @@ var human_slots: Array[int] = [0]
 var attract := false
 var arena: StringName = &"ashen_chapel"
 var difficulty := Difficulty.NORMAL
+## Highest CPU difficulty for this match, -1 for none (story fight 1 caps at EASY).
+var ai_cap := -1
+## CPU profile id per slot overriding the fighter's own (story: &"oath_shade").
+var ai_profiles: Dictionary[int, StringName] = {}
 ## Rounds a team needs to win the match (2 = best of 3).
 var rounds_to_win := 2
 var round_seconds := 99
@@ -68,6 +72,8 @@ func duplicate_config() -> MatchConfig:
 	copy.attract = attract
 	copy.arena = arena
 	copy.difficulty = difficulty
+	copy.ai_cap = ai_cap
+	copy.ai_profiles = ai_profiles.duplicate()
 	copy.rounds_to_win = rounds_to_win
 	copy.round_seconds = round_seconds
 	copy.seed = seed

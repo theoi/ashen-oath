@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="AiProfile" format=3]
+
+[ext_resource type="Script" path="res://ai/ai_profile.gd" id="1_nwabr"]
+
+[resource]
+script = ExtResource("1_nwabr")
+id = &"morrigan"
+preferred_min = 8.0
+preferred_max = 14.0
+approach = 40
+pressure = 60
+zone = 180
+bait = 80
+defend = 110
+retreat = 150
+jump_in = 2
+grab = 15
+ability_bias = PackedInt32Array(140, 120, 60)

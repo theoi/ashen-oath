@@ -1,0 +1,24 @@
+[gd_resource type="Resource" script_class="AiDifficulty" format=3]
+
+[ext_resource type="Script" path="res://ai/ai_difficulty.gd" id="1_k1u5n"]
+
+[resource]
+script = ExtResource("1_k1u5n")
+level = 2
+display_name = "Hard"
+reaction_delay = 13
+defend_chance = 75
+parry_percent = 20
+dodge_percent = 30
+anticipate_guard_percent = 60
+hold_guard_percent = 75
+tech_chance = 60
+punish_chance = 75
+combo_level = 2
+super_use = 2
+burst_chance = 70
+attack_gap = 30
+hesitation_percent = 5
+hesitation_ticks = 14
+whiff_percent = 2
+aim_noise_degrees = 6

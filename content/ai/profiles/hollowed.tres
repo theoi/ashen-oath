@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="AiProfile" format=3]
+
+[ext_resource type="Script" path="res://ai/ai_profile.gd" id="1_i4026"]
+
+[resource]
+script = ExtResource("1_i4026")
+id = &"hollowed"
+preferred_min = 1.0
+preferred_max = 2.5
+approach = 120
+pressure = 110
+zone = 0
+bait = 60
+defend = 70
+jump_in = 4
+grab = 20
+charge = 0
+ability_bias = PackedInt32Array(100, 100, 100)

@@ -1,0 +1,8 @@
+[gd_resource type="Resource" script_class="AiProfile" format=3]
+
+[ext_resource type="Script" path="res://ai/ai_profile.gd" id="1_jgnag"]
+
+[resource]
+script = ExtResource("1_jgnag")
+id = &"test_fighter"
+ability_bias = PackedInt32Array(100, 100, 100)

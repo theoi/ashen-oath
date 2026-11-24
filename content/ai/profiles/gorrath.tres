@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="AiProfile" format=3]
+
+[ext_resource type="Script" path="res://ai/ai_profile.gd" id="1_7n7ep"]
+
+[resource]
+script = ExtResource("1_7n7ep")
+id = &"gorrath"
+preferred_min = 1.0
+preferred_max = 2.6
+approach = 140
+pressure = 110
+zone = 30
+bait = 140
+retreat = 50
+aggression = 110
+grab = 55
+charge = 35
+ability_bias = PackedInt32Array(100, 100, 100)
