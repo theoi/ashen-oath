@@ -1,27 +1,41 @@
 extends Node
 ## Autoload `GameFlow`: moves between menu screens and matches.
 ##
-## Menu screens live in a stack inside the menu app (ui/app/menu_app.tscn, the main scene).
-## Screens call open_screen() / back(); leaving a match calls return_to_menu() with the stack
-## to rebuild, so "back" from the screen you land on still makes sense.
+## Menu screens live in ScreenStacks: the menus (ui/app/menu_app.tscn, the main scene) and,
+## during a match, the pause/results overlay. Screens call open_screen() / back(), which act
+## on the most recent stack. start_match() switches to the match scene; return_to_menu()
+## comes back with a given screen stack so "back" from the landing screen still makes sense.
+
+## A match finished (any mode). Story mode listens to this, or sets MatchConfig.on_finished.
+signal match_finished(result: MatchResult)
 
 const MENU_SCENE := "res://ui/app/menu_app.tscn"
+const MATCH_SCENE := "res://ui/match/match_screen.tscn"
 
 ## Screen id -> scene. "story" is the entry point the story mode replaces.
 const SCREENS: Dictionary[StringName, String] = {
 	&"title": "res://ui/menus/title_screen.tscn",
 	&"mode_select": "res://ui/menus/mode_select.tscn",
 	&"story": "res://ui/story/story_entry.tscn",
+	&"versus": "res://ui/versus/versus_select.tscn",
 	&"controls": "res://ui/menus/controls_screen.tscn",
 	&"settings": "res://ui/menus/settings_screen.tscn",
+	&"pause": "res://ui/match/pause_screen.tscn",
+	&"results": "res://ui/match/results_screen.tscn",
 }
 
-var _menu: MenuApp
-var _pending_stack: Array[StringName] = [&"title"]
+## The match being played or last played (rematch uses it).
+var current_match: MatchConfig
+## How the last match ended (the results screen shows it).
+var last_result: MatchResult
+
+var _hosts: Array[ScreenStack] = []
+var _pending_menu: Array[StringName] = [&"title"]
 
 
 func _ready() -> void:
-	# Dev and capture runs can start deeper in the menus: -- --menu=mode_select,settings
+	# Dev and capture runs can start deeper in the menus (-- --menu=mode_select,settings)
+	# or straight in a versus match (-- --match).
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--menu="):
 			var stack: Array[StringName] = []
@@ -29,40 +43,82 @@ func _ready() -> void:
 				if SCREENS.has(StringName(id)):
 					stack.append(StringName(id))
 			if not stack.is_empty():
-				_pending_stack = stack
+				_pending_menu = stack
+		elif arg.begins_with("--match"):
+			start_match.call_deferred(_dev_match(arg.trim_prefix("--match").trim_prefix("=")))
 
 
-## Called by the menu app when it starts; returns the screen stack to show.
-func attach_menu(menu: MenuApp) -> Array[StringName]:
-	_menu = menu
-	var stack := _pending_stack
-	_pending_stack = [&"title"]
+## Dev / capture matches: "" (Aldric vs Morrigan) or "1v2" (vs Morrigan and Gorrath).
+## An "-attract" suffix ("attract", "1v2-attract") makes every slot play itself.
+func _dev_match(kind: String) -> MatchConfig:
+	var config := MatchConfig.versus(&"aldric", &"morrigan", &"ashen_chapel", Settings.default_difficulty)
+	match kind:
+		"1v2", "1v2-attract":
+			config.fighters = [&"aldric", &"morrigan", &"gorrath"]
+			config.teams = [0, 1, 1]
+			config.starting_soul = [100, 0, 50]
+	config.attract = kind.ends_with("attract")
+	return config
+
+
+func attach_host(host: ScreenStack) -> void:
+	_hosts.erase(host)
+	_hosts.append(host)
+
+
+func detach_host(host: ScreenStack) -> void:
+	_hosts.erase(host)
+
+
+## The menu stack to show when the menus load; resets to the title afterwards.
+func take_pending_menu() -> Array[StringName]:
+	var stack := _pending_menu
+	_pending_menu = [&"title"]
 	return stack
-
-
-func detach_menu(menu: MenuApp) -> void:
-	if _menu == menu:
-		_menu = null
 
 
 func open_screen(id: StringName) -> void:
 	if not SCREENS.has(id):
 		push_error("unknown screen %s" % id)
 		return
-	if _menu != null:
-		_menu.push_screen(id)
-	else:
+	if _hosts.is_empty():
 		return_to_menu([id])
+	else:
+		_hosts.back().push_screen(id)
 
 
 func back() -> void:
-	if _menu != null:
-		_menu.pop_screen()
+	if not _hosts.is_empty():
+		_hosts.back().pop_screen()
 
 
-## Loads the menu app showing `stack` (bottom first). Unpauses the tree.
+func rematch() -> void:
+	if current_match != null:
+		start_match(current_match.duplicate_config())
+
+
+## Leaves the match for the menus it was started from.
+func leave_match() -> void:
+	return_to_menu(current_match.menu_stack if current_match != null else [&"mode_select"] as Array[StringName])
+
+
+func start_match(config: MatchConfig) -> void:
+	current_match = config
+	get_tree().paused = false
+	get_tree().change_scene_to_file(MATCH_SCENE)
+
+
+## Called by the match scene when the last round ends.
+func finish_match(result: MatchResult) -> void:
+	last_result = result
+	match_finished.emit(result)
+	if current_match != null and current_match.on_finished.is_valid():
+		current_match.on_finished.call(result)
+
+
+## Loads the menus showing `stack` (bottom first). Unpauses the tree.
 func return_to_menu(stack: Array[StringName] = [&"mode_select"]) -> void:
-	_pending_stack = stack
+	_pending_menu = stack
 	get_tree().paused = false
 	get_tree().change_scene_to_file(MENU_SCENE)
 
