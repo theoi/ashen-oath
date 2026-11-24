@@ -9,8 +9,11 @@ extends RefCounted
 ## Not in the InputMap, so input capture handles them itself:
 ## - Mouse camera: read InputEventMouseMotion while the mouse is captured.
 ## - Right-stick flick to switch target: watch camera_* axis strength.
-## - Gamepad abilities are chords (ability_modifier + light / heavy / dodge); use
-##   held_ability_slot() and is_chord_consumed() rather than the ability_* actions alone.
+## - Gamepad chords (Binding.gamepad_chord, e.g. LT + X for ability 1); use
+##   held_ability_chord() and is_chord_consumed() rather than the ability_* actions alone.
+##
+## Ability slots are the actions ability_1, ability_2, ... in the table; prompts, the HUD and
+## the move list read them through ability_actions(), so adding a slot is a table change.
 
 const MOVE_LEFT := &"move_left"
 const MOVE_RIGHT := &"move_right"
@@ -29,7 +32,7 @@ const GRAB := &"grab"
 const ABILITY_1 := &"ability_1"
 const ABILITY_2 := &"ability_2"
 const ABILITY_3 := &"ability_3"
-## Held on a gamepad (LT / L2) to turn light / heavy / dodge into abilities 1 / 2 / 3.
+## Held on a gamepad (LT / L2) as the first half of the ability chords.
 const ABILITY_MODIFIER := &"ability_modifier"
 const SUPER := &"super"
 const LOCK_ON := &"lock_on"
@@ -39,10 +42,8 @@ const STICK_DEADZONE := 0.2
 const TRIGGER_DEADZONE := 0.3
 const BUTTON_DEADZONE := 0.5
 
-## Gamepad face buttons that become ability 1 / 2 / 3 while ABILITY_MODIFIER is held.
-const ABILITY_CHORD_BUTTONS: Array[JoyButton] = [JOY_BUTTON_X, JOY_BUTTON_Y, JOY_BUTTON_B]
-## The actions those face buttons trigger on their own.
-const ABILITY_CHORD_BASE_ACTIONS: Array[StringName] = [LIGHT, HEAVY, DODGE]
+static var _table: Array[Binding] = []
+static var _abilities: Array[StringName] = []
 
 
 ## One action and its default events per control scheme.
@@ -54,6 +55,9 @@ class Binding:
 	var gamepad: Array[InputEvent] = []
 	var keyboard_mouse: Array[InputEvent] = []
 	var keyboard_only: Array[InputEvent] = []
+	## Gamepad events held together (modifier first). Not written to the InputMap, since the
+	## button alone belongs to another action; capture checks them with held_ability_chord().
+	var gamepad_chord: Array[InputEvent] = []
 
 	func _init(p_action: StringName, p_label: String, p_deadzone: float = BUTTON_DEADZONE) -> void:
 		action = p_action
@@ -70,6 +74,10 @@ class Binding:
 
 	func kb(events: Array[InputEvent]) -> Binding:
 		keyboard_only = events
+		return self
+
+	func pad_chord(events: Array[InputEvent]) -> Binding:
+		gamepad_chord = events
 		return self
 
 	## Every event across schemes, without duplicates (WASD is shared by both keyboard schemes).
@@ -98,9 +106,9 @@ static func gameplay() -> Array[Binding]:
 		Binding.new(DODGE, "Dodge / tech / air tech").pad([button(JOY_BUTTON_B)]).kbm([key(KEY_SHIFT)]).kb([key(KEY_L)]),
 		Binding.new(GUARD, "Guard (hold) / Parry (tap)").pad([button(JOY_BUTTON_RIGHT_SHOULDER)]).kbm([key(KEY_Q)]).kb([key(KEY_SEMICOLON)]),
 		Binding.new(GRAB, "Grab / grab tech").pad([button(JOY_BUTTON_LEFT_SHOULDER)]).kbm([key(KEY_E)]).kb([key(KEY_H)]),
-		Binding.new(ABILITY_1, "Ability 1").kbm([key(KEY_1)]).kb([key(KEY_U)]),
-		Binding.new(ABILITY_2, "Ability 2").kbm([key(KEY_2)]).kb([key(KEY_I)]),
-		Binding.new(ABILITY_3, "Ability 3").kbm([key(KEY_3)]).kb([key(KEY_O)]),
+		Binding.new(ABILITY_1, "Ability 1").pad_chord([axis(JOY_AXIS_TRIGGER_LEFT, 1.0), button(JOY_BUTTON_X)]).kbm([key(KEY_1)]).kb([key(KEY_U)]),
+		Binding.new(ABILITY_2, "Ability 2").pad_chord([axis(JOY_AXIS_TRIGGER_LEFT, 1.0), button(JOY_BUTTON_Y)]).kbm([key(KEY_2)]).kb([key(KEY_I)]),
+		Binding.new(ABILITY_3, "Ability 3").pad_chord([axis(JOY_AXIS_TRIGGER_LEFT, 1.0), button(JOY_BUTTON_B)]).kbm([key(KEY_3)]).kb([key(KEY_O)]),
 		Binding.new(ABILITY_MODIFIER, "Ability modifier", TRIGGER_DEADZONE).pad([axis(JOY_AXIS_TRIGGER_LEFT, 1.0)]),
 		Binding.new(SUPER, "Super (Soul Burst in hitstun)", TRIGGER_DEADZONE).pad([axis(JOY_AXIS_TRIGGER_RIGHT, 1.0)]).kbm([key(KEY_R)]).kb([key(KEY_P)]),
 		Binding.new(LOCK_ON, "Lock-on / switch target").pad([button(JOY_BUTTON_RIGHT_STICK)]).kbm([mouse(MOUSE_BUTTON_MIDDLE), key(KEY_TAB)]).kb([key(KEY_TAB)]),
@@ -119,35 +127,73 @@ static func ui_additions() -> Dictionary[StringName, Array]:
 	}
 
 
-## Ability slot (1-3) whose gamepad chord is held, or 0. Keyboard ability keys are plain actions.
+static func clear_cache() -> void:
+	_table.clear()
+	_abilities.clear()
+
+
+## The binding for `action`, or null.
+static func find(action: StringName) -> Binding:
+	if _table.is_empty():
+		_table = gameplay()
+	for binding in _table:
+		if binding.action == action:
+			return binding
+	return null
+
+
+## Action for ability slot `slot` (0-based): ability_1, ability_2, ...
+static func ability_action(slot: int) -> StringName:
+	return StringName("ability_%d" % (slot + 1))
+
+
+## The bound ability slot actions in slot order.
+static func ability_actions() -> Array[StringName]:
+	if _abilities.is_empty():
+		while find(ability_action(_abilities.size())) != null:
+			_abilities.append(ability_action(_abilities.size()))
+	return _abilities
+
+
+## Ability slot (1-based) whose gamepad chord is held, or 0. Keyboard ability keys are plain actions.
 static func held_ability_chord() -> int:
-	if not Input.is_action_pressed(ABILITY_MODIFIER):
-		return 0
-	for i in ABILITY_CHORD_BUTTONS.size():
-		if _any_joypad_button(ABILITY_CHORD_BUTTONS[i]):
+	var actions := ability_actions()
+	for i in actions.size():
+		var chord := find(actions[i]).gamepad_chord
+		if not chord.is_empty() and chord.all(_pad_event_held):
 			return i + 1
 	return 0
 
 
-## True when `action` is only held because its pad button is part of an ability chord,
-## so capture should not also report the light / heavy / dodge underneath.
+## True when `action` is only held because its pad button is part of a held chord, so
+## capture should not also report the action underneath (light under LT + X).
 static func is_chord_consumed(action: StringName) -> bool:
-	var index := ABILITY_CHORD_BASE_ACTIONS.find(action)
-	if index < 0 or not Input.is_action_pressed(ABILITY_MODIFIER):
+	var binding := find(action)
+	if binding == null or binding.gamepad.is_empty():
 		return false
-	return _any_joypad_button(ABILITY_CHORD_BUTTONS[index])
+	for chord_action in ability_actions():
+		var chord := find(chord_action).gamepad_chord
+		if chord.is_empty() or not chord.all(_pad_event_held):
+			continue
+		for event in binding.gamepad:
+			if chord.any(func(e: InputEvent) -> bool: return same_event(e, event)):
+				return true
+	return false
 
 
-## Gamepad text for actions that have no direct pad event.
+## Gamepad text for actions bound as a chord, e.g. "LT + X  /  L2 + Square"; "" otherwise.
 static func gamepad_hint(action: StringName) -> String:
-	match action:
-		ABILITY_1:
-			return "LT + X  /  L2 + Square"
-		ABILITY_2:
-			return "LT + Y  /  L2 + Triangle"
-		ABILITY_3:
-			return "LT + B  /  L2 + Circle"
-	return ""
+	var binding := find(action)
+	if binding == null or binding.gamepad_chord.is_empty():
+		return ""
+	var xbox := PackedStringArray()
+	var playstation := PackedStringArray()
+	for event in binding.gamepad_chord:
+		# describe() names pad inputs "Xbox / PlayStation".
+		var names := describe(event).split(" / ")
+		xbox.append(names[0])
+		playstation.append(names[names.size() - 1])
+	return "%s  /  %s" % [" + ".join(xbox), " + ".join(playstation)]
 
 
 ## Keyboard + mouse text for actions that are not plain events.
@@ -250,6 +296,17 @@ const _JOY_BUTTON_NAMES: Dictionary[JoyButton, String] = {
 
 static func _key_code(event: InputEventKey) -> Key:
 	return event.physical_keycode if event.physical_keycode != KEY_NONE else event.keycode
+
+
+static func _pad_event_held(event: InputEvent) -> bool:
+	if event is InputEventJoypadButton:
+		return _any_joypad_button((event as InputEventJoypadButton).button_index)
+	if event is InputEventJoypadMotion:
+		var motion := event as InputEventJoypadMotion
+		for device in Input.get_connected_joypads():
+			if Input.get_joy_axis(device, motion.axis) * signf(motion.axis_value) >= TRIGGER_DEADZONE:
+				return true
+	return false
 
 
 static func _any_joypad_button(index: JoyButton) -> bool:

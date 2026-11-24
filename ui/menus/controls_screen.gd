@@ -4,6 +4,8 @@ extends MenuScreen
 const B := preload("res://ui/input/default_bindings.gd")
 
 ## [row label, actions]. Direction groups are summarized ("Left stick", "W A S D", "Arrow keys").
+## Ability slots are inserted after ABILITY_ROWS_AFTER from the bindings table.
+const ABILITY_ROWS_AFTER := "Grab / grab tech"
 const ROWS: Array[Array] = [
 	["Move", [B.MOVE_FORWARD, B.MOVE_LEFT, B.MOVE_BACK, B.MOVE_RIGHT]],
 	["Camera", [B.CAMERA_UP, B.CAMERA_LEFT, B.CAMERA_DOWN, B.CAMERA_RIGHT]],
@@ -13,9 +15,6 @@ const ROWS: Array[Array] = [
 	["Dodge / tech", [B.DODGE]],
 	["Guard (hold) / Parry (tap)", [B.GUARD]],
 	["Grab / grab tech", [B.GRAB]],
-	["Ability 1", [B.ABILITY_1]],
-	["Ability 2", [B.ABILITY_2]],
-	["Ability 3", [B.ABILITY_3]],
 	["Super / Soul Burst (in hitstun)", [B.SUPER]],
 	["Lock-on / switch target", [B.LOCK_ON]],
 	["Pause", [B.PAUSE]],
@@ -40,17 +39,27 @@ func _ready() -> void:
 	var bindings := {}
 	for binding in B.gameplay():
 		bindings[binding.action] = binding
-	for row in ROWS:
+	for row in _rows():
 		var actions: Array = row[1]
 		grid.add_child(make_label(row[0], &"BodyLabel"))
 		grid.add_child(_cell(_gamepad_text(actions, bindings)))
 		grid.add_child(_cell(_keyboard_text(actions, bindings, true)))
 		grid.add_child(_cell(_keyboard_text(actions, bindings, false)))
 
-	page.add_child(make_label("Gamepad abilities: hold LT / L2 and press X, Y or B.   Menus: A / Enter to choose, B / Esc to go back.", &"SubtleLabel"))
+	page.add_child(make_label("Menus: A / Enter to choose, B / Esc to go back.", &"SubtleLabel"))
 	_back = make_button("Back", go_back)
 	_back.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 	page.add_child(_back)
+
+
+static func _rows() -> Array[Array]:
+	var rows: Array[Array] = []
+	for row in ROWS:
+		rows.append(row)
+		if row[0] == ABILITY_ROWS_AFTER:
+			for action in B.ability_actions():
+				rows.append([B.find(action).label, [action]])
+	return rows
 
 
 func default_focus() -> Control:

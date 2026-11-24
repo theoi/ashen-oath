@@ -46,7 +46,11 @@ func test_design_default_bindings() -> void:
 		for i in range(1, 4):
 			if row[i] != null:
 				assert_true(_contains(events, row[i]), "%s lacks %s" % [action, B.describe(row[i])])
-	assert_eq(B.ABILITY_CHORD_BASE_ACTIONS, [B.LIGHT, B.HEAVY, B.DODGE] as Array[StringName], "LT + X / Y / B")
+	assert_eq(B.ability_actions(), [B.ABILITY_1, B.ABILITY_2, B.ABILITY_3] as Array[StringName])
+	assert_eq(B.gamepad_hint(B.ABILITY_1), "LT + X  /  L2 + Square")
+	assert_eq(B.gamepad_hint(B.ABILITY_2), "LT + Y  /  L2 + Triangle")
+	assert_eq(B.gamepad_hint(B.ABILITY_3), "LT + B  /  L2 + Circle")
+	assert_eq(B.gamepad_hint(B.LIGHT), "", "plain pad buttons need no hint")
 
 
 func test_no_event_triggers_two_gameplay_actions() -> void:

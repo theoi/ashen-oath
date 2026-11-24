@@ -4,6 +4,8 @@ extends RefCounted
 ## Presentation only: never writes the sim.
 
 const _T := SimEvent.Type
+## Actions in which the sim accepts Soul Burst (Sim._reaction).
+const BURST_ACTIONS: Array[FighterState.Action] = [FighterState.Action.HITSTUN, FighterState.Action.AIR_HITSTUN, FighterState.Action.WALL_SPLAT]
 
 
 ## Fills `hud` from the sim state. Creates fighter entries on first use. `human_slots` get
@@ -37,6 +39,7 @@ static func fill(sim: Sim, hud: HudState, human_slots: Array[int] = [0]) -> HudS
 		entry.max_guard = 100.0
 		entry.guard_broken = f.guard_broken
 		entry.knocked_out = f.ko
+		entry.burst_window = not f.ko and f.action in BURST_ACTIONS
 		entry.cooldown_left.resize(f.cooldowns.size())
 		for i in f.cooldowns.size():
 			entry.cooldown_left[i] = f.cooldowns[i] / 60.0
@@ -113,18 +116,17 @@ static func _team_count(sim: Sim) -> int:
 
 
 static func _ability_names(data: FighterData) -> PackedStringArray:
-	var names := Roster.ability_names(data.id)
-	if names.size() >= 3:
-		return names
-	names = PackedStringArray()
-	for id in data.abilities:
-		names.append(String(id).capitalize())
+	var known := Roster.ability_names(data.id)
+	var names := PackedStringArray()
+	for i in data.abilities.size():
+		names.append(known[i] if i < known.size() else String(data.abilities[i]).capitalize())
 	return names
 
 
 static func _cooldown_totals(data: FighterData) -> Array[float]:
-	var totals: Array[float] = [1.0, 1.0, 1.0]
-	for i in mini(3, data.abilities.size()):
+	var totals: Array[float] = []
+	for i in data.abilities.size():
+		totals.append(1.0)
 		var move := data.move_by_id(data.abilities[i])
 		if move != null and move.cooldown > 0:
 			totals[i] = move.cooldown / 60.0

@@ -15,10 +15,13 @@ class Fighter:
 	var max_guard := 100.0
 	var guard_broken := false
 	var knocked_out := false
+	## In hitstun, air hitstun or a wall splat: Soul Burst is possible (with 50 Soul).
+	var burst_window := false
 	## Seconds until each ability slot is ready (0 = ready).
-	var cooldown_left: Array[float] = [0.0, 0.0, 0.0]
+	var cooldown_left: Array[float] = []
 	## Full cooldown per slot, in seconds.
-	var cooldown_total: Array[float] = [1.0, 1.0, 1.0]
+	var cooldown_total: Array[float] = []
+	## One per ability slot; the HUD shows as many slots as there are names.
 	var ability_names: PackedStringArray = []
 
 
