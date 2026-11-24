@@ -291,6 +291,43 @@ func test_stance_destroys_projectiles_but_not_hits_from_behind() -> void:
 	assert_ne(F.tick_of(ticks, T.HIT), -1)
 
 
+func _hit_amounts(ticks: Array[Array]) -> Array[int]:
+	var out: Array[int] = []
+	for events in ticks:
+		for e: SimEvent in events:
+			if e.type == T.HIT and e.source == 0:
+				out.append(e.amount)
+	return out
+
+
+func _settle() -> void:
+	F.until_action(sim, me, Action.IDLE)
+	F.until_action(sim, foe, Action.IDLE)
+	F.place(sim, 0, 0.0, 0.0, 0)
+	F.place(sim, 1, 0.0, 1.2, Fx.HALF_TURN)
+
+
+func test_buff_uses_count_per_cast_not_per_hit() -> void:
+	var plain := _fighter()
+	plain.parry_buff = null
+	_duel(1.2, F.config(2, plain))
+	var unbuffed := _hit_amounts(F.play(sim, [BULWARK], [0, F.L], 20))
+	_duel(1.2)
+	var ticks := F.play(sim, [BULWARK], [0, F.L], 20)
+	assert_eq(_hit_amounts(ticks), unbuffed, "Retribution (started with the buff) does not use it")
+	assert_eq(me.buffs[0].uses_left, 2)
+	_settle()
+	assert_eq(_hit_amounts(F.play(sim, F.held(WHEEL, 34), [], 34)), [25, 25, 25] as Array[int],
+			"every tick of one Cinder Wheel cast is buffed")
+	assert_eq(me.buffs[0].uses_left, 1, "one use for the whole cast")
+	_settle()
+	assert_eq(_hit_amounts(F.play(sim, [F.L], [], 8)), [31] as Array[int], "second cast: 25 × 125%")
+	assert_eq(me.buffs.size(), 1, "kept while the last cast runs")
+	_settle()
+	assert_true(me.buffs.is_empty(), "gone once the last cast is over")
+	assert_eq(_hit_amounts(F.play(sim, [F.L], [], 8)), [25] as Array[int])
+
+
 func test_move_speed_percent_scales_frames() -> void:
 	for percent: int in [200, 50]:
 		var cfg := F.config(2, _fighter())

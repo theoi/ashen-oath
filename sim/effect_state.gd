@@ -21,3 +21,5 @@ var last_hit_tick: PackedInt32Array = PackedInt32Array([0, 0, 0, 0])
 var dead: bool = false
 ## Skill slot whose cast spawned it (-1 = none), for chain skills armed by effect hits.
 var skill_slot: int = -1
+## The owner's FighterState.move_cast when it spawned.
+var cast: int = 0

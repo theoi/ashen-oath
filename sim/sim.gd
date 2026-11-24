@@ -406,6 +406,7 @@ func spawn_effect(owner: FighterState, move_index: int, effect_index: int, pos: 
 	e.age = 0
 	if owner.move_index == move_index:
 		e.skill_slot = owner.move_slot
+	e.cast = owner.move_cast
 	state.effects.append(e)
 	_emit(EventType.EFFECT_SPAWN, owner.slot, -1, ed.id, pos, e.id).cue = ed.cue
 	return e
@@ -932,6 +933,7 @@ func start_move(f: FighterState, move_index: int, bit: int = 0) -> void:
 	f.move_frame = 1
 	f.move_button = bit
 	f.move_contact = 0
+	f.move_cast += 1
 	f.move_hit_masks.fill(0)
 	f.charge = 0
 	f.charging = false
@@ -1344,6 +1346,7 @@ func apply_buff(f: FighterState, data: BuffData, source: int) -> void:
 	buff.source = source
 	buff.ticks_left = data.duration
 	buff.uses_left = data.uses
+	buff.after_cast = f.move_cast
 	buff.damage_bonus_percent = data.damage_bonus_percent
 	buff.speed_bonus_percent = data.speed_bonus_percent
 	f.buffs.append(buff)
@@ -2544,13 +2547,13 @@ func _try_stance(c: Contact) -> bool:
 		a.move_contact = maxi(a.move_contact, 1)
 	_gain_soul(v, rules.counter_soul * 100)
 	var data := fighter_data[v.slot]
-	if data.parry_buff != null:
-		apply_buff(v, data.parry_buff, -1)
 	var counter := data.find_move(move.counter_move)
 	if counter >= 0:
 		var slot := v.move_slot
 		start_move(v, counter, v.move_button)
 		v.move_slot = slot
+	if data.parry_buff != null:
+		apply_buff(v, data.parry_buff, -1)
 	v.hitstop = hitstop
 	return true
 
@@ -2616,7 +2619,7 @@ func _hit_damage(c: Contact) -> int:
 	if c.counter:
 		damage = damage * rules.counter_damage_percent / 100
 	if a != null:
-		damage = damage * (100 + _use_damage_buffs(a)) / 100
+		damage = damage * (100 + _use_damage_buffs(a, c.effect.cast if c.effect != null else a.move_cast)) / 100
 		var hook := traits[a.slot]
 		if hook != null:
 			damage = damage * hook.damage_percent(self, a, v, c.move, c.hit) / 100
@@ -2911,21 +2914,33 @@ func _ko(f: FighterState) -> void:
 	_emit(EventType.KO, f.last_attacker, f.slot, &"", f.pos, 0)
 
 
-## Sums active damage buffs and spends their uses.
-func _use_damage_buffs(f: FighterState) -> int:
+## Sums the damage buffs that apply to a hit of `cast`; the first hit of each cast spends a use.
+func _use_damage_buffs(f: FighterState, cast: int) -> int:
 	var total := 0
-	var i := 0
-	while i < f.buffs.size():
-		var buff := f.buffs[i]
-		if buff.damage_bonus_percent != 0:
-			total += buff.damage_bonus_percent
-			if buff.uses_left > 0:
-				buff.uses_left -= 1
-				if buff.uses_left == 0:
-					f.buffs.remove_at(i)
-					continue
-		i += 1
+	for buff in f.buffs:
+		if buff.damage_bonus_percent == 0:
+			continue
+		var limited := buff.uses_left > 0 or buff.spent
+		if limited and cast <= buff.after_cast:
+			continue
+		if limited and cast != buff.last_cast:
+			if buff.spent:
+				continue
+			buff.last_cast = cast
+			buff.uses_left -= 1
+			buff.spent = buff.uses_left == 0
+		total += buff.damage_bonus_percent
 	return total
+
+
+## Whether `f`'s move `cast` is still running or has live effects.
+func _cast_live(f: FighterState, cast: int) -> bool:
+	if f.action == Action.ATTACK and f.move_cast == cast:
+		return true
+	for e in state.effects:
+		if e.owner == f.slot and e.cast == cast and not e.dead:
+			return true
+	return false
 
 
 ## Adds Soul in hundredths, capped, with a SOUL_FULL event when it fills.
@@ -2994,7 +3009,7 @@ func _post_tick(f: FighterState) -> void:
 	while i < f.buffs.size():
 		var buff := f.buffs[i]
 		buff.ticks_left -= 1
-		if buff.ticks_left <= 0:
+		if buff.ticks_left <= 0 or (buff.spent and not _cast_live(f, buff.last_cast)):
 			f.buffs.remove_at(i)
 		else:
 			i += 1

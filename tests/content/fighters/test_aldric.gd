@@ -128,7 +128,8 @@ func test_oathkeeper_parry_ignites_the_next_hit() -> void:
 	var hit := _hits_by(after, &"aldric_l1")
 	assert_eq(hit.size(), 1)
 	assert_eq(hp_before - foe.hp, 35 * 130 / 100, "+30% on the next hit")
-	assert_true(me.buffs.is_empty(), "the ignite is spent after one hit")
+	F.until_action(sim, me, Action.IDLE)
+	assert_true(me.buffs.is_empty(), "the ignite is spent after one cast")
 
 
 func test_pyre_is_invincible_through_startup_and_launches() -> void:
