@@ -1,30 +1,35 @@
 class_name MoveList
 extends RefCounted
 ## Builds a fighter's move list from its FighterData and MoveData, so it stays correct as
-## content changes. Names and one-line descriptions of abilities, trait and super come from
-## Roster; everything else (strings, charge, launches, armor, cooldowns...) from the data.
+## content changes. Names and one-line descriptions of skills, trait and awakening come from
+## Roster; everything else (skill type, follow-ups, charge, armor, cooldowns...) from the data.
+## Only moves the player can input with the default bindings (design-lost-ark §2) are listed.
 ##
 ## Inputs are Arrays of DefaultBindings actions (drawn as glyphs) and context Strings.
 
 const B := preload("res://ui/input/default_bindings.gd")
 
-const BASICS := "Attacks"
-const ABILITIES := "Abilities"
-const SOUL := "Trait, super and Soul"
+const BASICS := "Basic attack"
+const ABILITIES := "Skills"
+const SOUL := "Awakening and Soul"
 const DEFENSE := "Movement and defense"
 
-## How deep string chains are followed (L L L H would be 4).
-const MAX_STRING := 4
+## MoveData.skill_type names, in enum order (TAP, HOLD, CHARGE, COMBO, CHAIN, DASH_STRIKE, STANCE).
+const SKILL_TYPES: PackedStringArray = ["Tap", "Hold", "Charge", "Combo", "Chain", "Dash-strike", "Stance"]
+## How far a basic chain is followed.
+const MAX_CHAIN := 6
 
 
 class Entry:
 	var section := ""
 	var name := ""
-	## Shown before the inputs, e.g. "Running", "Hold", "In hitstun".
+	## Shown before the inputs, e.g. "Charge", "Knocked down", "In hitstun".
 	var context := ""
-	## DefaultBindings actions (and InputGlyphs.MOVE / CAMERA) in press order.
+	## DefaultBindings actions (and InputGlyphs.MOVE / AIM) in press order.
 	var inputs: Array[StringName] = []
 	var detail := ""
+	## A ⚡Counter move: interrupts an enemy's counter window (blue flash).
+	var counter := false
 
 	func _init(p_section: String, p_name: String, p_inputs: Array[StringName], p_detail: String, p_context: String = "") -> void:
 		section = p_section
@@ -38,79 +43,110 @@ static func build(data: FighterData, rules: CombatRules = null) -> Array[Entry]:
 	if rules == null:
 		rules = CombatRules.new()
 	var entries: Array[Entry] = []
-	_strings(data, data.light, [B.LIGHT], entries, [])
-	_strings(data, data.heavy, [B.HEAVY], entries, [])
-	_single(data, data.run_light, "Running attack", [B.LIGHT], "Running", entries)
-	_strings(data, data.air_light, [B.LIGHT], entries, [], "In the air")
-	_single(data, data.air_heavy, "Air heavy", [B.HEAVY], "In the air", entries)
-	_single(data, data.grab, "Grab", [B.GRAB], "", entries, "Throw that beats guard; loses to attacks, jumps and dodges.")
-	_single(data, data.getup_attack, "Get-up attack", [B.LIGHT], "Getting up", entries)
-
 	var info := Roster.fighter(data.id)
+	var skill_kit := data.dash != null
+
+	_basic_chain(data, entries)
+	_single(data, data.run_light, "Running attack", [B.BASIC], "Running", entries)
+	_single(data, data.getup_attack, "Get-up attack", [B.BASIC], "Knocked down", entries)
+
 	var names: Array = info.get("abilities", [])
 	var details: Array = info.get("ability_details", [])
 	for i in data.abilities.size():
 		var move := data.move_by_id(data.abilities[i])
 		if move == null:
 			continue
-		var name: String = names[i] if i < names.size() else String(move.id).capitalize()
+		var name: String = names[i] if i < names.size() else _title(move.id)
 		var line: String = details[i] if i < details.size() else ""
-		entries.append(Entry.new(ABILITIES, name, [B.ability_action(i)], _sentence(line, tags(move))))
+		var extra := tags(move)
+		var follow := _follow_text(data, move)
+		if not follow.is_empty():
+			extra.insert(0, follow)
+		var entry := Entry.new(ABILITIES, name, [B.ability_action(i)], _sentence(line, extra), skill_type(move))
+		entry.counter = is_counter(move)
+		entries.append(entry)
 
+	var awakening := data.move_by_id(data.super_move)
+	if awakening != null:
+		var cost := awakening.soul_cost if awakening.soul_cost > 0 else rules.super_cost
+		var awakening_name: String = info.get("super", "")
+		entries.append(Entry.new(SOUL, awakening_name if not awakening_name.is_empty() else "Awakening", [B.AWAKEN],
+				_sentence(info.get("super_detail", ""), tags(awakening)), "%d Soul" % cost))
 	var trait_text: String = info.get("trait", "")
 	if not trait_text.is_empty():
 		var colon := trait_text.find(":")
 		var trait_detail := trait_text.substr(colon + 1).strip_edges() if colon > 0 else trait_text
 		entries.append(Entry.new(SOUL, trait_text.substr(0, colon) if colon > 0 else "Trait", [],
 				trait_detail.left(1).to_upper() + trait_detail.substr(1), "Trait"))
-	var super_move := data.move_by_id(data.super_move)
-	if super_move != null:
-		var cost := super_move.soul_cost if super_move.soul_cost > 0 else rules.super_cost
-		var super_name: String = info.get("super", "")
-		entries.append(Entry.new(SOUL, super_name if not super_name.is_empty() else "Super", [B.SUPER],
-				_sentence(info.get("super_detail", ""), tags(super_move)), "%d Soul" % cost))
-	entries.append(Entry.new(SOUL, "Soul Burst", [B.SUPER],
-			"Breaks a combo and pushes everyone near you away. Costs %d Soul; not while guard-broken or thrown." % rules.burst_cost,
+	entries.append(Entry.new(SOUL, "Soul Burst", [B.DASH if skill_kit else B.AWAKEN],
+			"Breaks a combo and pushes everyone near you away. Costs %d Soul." % rules.burst_cost,
 			"In hitstun"))
 	entries.append(Entry.new(SOUL, "Gaining Soul", [],
-			"Deal and take damage, parry (+%d) and perfect dodge (+%d). Soul carries over between rounds." % [rules.parry_soul, rules.perfect_dodge_soul]))
+			"Deal and take damage, perfect dashes (+%d) and ⚡Counters. Soul carries over between rounds." % rules.perfect_dodge_soul))
 
-	entries.append(Entry.new(DEFENSE, "Move", [InputGlyphs.MOVE], "Relative to the camera. Attacks track the enemy your stick points at."))
-	entries.append(Entry.new(DEFENSE, "Jump", [B.JUMP], ""))
-	entries.append(Entry.new(DEFENSE, "Guard", [B.GUARD],
-			"Blocks hits from the front. Blocking drains the guard gauge; when it empties your guard breaks.", "Hold"))
-	entries.append(Entry.new(DEFENSE, "Parry", [B.GUARD],
-			"Tap just before a hit lands (%d-frame window): no damage, the attacker staggers, +%d Soul. Works on projectiles." % [data.parry_window, rules.parry_soul],
-			"Tap"))
-	entries.append(Entry.new(DEFENSE, "Dodge roll", [B.DODGE],
-			"Rolls toward the stick (backward if neutral), invincible frames %d-%d." % [data.dodge_invuln_start, data.dodge_invuln_end]))
-	entries.append(Entry.new(DEFENSE, "Air dodge", [B.DODGE], "Once per jump, briefly invincible.", "In the air"))
-	entries.append(Entry.new(DEFENSE, "Tech", [B.DODGE],
-			"Just before landing from a knockdown: roll to your feet. In air hitstun: recover in the air.", "Knocked down"))
-	entries.append(Entry.new(DEFENSE, "Grab tech", [B.GRAB], "Press right as you are grabbed to break free.", "Grabbed"))
+	entries.append(Entry.new(DEFENSE, "Move", [InputGlyphs.MOVE], ""))
+	entries.append(Entry.new(DEFENSE, "Aim", [InputGlyphs.AIM],
+			"Skills and basics snap to the aim on their first frame. Without aim they go toward the nearest enemy."))
+	if data.dash != null:
+		entries.append(Entry.new(DEFENSE, "Dash", [B.DASH], _dash_text(data.dash)))
+		entries.append(Entry.new(DEFENSE, "Quick rise", [B.DASH], "Roll to your feet, invincible. Uses a dash charge.", "Knocked down"))
+	else:
+		entries.append(Entry.new(DEFENSE, "Dodge roll", [B.DASH],
+				"Rolls toward the stick (backward if neutral), invincible frames %d-%d." % [data.dodge_invuln_start, data.dodge_invuln_end]))
+		entries.append(Entry.new(DEFENSE, "Tech", [B.DASH], "Just before landing from a knockdown: roll to your feet.", "Knocked down"))
 	entries.append(Entry.new(DEFENSE, "Lock-on", [B.LOCK_ON],
-			"Hard lock: face and circle your target. Press again to switch target in 1v2; after the last it unlocks."))
-	entries.append(Entry.new(DEFENSE, "Camera", [InputGlyphs.CAMERA], ""))
+			"Aim at one enemy; press again for the next, and after the last it unlocks."))
+	if B.find(B.TARGET_NEXT) != null:
+		entries.append(Entry.new(DEFENSE, "Next target", [B.TARGET_NEXT], "Switch target and stay locked."))
 	return entries
+
+
+## The skill type label: MoveData.skill_type when set, else read from the move (TAP is the
+## default, so older kits get a type from their charge, follow-ups, stance, hold or aim).
+static func skill_type(move: MoveData) -> String:
+	if move.skill_type != MoveData.SkillType.TAP:
+		return SKILL_TYPES[move.skill_type]
+	if move.chargeable:
+		return SKILL_TYPES[MoveData.SkillType.CHARGE]
+	if not move.follow_up.is_empty():
+		return SKILL_TYPES[MoveData.SkillType.COMBO]
+	if not move.chain_move.is_empty():
+		return SKILL_TYPES[MoveData.SkillType.CHAIN]
+	if move.stance_end > 0:
+		return SKILL_TYPES[MoveData.SkillType.STANCE]
+	if move.hold_end > 0:
+		return SKILL_TYPES[MoveData.SkillType.HOLD]
+	if move.aim == MoveData.Aim.DASH_TO:
+		return SKILL_TYPES[MoveData.SkillType.DASH_STRIKE]
+	return SKILL_TYPES[MoveData.SkillType.TAP]
+
+
+## True when any hit of the move is a ⚡Counter hit.
+static func is_counter(move: MoveData) -> bool:
+	for hit in _hits(move):
+		if hit.counter:
+			return true
+	return false
 
 
 ## Short traits of a move from its data: charge, reactions, armor, invincibility, cooldown.
 static func tags(move: MoveData) -> PackedStringArray:
 	var out := PackedStringArray()
+	if is_counter(move):
+		out.append("⚡counter")
 	if move.chargeable:
-		out.append("hold to charge" + (", breaks guard at full charge" if move.full_charge_guard_break else ""))
-	var hits: Array[HitData] = []
-	for box in move.hitboxes:
-		if box.hit != null:
-			hits.append(box.hit)
+		if move.perfect_end > 0:
+			out.append("hold to charge, release in the perfect zone for a bonus")
+		else:
+			out.append("hold to charge" + (", breaks guard at full charge" if move.full_charge_guard_break else ""))
+	if move.hold_end > 0:
+		out.append("hold to keep going")
 	var projectile := false
 	for effect in move.effects:
-		if effect.hit != null:
-			hits.append(effect.hit)
 		if effect.projectile and effect.speed > 0.0:
 			projectile = true
 	var seen := PackedStringArray()
-	for hit in hits:
+	for hit in _hits(move):
 		var words := PackedStringArray()
 		match hit.reaction:
 			HitData.Reaction.LAUNCH:
@@ -125,8 +161,6 @@ static func tags(move: MoveData) -> PackedStringArray:
 			words.append("wall splat")
 		if hit.unblockable:
 			words.append("unblockable")
-		if hit.guard_break:
-			words.append("breaks guard")
 		if hit.otg:
 			words.append("hits downed foes")
 		for word in words:
@@ -137,12 +171,14 @@ static func tags(move: MoveData) -> PackedStringArray:
 		out.append("projectile")
 	if move.teleport != null:
 		out.append("teleport")
+	if move.push_immune_end > 0:
+		out.append("unstoppable (push immune)")
+	elif move.flinch_immune_end > 0:
+		out.append("flinch immune")
 	if move.armor_hits > 0:
 		out.append("armor (%d hit%s)" % [move.armor_hits, "" if move.armor_hits == 1 else "s"])
 	if move.invuln_end > 0:
 		out.append("invincible frames %d-%d" % [move.invuln_start, move.invuln_end])
-	if move.air_ok:
-		out.append("usable in the air")
 	if move.cooldown > 0:
 		out.append("%s s cooldown" % String.num(move.cooldown / 60.0, 1).trim_suffix(".0"))
 	return out
@@ -152,28 +188,22 @@ static func sections() -> PackedStringArray:
 	return [BASICS, ABILITIES, SOUL, DEFENSE]
 
 
-static func _strings(data: FighterData, move_id: StringName, path: Array[StringName], out: Array[Entry],
-		visited: Array[StringName], context: String = "") -> void:
-	var move := data.move_by_id(move_id)
-	if move == null or move_id in visited or path.size() > MAX_STRING:
+## The basic attack chain (following next_light): one entry with its hit count and traits.
+static func _basic_chain(data: FighterData, out: Array[Entry]) -> void:
+	var move := data.move_by_id(data.light)
+	if move == null:
 		return
-	var seen: Array[StringName] = visited.duplicate()
-	seen.append(move_id)
-	var detail := _sentence("", tags(move))
-	var continues := not move.next_light.is_empty() or not move.next_heavy.is_empty()
-	if path.size() == 1 and detail.is_empty() and context.is_empty():
-		detail = "Fastest attack; starts your strings." if path[0] == B.LIGHT else ""
-	# Middle steps of a string with nothing special about them would only repeat the full string.
-	if path.size() == 1 or not detail.is_empty() or not continues:
-		out.append(Entry.new(BASICS, _string_name(path), path, detail, context))
-	if not move.next_light.is_empty():
-		var next: Array[StringName] = path.duplicate()
-		next.append(B.LIGHT)
-		_strings(data, move.next_light, next, out, seen, context)
-	if not move.next_heavy.is_empty():
-		var next: Array[StringName] = path.duplicate()
-		next.append(B.HEAVY)
-		_strings(data, move.next_heavy, next, out, seen, context)
+	var seen: Array[StringName] = []
+	var extra := PackedStringArray()
+	while move != null and not move.id in seen and seen.size() < MAX_CHAIN:
+		seen.append(move.id)
+		for tag in tags(move):
+			if not tag in extra:
+				extra.append(tag)
+		move = data.move_by_id(move.next_light) if not move.next_light.is_empty() else null
+	var line := "A %d-hit chain; hold to repeat. Skills and the dash cancel it at any time." % seen.size() \
+			if seen.size() > 1 else "Fastest attack. Skills and the dash cancel it at any time."
+	out.append(Entry.new(BASICS, "Basic attack", [B.BASIC], _sentence(line, extra)))
 
 
 static func _single(data: FighterData, move_id: StringName, name: String, inputs: Array[StringName], context: String,
@@ -183,13 +213,34 @@ static func _single(data: FighterData, move_id: StringName, name: String, inputs
 		out.append(Entry.new(BASICS, name, inputs, _sentence(line, tags(move)), context))
 
 
-## "Light", "Heavy", or a string like "Light, light, heavy".
-static func _string_name(path: Array[StringName]) -> String:
-	var words := PackedStringArray()
-	for action in path:
-		words.append("light" if action == B.LIGHT else "heavy")
-	var name := ", ".join(words)
-	return name.left(1).to_upper() + name.substr(1)
+## "Press again: Brand Rise II" (combo) or "Then within 3 s: Rend Ignition" (chain), or "".
+static func _follow_text(data: FighterData, move: MoveData) -> String:
+	if not move.follow_up.is_empty():
+		return "press again for %s" % _title(move.follow_up)
+	if not move.chain_move.is_empty():
+		return "on hit, press again within %s s for %s" % [String.num(move.chain_frames / 60.0, 1).trim_suffix(".0"), _title(move.chain_move)]
+	return ""
+
+
+static func _dash_text(dash: DashData) -> String:
+	return "%s m, invincible frames %d-%d. %d charges, each back after %s s. Cancels basics and most skills." % [
+		String.num(dash.distance, 1).trim_suffix(".0"), dash.invuln_start, dash.invuln_end,
+		dash.charges, String.num(dash.recharge_frames / 60.0, 1).trim_suffix(".0")]
+
+
+static func _hits(move: MoveData) -> Array[HitData]:
+	var hits: Array[HitData] = []
+	for box in move.hitboxes:
+		if box.hit != null:
+			hits.append(box.hit)
+	for effect in move.effects:
+		if effect.hit != null:
+			hits.append(effect.hit)
+	return hits
+
+
+static func _title(id: StringName) -> String:
+	return String(id).capitalize()
 
 
 ## A description line plus the data tags: "Rising slash. Launches, 4 s cooldown."

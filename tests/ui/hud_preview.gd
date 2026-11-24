@@ -26,9 +26,9 @@ func _ready() -> void:
 	state.round_wins = [1, 0]
 	state.seconds_left = 47.0
 	var rows: Array[Array] = [
-		["Aldric Vane", 0, 640.0, 1000.0, 58.0, 72.0, [0.0, 2.4, 5.1], PackedStringArray(["Oathfire Lunge", "Brand Rise", "Bulwark Charge"])],
-		["Morrigan", 1, 310.0, 900.0, 100.0, 40.0, [0.0, 0.0, 0.0], PackedStringArray()],
-		["Gorrath", 1, 900.0, 1150.0, 24.0, 18.0, [0.0, 0.0, 0.0], PackedStringArray()],
+		["Aldric Vane", 0, 960.0, 1500.0, 100.0, 72.0],
+		["Morrigan", 1, 310.0, 900.0, 100.0, 40.0],
+		["Gorrath", 1, 900.0, 1150.0, 24.0, 18.0],
 	]
 	for slot in rows.size():
 		var row := rows[slot]
@@ -42,11 +42,49 @@ func _ready() -> void:
 		fighter.guard = row[5]
 		fighter.guard_broken = slot == 2
 		fighter.is_player = slot == 0
-		fighter.cooldown_left.assign(row[6])
-		fighter.cooldown_total = [5.0, 4.0, 6.0]
-		fighter.ability_names = row[7]
+		if fighter.is_player:
+			_pilot_skills(fighter)
 		state.fighters.append(fighter)
 	hud.apply(state)
 	hud.on_event({"type": MatchEvents.PARRY, "slot": 0})
 	hud.on_event({"type": MatchEvents.GUARD_BREAK, "slot": 2})
 	hud.announce("Counter", "Aldric breaks Gorrath's guard", 30.0)
+
+
+## Aldric's pilot kit (design-lost-ark §4) mid-fight: a chain follow-up waiting on R, Verdict
+## charging inside its perfect zone, one dash charge recharging, full Soul.
+func _pilot_skills(fighter: HudState.Fighter) -> void:
+	var rows: Array[Array] = [
+		["Oathfire Lunge", HudState.Skill.Type.DASH_STRIKE, true, 0.0, 5.0],
+		["Brand Rise", HudState.Skill.Type.COMBO, false, 3.6, 6.0],
+		["Flame Rend", HudState.Skill.Type.CHAIN, true, 8.0, 8.0],
+		["Bulwark", HudState.Skill.Type.STANCE, false, 0.0, 8.0],
+		["Cinder Wheel", HudState.Skill.Type.HOLD, false, 6.2, 10.0],
+		["Verdict", HudState.Skill.Type.CHARGE, false, 0.0, 12.0],
+	]
+	for i in rows.size():
+		var row := rows[i]
+		var skill := HudState.Skill.new()
+		skill.name = row[0]
+		skill.type = row[1]
+		skill.counter = row[2]
+		skill.cooldown_left = row[3]
+		skill.cooldown_total = row[4]
+		skill.action = DefaultBindings.ability_action(i)
+		fighter.skills.append(skill)
+	fighter.skills[2].follow_name = "Rend Ignition"
+	fighter.skills[2].follow_left = 1.8
+	fighter.skills[2].follow_total = 3.0
+	var verdict := fighter.skills[5]
+	verdict.charging = true
+	verdict.charge = 0.78
+	verdict.charge_levels = PackedFloat32Array([0.3, 0.7])
+	verdict.perfect_from = 0.7
+	verdict.perfect_to = 0.9
+	fighter.awakening_name = "Pyre of the Forsworn"
+	fighter.awakening_action = DefaultBindings.SUPER
+	fighter.dash_max = 2
+	fighter.dash_charges = 1
+	fighter.dash_recharge = 0.55
+	fighter.dash_action = DefaultBindings.DODGE
+	fighter.burst_on_dash = true

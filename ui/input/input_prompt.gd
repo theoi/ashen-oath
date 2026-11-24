@@ -2,7 +2,7 @@ class_name InputPrompt
 extends HBoxContainer
 ## Shows the button(s) for an action in the active control scheme, as glyphs, and follows
 ## ActiveDevice when the player switches device. Set `action` (a DefaultBindings action, or
-## InputGlyphs.MOVE / CAMERA).
+## InputGlyphs.MOVE / AIM).
 
 @export var action: StringName = &"":
 	set(value):
@@ -12,11 +12,14 @@ extends HBoxContainer
 
 ## Glyph height in pixels.
 @export var glyph_size := 30.0
+## Only the first of several alternative buttons.
+@export var primary_only := false
 
 
-func _init(p_action: StringName = &"", p_size: float = 30.0) -> void:
+func _init(p_action: StringName = &"", p_size: float = 30.0, p_primary_only: bool = false) -> void:
 	action = p_action
 	glyph_size = p_size
+	primary_only = p_primary_only
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	alignment = BoxContainer.ALIGNMENT_CENTER
 	add_theme_constant_override("separation", 2)
@@ -29,7 +32,7 @@ func _ready() -> void:
 
 ## The prompt as text (for tests and screen readers), e.g. "LT + X".
 func describe() -> String:
-	return InputGlyphs.text(action, ActiveDevice.scheme, ActiveDevice.pad_family)
+	return InputGlyphs.text(action, ActiveDevice.scheme, ActiveDevice.pad_family, primary_only)
 
 
 func _rebuild() -> void:
@@ -38,7 +41,7 @@ func _rebuild() -> void:
 		child.queue_free()
 	if action.is_empty():
 		return
-	for part: Variant in InputGlyphs.parts(action, ActiveDevice.scheme, ActiveDevice.pad_family):
+	for part: Variant in InputGlyphs.parts(action, ActiveDevice.scheme, ActiveDevice.pad_family, primary_only):
 		if part is Texture2D:
 			var glyph := TextureRect.new()
 			glyph.texture = part

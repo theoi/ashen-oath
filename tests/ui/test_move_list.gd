@@ -15,8 +15,13 @@ func test_move_list_generates_for_every_fighter() -> void:
 			assert_has(MoveList.sections(), entry.section)
 			for action in entry.inputs:
 				assert_false(InputGlyphs.parts(action, ActiveDevice.Scheme.GAMEPAD, 0).is_empty(), "%s: %s input" % [id, entry.name])
-		for universal: String in ["Light", "Heavy", "Grab", "Guard", "Parry", "Dodge roll", "Lock-on", "Soul Burst"]:
+		for universal: String in ["Basic attack", "Soul Burst", "Move", "Aim", "Lock-on"]:
 			assert_has(names, universal, "%s lists %s" % [id, universal])
+		assert_true("Dash" in names or "Dodge roll" in names, "%s lists its dash or roll" % id)
+		for entry in entries:
+			for action in entry.inputs:
+				if action != InputGlyphs.MOVE and action != InputGlyphs.AIM:
+					assert_true(InputMap.has_action(action), "%s: %s uses a bound action (%s)" % [id, entry.name, action])
 		var abilities := entries.filter(func(e: MoveList.Entry) -> bool: return e.section == MoveList.ABILITIES)
 		assert_eq(abilities.size(), data.abilities.size(), "%s: one entry per ability" % id)
 
@@ -28,18 +33,34 @@ func test_entries_come_from_the_data() -> void:
 	for entry in entries:
 		if not by_name.has(entry.name):
 			by_name[entry.name] = entry
-	var launcher: MoveList.Entry = by_name.get("Light, light, heavy")
-	assert_not_null(launcher, "the L L H string is found by following next_light / next_heavy")
-	if launcher != null:
-		assert_true(launcher.detail.contains("Launches"), launcher.detail)
+	var basic: MoveList.Entry = by_name.get("Basic attack")
+	var chain := 0
+	var step := data.move_by_id(data.light)
+	while step != null and chain < MoveList.MAX_CHAIN:
+		chain += 1
+		step = data.move_by_id(step.next_light) if not step.next_light.is_empty() else null
+	if chain > 1:
+		assert_true(basic.detail.contains("%d-hit chain" % chain), basic.detail)
 	var lunge: MoveList.Entry = by_name.get("Oathfire Lunge")
 	assert_not_null(lunge)
 	if lunge != null:
 		var move := data.move_by_id(data.abilities[0])
 		assert_true(lunge.detail.contains("%s s cooldown" % String.num(move.cooldown / 60.0, 1).trim_suffix(".0")), lunge.detail)
-		assert_eq(lunge.inputs, [DefaultBindings.ABILITY_1] as Array[StringName])
-	var parry: MoveList.Entry = by_name.get("Parry")
-	assert_true(parry.detail.contains("%d-frame" % data.parry_window), "Aldric's wider parry window comes from his data")
+		assert_eq(lunge.inputs, [DefaultBindings.SKILL_1] as Array[StringName])
+		assert_has(MoveList.SKILL_TYPES, lunge.context, "every skill shows its type")
+
+
+func test_skill_types_come_from_the_move_data() -> void:
+	var move := MoveData.new()
+	assert_eq(MoveList.skill_type(move), "Tap")
+	move.chargeable = true
+	assert_eq(MoveList.skill_type(move), "Charge")
+	move.chargeable = false
+	move.aim = MoveData.Aim.DASH_TO
+	assert_eq(MoveList.skill_type(move), "Dash-strike")
+	if &"skill_type" in move:
+		move.set(&"skill_type", MoveList.SKILL_TYPES.find("Stance"))
+		assert_eq(MoveList.skill_type(move), "Stance", "the declared type wins")
 
 
 func test_any_number_of_ability_slots_is_listed() -> void:

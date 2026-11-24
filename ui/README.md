@@ -14,22 +14,24 @@ godot --headless --path . -s "$PWD/tools/gen_input_map.gd"
 
 `tests/ui/test_input_map.gd` fails if `project.godot` and the table drift apart.
 
-Gameplay actions: `move_left/right/forward/back`, `camera_left/right/up/down`, `attack_light`,
-`attack_heavy`, `jump`, `dodge`, `guard`, `grab`, `ability_1/2/3`, `ability_modifier`,
-`super`, `lock_on`, `pause`. Menus use Godot's `ui_*` actions, extended with gamepad A
-(accept), B (back) and the shoulder buttons (next/previous tab).
+Bindings follow design-lost-ark §2 (no chords). Gameplay actions, with the old ids kept so
+content and other code stay valid: `move_left/right/forward/back`, `camera_left/right/up/down`
+(aim: right stick or arrow keys; `AIM_*` constants), `attack_light` (basic, `BASIC`), `dodge`
+(dash, `DASH`), `ability_1`..`ability_6` (skills, `SKILL_1..6`), `super` (awakening,
+`AWAKEN`), `lock_on`, `target_next`, `pause`. Heavy, jump, guard and grab have no player
+bindings. Menus use Godot's `ui_*` actions, extended with gamepad A (accept), B (back) and the
+shoulder buttons (next/previous tab).
 
-Things input capture handles itself, because they are not plain actions:
-- **Mouse camera:** `InputEventMouseMotion` while the mouse is captured.
-- **Gamepad abilities** are chords (`Binding.gamepad_chord`, LT + X / Y / B by default). Use
-  `DefaultBindings.held_ability_chord()` and skip light / heavy / dodge when
-  `DefaultBindings.is_chord_consumed(action)` is true.
-- **Right-stick flick** to switch target: watch the `camera_*` axis strength.
+`presentation/input/device_input_source.gd` turns these into `SimInput` frames: buttons, the
+camera-relative move stick, and the aim (mouse cursor ray-cast onto the floor, else the aim
+actions, else the move direction). It sends the raw aim; aim assist and lock-on are the sim's.
+`Binding.gamepad_chord` still supports pad chords (none by default) through
+`DefaultBindings.held_ability_chord()` / `is_chord_consumed(action)`.
 
 Ability slots are the table's `ability_1`, `ability_2`, ... actions
 (`DefaultBindings.ability_actions()` / `ability_action(slot)`). The controls screen, HUD,
 move list and prompts all read slots from there and from the fighter's `abilities`, so a
-different slot count or different chords is a table change, not a UI change.
+different slot count is a table change, not a UI change.
 
 ### Prompts
 
@@ -44,10 +46,12 @@ different slot count or different chords is a table change, not a UI change.
 ## Move list
 
 `movelist/move_list.gd` (`MoveList.build(data, rules)`) generates a fighter's move list from
-its `FighterData` / `MoveData`: strings by following `next_light` / `next_heavy`, special
-attacks, every ability slot, trait, super and Burst costs, defense with the fighter's own
-parry and dodge frames. Traits such as "launches", "armor (1 hit)" or "4 s cooldown" come
-from the move data; only names and one-line descriptions come from `Roster`. The screen
+its `FighterData` / `MoveData`, listing only what the default bindings can input: the basic
+chain (following `next_light`), every skill slot with its type (tap, hold, charge, combo,
+chain, dash-strike, stance: `MoveData.skill_type`, else read from the move), its follow-up,
+⚡Counter mark and traits, the awakening and Burst costs, and dash (from `FighterData.dash`) or
+the old roll. Traits such as "launches", "flinch immune" or "4 s cooldown" come from the move
+data; only names and one-line descriptions come from `Roster`. The screen
 (`movelist/move_list_screen.tscn`, `GameFlow.open_move_list(id)`) is reachable from the pause
 menu and from versus select, and redraws its inputs when the device changes.
 
@@ -165,7 +169,24 @@ Soul with the Burst mark, ability cooldowns, timer, round pips) and announcement
 callouts from `MatchEvents`. `hud/sim_hud.gd` (`SimHud`) fills the HudState from the sim
 and translates `SimEvent`s into `MatchEvents`, which also drive sounds
 (`presentation/audio/match_sounds.gd`). Team 0 is on the left; extra fighters on a side get
-compact plates (1v2). The ability bar (`hud/ability_bar.gd`) shows one slot per ability with
-its button for the active device, lit when ready (cooldown over; super at 100 Soul; Soul
-Burst at 50 Soul while in hitstun). Preview a mid-fight HUD:
+compact plates (1v2). The skill bar (`hud/skill_bar.gd`, bottom center, design-lost-ark
+§1.11) shows dash pips, one `SkillSlotView` per skill and the awakening with its Soul ring.
+Each slot has its button for the active device, a radial cooldown sweep with seconds left, a
+flash and chime when ready, grey-out when unusable, a ⚡ mark on counter skills, a draining
+border and the follow-up's name while a combo or chain part waits, and a charge bar with
+level marks and the perfect zone. Soul Burst lights on the dash (skill-kit fighters) or the
+awakening button. SimHud reads the newer sim fields (`dash_charges`, `skill_next`,
+`skill_window`, `charge_levels`, `perfect_start/end`) when they exist. Preview a mid-fight HUD:
 `SCENE=res://tests/ui/hud_preview.tscn tools/capture_screenshot.sh /tmp/hud.png 40`.
+
+## Feel tuning (pilot)
+
+`tuning/feel_tuning.gd` (autoload `FeelTuning`) holds the design-lost-ark §1.13 values with
+their defaults, persisted in `user://feel_tuning.cfg`. Presentation reads the live ones
+(`FeelTuning.value(FeelTuning.CAMERA_PITCH)`, `SHAKE_SCALE`, `RUMBLE_SCALE`, `SLOW_MOTION`,
+`CAMERA_DISTANCE / FOV / SMOOTHING / LEAD`, `flag(DAMAGE_NUMBERS)`; signal `changed`). The
+sim ones (hitstop scale, skill speed, dash distance and charges) only reach a match through
+`FeelTuning.apply_to(sim_config)` at match start, so replays record them and a running match
+stays deterministic. The hidden panel (`tuning/tuning_panel.gd`) opens with Ctrl+Shift+F,
+`?tune=1` on web or `-- --tune`, and has sliders, "Copy values" (text to paste back),
+"Restart match" and "Defaults".

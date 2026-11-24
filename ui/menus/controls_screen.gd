@@ -3,21 +3,10 @@ extends MenuScreen
 
 const B := preload("res://ui/input/default_bindings.gd")
 
-## [row label, actions]. Direction groups are summarized ("Left stick", "W A S D", "Arrow keys").
-## Ability slots are inserted after ABILITY_ROWS_AFTER from the bindings table.
-const ABILITY_ROWS_AFTER := "Grab / grab tech"
-const ROWS: Array[Array] = [
+## Direction groups, summarized in one row each ("Left stick", "W A S D", "Arrow keys").
+const GROUPS: Array[Array] = [
 	["Move", [B.MOVE_FORWARD, B.MOVE_LEFT, B.MOVE_BACK, B.MOVE_RIGHT]],
-	["Camera", [B.CAMERA_UP, B.CAMERA_LEFT, B.CAMERA_DOWN, B.CAMERA_RIGHT]],
-	["Light attack", [B.LIGHT]],
-	["Heavy attack (hold to charge)", [B.HEAVY]],
-	["Jump", [B.JUMP]],
-	["Dodge / tech", [B.DODGE]],
-	["Guard (hold) / Parry (tap)", [B.GUARD]],
-	["Grab / grab tech", [B.GRAB]],
-	["Super / Soul Burst (in hitstun)", [B.SUPER]],
-	["Lock-on / switch target", [B.LOCK_ON]],
-	["Pause", [B.PAUSE]],
+	["Aim", [B.AIM_UP, B.AIM_LEFT, B.AIM_DOWN, B.AIM_RIGHT]],
 ]
 const COLUMNS: PackedStringArray = ["", "Gamepad (Xbox / PS)", "Keyboard + mouse", "Keyboard only"]
 
@@ -52,13 +41,15 @@ func _ready() -> void:
 	page.add_child(_back)
 
 
+## [row label, actions]: the direction groups, then every other action in table order.
 static func _rows() -> Array[Array]:
-	var rows: Array[Array] = []
-	for row in ROWS:
-		rows.append(row)
-		if row[0] == ABILITY_ROWS_AFTER:
-			for action in B.ability_actions():
-				rows.append([B.find(action).label, [action]])
+	var rows: Array[Array] = GROUPS.duplicate()
+	var grouped: Array = []
+	for group in GROUPS:
+		grouped.append_array(group[1])
+	for binding in B.gameplay():
+		if not binding.action in grouped:
+			rows.append([binding.label, [binding.action]])
 	return rows
 
 
@@ -80,11 +71,9 @@ func _gamepad_text(actions: Array, bindings: Dictionary) -> String:
 	for action: StringName in actions:
 		for event: InputEvent in bindings[action].gamepad:
 			var text := B.describe(event)
-			if text.begins_with("D-pad"):
-				text = "D-pad"
 			if not text in names:
 				names.append(text)
-	return " / ".join(names)
+	return " / ".join(names) if not names.is_empty() else "—"
 
 
 func _keyboard_text(actions: Array, bindings: Dictionary, with_mouse: bool) -> String:
@@ -101,4 +90,6 @@ func _keyboard_text(actions: Array, bindings: Dictionary, with_mouse: bool) -> S
 				names.append(text)
 	if names == PackedStringArray(["Up", "Left", "Down", "Right"]):
 		return "Arrow keys"
+	if names.is_empty():
+		return "—"
 	return (" " if actions.size() > 1 else " / ").join(names)

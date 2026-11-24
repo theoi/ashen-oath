@@ -14,7 +14,7 @@ var _left: VBoxContainer
 var _right: VBoxContainer
 var _timer: Label
 var _round: Label
-var _abilities: AbilityBar
+var _skills: SkillBar
 var _announce_title: Label
 var _announce_sub: Label
 var _queue: Array[Array] = []
@@ -48,12 +48,12 @@ func _ready() -> void:
 	_round.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	center.add_child(_round)
 
-	_abilities = AbilityBar.new()
-	_abilities.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
-	_abilities.offset_left = 36.0
-	_abilities.offset_top = -130.0
-	_abilities.grow_vertical = Control.GROW_DIRECTION_BEGIN
-	add_child(_abilities)
+	_skills = SkillBar.new()
+	_skills.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM)
+	_skills.offset_bottom = -18.0
+	_skills.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	_skills.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	add_child(_skills)
 
 	var announcer := VBoxContainer.new()
 	announcer.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -85,9 +85,9 @@ func apply(state: HudState) -> void:
 	_timer.add_theme_color_override("font_color", Palette.EMBER if 0.0 <= state.seconds_left and state.seconds_left <= 10.0 else Palette.BONE)
 	_round.text = "Round %d" % state.round_number
 	var player := _player(state)
-	_abilities.visible = player != null
+	_skills.visible = player != null
 	if player != null:
-		_abilities.apply(player)
+		_skills.apply(player)
 
 
 func on_event(event: Dictionary) -> void:
@@ -138,8 +138,8 @@ func plate_for(slot: int) -> FighterPlate:
 	return null
 
 
-func ability_bar() -> AbilityBar:
-	return _abilities
+func skill_bar() -> SkillBar:
+	return _skills
 
 
 func _process(delta: float) -> void:

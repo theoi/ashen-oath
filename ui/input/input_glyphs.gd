@@ -3,10 +3,12 @@ extends RefCounted
 ## Button glyphs (Kenney Input Prompts, CC0) and plain-text labels for an action in a scheme.
 ##
 ## parts() returns what to draw, in order: Texture2D glyphs and short Strings ("+", "/").
-## Besides the gameplay actions, two grouped actions exist for prompts: MOVE and CAMERA.
+## Besides the gameplay actions, two grouped actions exist for prompts: MOVE and AIM.
+## With `primary_only`, only the first of several alternatives is returned ("R3", not
+## "R3 / D-pad up"), for tight spots such as the skill bar.
 
 const MOVE := &"move"
-const CAMERA := &"camera"
+const AIM := &"aim"
 
 const _DIR := "res://assets/kenney-input-prompts/"
 const _XBOX: Dictionary[JoyButton, String] = {
@@ -36,15 +38,20 @@ const _KEY_FILES: Dictionary[Key, String] = {
 }
 const _MOUSE_FILES: Dictionary[MouseButton, String] = {
 	MOUSE_BUTTON_LEFT: "mouse_left", MOUSE_BUTTON_RIGHT: "mouse_right", MOUSE_BUTTON_MIDDLE: "mouse_scroll",
+	MOUSE_BUTTON_XBUTTON1: "mouse_side_back",
+}
+const _DPAD: Dictionary[JoyButton, Array] = {
+	JOY_BUTTON_DPAD_UP: ["dpad_up", "D-pad up"], JOY_BUTTON_DPAD_DOWN: ["dpad_down", "D-pad down"],
+	JOY_BUTTON_DPAD_LEFT: ["dpad_left", "D-pad left"], JOY_BUTTON_DPAD_RIGHT: ["dpad_right", "D-pad right"],
 }
 
 static var _cache: Dictionary[String, Texture2D] = {}
 
 
 ## What to draw for `action` in `scheme`: Texture2D glyphs and joiner strings.
-static func parts(action: StringName, scheme: int, family: int) -> Array:
+static func parts(action: StringName, scheme: int, family: int, primary_only: bool = false) -> Array:
 	var result: Array = []
-	for token: Variant in _tokens(action, scheme, family):
+	for token: Variant in _tokens(action, scheme, family, primary_only):
 		if token is String and (token == "+" or token == "/"):
 			result.append(token)
 			continue
@@ -54,22 +61,29 @@ static func parts(action: StringName, scheme: int, family: int) -> Array:
 
 
 ## Plain text for `action` in `scheme`, e.g. "LT + X", "J", "Left mouse / Tab".
-static func text(action: StringName, scheme: int, family: int) -> String:
+static func text(action: StringName, scheme: int, family: int, primary_only: bool = false) -> String:
 	var words := PackedStringArray()
-	for token: Variant in _tokens(action, scheme, family):
+	for token: Variant in _tokens(action, scheme, family, primary_only):
 		words.append(token if token is String else token[1])
 	return " ".join(words)
 
 
 ## [glyph file, text] pairs and joiners.
-static func _tokens(action: StringName, scheme: int, family: int) -> Array:
+static func _tokens(action: StringName, scheme: int, family: int, primary_only: bool = false) -> Array:
+	var tokens := _all_tokens(action, scheme, family)
+	if primary_only and "/" in tokens:
+		return tokens.slice(0, tokens.find("/"))
+	return tokens
+
+
+static func _all_tokens(action: StringName, scheme: int, family: int) -> Array:
 	var pad := scheme == ActiveDevice.Scheme.GAMEPAD
 	var ps := family == ActiveDevice.PadFamily.PLAYSTATION
 	if action == MOVE:
 		if pad:
 			return [[(_PS_STICK_L if ps else _XBOX_STICK_L), "Left stick"]]
 		return [_key(KEY_W), _key(KEY_A), _key(KEY_S), _key(KEY_D)]
-	if action == CAMERA:
+	if action == AIM:
 		if pad:
 			return [[(_PS_STICK_R if ps else _XBOX_STICK_R), "Right stick"]]
 		if scheme == ActiveDevice.Scheme.KEYBOARD_MOUSE:
@@ -123,8 +137,9 @@ static func _event_token(event: InputEvent, ps: bool) -> Variant:
 		return ["keyboard/" + _MOUSE_FILES.get(index, "mouse"), DefaultBindings.describe(event)]
 	if event is InputEventJoypadButton:
 		var index := (event as InputEventJoypadButton).button_index
-		if index >= JOY_BUTTON_DPAD_UP and index <= JOY_BUTTON_DPAD_RIGHT:
-			return null
+		if _DPAD.has(index):
+			var dpad: Array = _DPAD[index]
+			return ["%s/%s_%s" % ["playstation" if ps else "xbox", "playstation" if ps else "xbox", dpad[0]], dpad[1]]
 		return _pad_button(index, ps)
 	if event is InputEventJoypadMotion:
 		var motion := event as InputEventJoypadMotion
