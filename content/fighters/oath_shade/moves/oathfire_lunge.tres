@@ -1,0 +1,51 @@
+[gd_resource type="Resource" script_class="MoveData" format=3]
+
+[ext_resource type="Script" path="res://content/types/move_data.gd" id="1_move_datagd"]
+[ext_resource type="Script" path="res://content/types/motion_data.gd" id="2_motion_datag"]
+[ext_resource type="Script" path="res://content/types/hitbox_data.gd" id="3_hitbox_datag"]
+[ext_resource type="Script" path="res://content/types/hit_data.gd" id="4_hit_datagd"]
+
+[sub_resource type="Resource" id="Motion_1"]
+script = ExtResource("2_motion_datag")
+start_frame = 4
+end_frame = 18
+forward_speed = 24
+stop_at_distance = 0.9
+homing = true
+
+[sub_resource type="Resource" id="Hit_3"]
+script = ExtResource("4_hit_datagd")
+damage = 90
+hitstun = 26
+blockstun = 18
+knockback = 3
+block_pushback = 1
+wall_splat = true
+carry_frames = 6
+cue = &"hit_fire"
+
+[sub_resource type="Resource" id="Hitbox_2"]
+script = ExtResource("3_hitbox_datag")
+offset = Vector3(0, 1.05, 0.4)
+offset_end = Vector3(0, 1.05, 1.7)
+capsule = true
+radius = 0.55
+hit = SubResource("Hit_3")
+
+[resource]
+script = ExtResource("1_move_datagd")
+id = &"oathfire_lunge"
+kind = 6
+startup = 12
+active = 7
+recovery = 24
+cooldown = 300
+animation = &"1H_Melee_Attack_Stab"
+cue = &"oathfire_lunge"
+armor_start = 4
+armor_end = 12
+armor_hits = 1
+armor_damage_percent = 100
+tracking = 4
+motions = Array[ExtResource("2_motion_datag")]([SubResource("Motion_1")])
+hitboxes = Array[ExtResource("3_hitbox_datag")]([SubResource("Hitbox_2")])

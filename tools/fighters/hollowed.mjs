@@ -2,8 +2,9 @@ import { writeResource, sn } from './gen.mjs';
 import path from 'node:path';
 
 const repo = process.argv[2];
-const A = (id) => `res://content/fighters/aldric/moves/${id}.tres`;
-// Hollowed grunts: skeletons running a reduced Aldric moveset (no abilities, no super).
+const A = (id) => `res://content/fighters/oath_shade/moves/${id}.tres`;
+// Hollowed grunts: skeletons running a reduced classic Aldric moveset (no abilities, no
+// super), shared with the Oath-Shade.
 const hollowed = {
   id: 'hollowed', display_name: 'Hollowed', max_hp: 750, radius: 0.42, height: 1.8, weight: 1.05,
   run_speed: 5.6, parry_window: 6,

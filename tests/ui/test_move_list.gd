@@ -36,7 +36,9 @@ func test_entries_come_from_the_data() -> void:
 	var basic: MoveList.Entry = by_name.get("Basic attack")
 	var chain := 0
 	var step := data.move_by_id(data.light)
-	while step != null and chain < MoveList.MAX_CHAIN:
+	var seen: Array[StringName] = []
+	while step != null and chain < MoveList.MAX_CHAIN and not seen.has(step.id):
+		seen.append(step.id)
 		chain += 1
 		step = data.move_by_id(step.next_light) if not step.next_light.is_empty() else null
 	if chain > 1:
@@ -65,8 +67,8 @@ func test_skill_types_come_from_the_move_data() -> void:
 
 func test_any_number_of_ability_slots_is_listed() -> void:
 	var data: FighterData = (load("res://content/fighters/aldric/aldric.tres") as FighterData).duplicate()
-	var abilities := data.abilities.duplicate()
-	abilities.append_array(data.abilities)
+	var abilities := data.abilities.slice(0, 3)
+	abilities.append_array(data.abilities.slice(0, 3))
 	data.abilities = abilities
 	var entries := MoveList.build(data, load(MatchSetup.RULES) as CombatRules)
 	var inputs: Array[StringName] = []

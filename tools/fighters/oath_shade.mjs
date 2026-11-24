@@ -1,13 +1,12 @@
-import { writeResource } from './gen.mjs';
-import { fighter as aldric, moves } from './aldric.mjs';
-import path from 'node:path';
+import { writeFighter } from './gen.mjs';
+import { fighter as classic, moves } from './aldric_classic.mjs';
 
 const repo = process.argv[2];
-// The Oath-Shade: Aldric's whole kit and Oathkeeper trait, worn by his own curse.
+// The Oath-Shade: Aldric's classic kit and Oathkeeper trait, worn by his own curse. Its
+// move files (content/fighters/oath_shade/moves) are shared with the Hollowed.
 const shade = {
-  ...aldric,
+  ...classic,
   id: 'oath_shade', display_name: 'Oath-Shade',
   scene: 'res://presentation/fighters/oath_shade/oath_shade.tscn',
-  moves: { $extArray: moves.map((m) => `res://content/fighters/aldric/moves/${m.id}.tres`), type: 'MoveData' },
 };
-if (repo) writeResource(path.join(repo, 'content/fighters/oath_shade/oath_shade.tres'), 'FighterData', shade);
+if (repo) writeFighter(repo, 'content/fighters/oath_shade', 'oath_shade.tres', shade, moves);

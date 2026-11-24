@@ -1,0 +1,43 @@
+[gd_resource type="Resource" script_class="MoveData" format=3]
+
+[ext_resource type="Script" path="res://content/types/move_data.gd" id="1_move_datagd"]
+[ext_resource type="Script" path="res://content/types/hitbox_data.gd" id="2_hitbox_datag"]
+[ext_resource type="Script" path="res://content/types/hit_data.gd" id="3_hit_datagd"]
+
+[sub_resource type="Resource" id="Hit_2"]
+script = ExtResource("3_hit_datagd")
+damage = 15
+weight = 6
+stagger = 15
+hitstun = 14
+knockback = -0.3
+cue = &"hit_fire"
+
+[sub_resource type="Resource" id="Hitbox_1"]
+script = ExtResource("2_hitbox_datag")
+offset = Vector3(0, 1, 0)
+radius = 2.8
+rehit_frames = 8
+hit = SubResource("Hit_2")
+
+[resource]
+script = ExtResource("1_move_datagd")
+id = &"cinder_wheel"
+kind = 6
+skill_type = 1
+aim = 3
+startup = 5
+active = 72
+recovery = 14
+hold_start = 5
+hold_end = 76
+hold_steer_percent = 50
+skill_cancel_from = 15
+flinch_immune_start = 1
+flinch_immune_end = 76
+counter_window_start = 1
+counter_window_end = 16
+cooldown = 600
+animation = &"2H_Melee_Attack_Spinning"
+cue = &"cinder_wheel"
+hitboxes = Array[ExtResource("2_hitbox_datag")]([SubResource("Hitbox_1")])

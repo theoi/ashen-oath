@@ -115,42 +115,53 @@ func _on_event(e: SimEvent) -> void:
 			var at := _contact_point(e)
 			burst(at, Color(0.6, 0.8, 1.0), 10, 3.5, _away(e))
 			flash_at(at, Color(0.55, 0.75, 1.0), 0.6, 0.08)
-			_shake(0.12)
+			_shake(0.02, 6)
 			_play(e.cue, &"block")
 		SimEvent.Type.PARRY:
 			var at := _contact_point(e)
 			flash_at(at, Color(1.0, 0.85, 0.45), 1.1, 0.14)
 			ring_at(at, Color(1.0, 0.8, 0.4), 2.2)
 			burst(at, Color(1.0, 0.85, 0.5), 22, 5.0, Vector3.ZERO)
-			_shake(0.3)
+			_shake(0.05, 10)
 			_overlay_pulse(Color(1.0, 0.9, 0.7), 0.12)
 			Sound.play(&"parry")
 		SimEvent.Type.GUARD_BREAK:
 			var at := _body_point(e.target)
 			burst(at, Color(0.7, 0.85, 1.0), 30, 6.0, Vector3.ZERO)
 			ring_at(at, Color(0.6, 0.8, 1.0), 2.0)
-			_shake(0.5)
+			_shake(0.08, 14)
 			Sound.play(&"guard_break")
 		SimEvent.Type.ARMOR:
+			# Armored hits: grey sparks instead of the flash, and a softer shake.
 			var at := _contact_point(e)
-			flash_at(at, Color(1.0, 0.55, 0.2), 1.0, 0.1)
-			burst(at, Color(1.0, 0.6, 0.25), 12, 3.0, _away(e))
-			_shake(WEIGHT_SHAKE[weight_of(e)] * 0.6)
-			numbers.show_hit(at, e.amount, weight_of(e), false, _local(e.target), true, "")
+			var w := weight_of(e)
+			burst(at, Color(0.62, 0.64, 0.68), 12, 3.0, _away(e))
+			_shake(WEIGHT_SHAKE[w].x * 0.5, WEIGHT_SHAKE[w].y)
+			numbers.show_hit(at, e.amount, w, false, _local(e.target), true, "")
 			Sound.play(&"armor")
+		SimEvent.Type.STANCE_TRIGGER:
+			# A stance catching a hit (Bulwark): a shatter flare with the Heavy flash.
+			var at := _contact_point(e)
+			impact_flash(at, HEAVY)
+			ring_at(at, _accent(e.source), 2.4, true)
+			burst(at, _accent(e.source), 34, 6.0, Vector3.ZERO)
+			_shake(WEIGHT_SHAKE[HEAVY].x, WEIGHT_SHAKE[HEAVY].y)
+			if _local(e.source):
+				_rumble(HEAVY)
+			Sound.play(&"parry")
 		SimEvent.Type.LAUNCH:
 			Sound.play(&"launch")
 		SimEvent.Type.WALL_SPLAT:
 			var at := _body_point(e.target)
 			burst(at, Color(0.55, 0.52, 0.5), 24, 3.0, Vector3.ZERO)
 			ring_at(at, Color(0.8, 0.7, 0.6), 1.6, true)
-			_shake(0.55)
+			_shake(0.08, 14)
 			Sound.play(&"wall_splat")
 		SimEvent.Type.KNOCKDOWN:
 			var at := _ground_point(e.target)
 			ring_at(at, Color(0.5, 0.48, 0.45), 1.8)
 			burst(at + Vector3.UP * 0.1, Color(0.45, 0.43, 0.42), 14, 1.8, Vector3.UP)
-			_shake(0.2)
+			_shake(0.03, 8)
 			Sound.play(&"body_fall")
 		SimEvent.Type.MOVE_START:
 			_on_move_start(e)
@@ -160,7 +171,7 @@ func _on_event(e: SimEvent) -> void:
 			var at := _body_point(e.source)
 			ring_at(at, Color(0.75, 0.95, 1.0), 4.5)
 			flash_at(at, Color(0.8, 0.95, 1.0), 1.5, 0.2)
-			_shake(0.4)
+			_shake(0.06, 12)
 			Sound.play(&"soul_burst")
 		SimEvent.Type.DODGE:
 			Sound.play(&"dodge", -4.0)
@@ -176,7 +187,7 @@ func _on_event(e: SimEvent) -> void:
 			Sound.play(&"land", -6.0)
 		SimEvent.Type.GRAB:
 			Sound.play(&"grab")
-			_shake(0.15)
+			_shake(0.02, 6)
 		SimEvent.Type.GRAB_TECH:
 			flash_at(_contact_point(e), Color(1, 1, 1), 1.0, 0.1)
 			Sound.play(&"block")
@@ -193,7 +204,7 @@ func _on_event(e: SimEvent) -> void:
 			if dead != null and dead.model.ash_on_death:
 				dead.dissolve_to_ash()
 			flash_at(at, Color(1.0, 0.9, 0.8), 1.8, 0.3)
-			_shake(0.9)
+			_shake(0.12, 20)
 			_overlay_pulse(Color(1.0, 1.0, 1.0), 0.3)
 			Sound.play(&"ko")
 		SimEvent.Type.EFFECT_SPAWN:
@@ -212,7 +223,7 @@ func _on_event(e: SimEvent) -> void:
 				if e.type == SimEvent.Type.EFFECT_DESTROYED:
 					burst(Fx.to_vec3(e.position), _accent(e.source), 12, 2.5, Vector3.ZERO)
 		SimEvent.Type.HAZARD_ACTIVE:
-			_shake(0.2)
+			_shake(0.03, 8)
 			_play(e.cue, &"")
 		SimEvent.Type.ROUND_START:
 			for id: int in _effects.keys():
@@ -223,17 +234,21 @@ func _on_event(e: SimEvent) -> void:
 func _on_hit(e: SimEvent) -> void:
 	var at := _contact_point(e)
 	var weight := weight_of(e)
-	var strength := float(weight - 1) / 4.0
+	var strength := maxf(0.0, float(weight - 1) / 4.0)
 	var counter := (e.flags & SimEvent.FLAG_COUNTER) != 0
 	var super_hit := (e.flags & SimEvent.FLAG_SUPER) != 0
 	var color := _spark_color(e.source)
-	burst(at, color, 12 + int(30.0 * strength), 3.0 + 6.0 * strength, _away(e))
-	flash_at(at, color.lerp(Color.WHITE, 0.4), 0.5 + 0.8 * strength, 0.07 + 0.06 * strength)
+	if weight == TICK:
+		burst(at, color, 8, 2.5, _away(e))
+	else:
+		burst(at, color, 12 + int(30.0 * strength), 3.0 + 6.0 * strength, _away(e))
+		impact_flash(at, weight)
 	if counter:
 		ring_at(at, Color(1.0, 0.3, 0.2), 1.6)
 		_overlay_pulse(Color(1.0, 0.35, 0.25), 0.1)
 		Sound.play(&"hit_counter")
-	_shake(WEIGHT_SHAKE[weight] + (0.15 if counter else 0.0))
+	var shake := WEIGHT_SHAKE[maxi(weight, LIGHT) if counter else weight]
+	_shake(shake.x, shake.y)
 	if weight >= MASSIVE:
 		_punch(0.3)
 		ring_at(_ground_point(e.target), color, 3.0)
@@ -291,17 +306,26 @@ func _on_super_flash(e: SimEvent) -> void:
 
 # --- Impact by weight (design-lost-ark §1.12) -----------------------------------------------
 
-## Camera shake, rumble (weak, strong, seconds) and spark scale per weight class
-## (index: 1 BASIC .. 5 MASSIVE; 0 unused).
-const WEIGHT_SHAKE: Array[float] = [0.0, 0.05, 0.15, 0.3, 0.55, 0.8]
-const WEIGHT_RUMBLE: Array[Vector3] = [Vector3.ZERO, Vector3(0.3, 0.0, 0.04), Vector3(0.45, 0.0, 0.07),
+## Per weight class, indexed 0 TICK, 1 BASIC .. 5 MASSIVE:
+## shake (amplitude m, decay frames), impact flash (share of the screen, life frames) and
+## rumble (weak, strong, seconds). Ticks and basic hits do not shake; ticks do not flash.
+const WEIGHT_SHAKE: Array[Vector2] = [Vector2.ZERO, Vector2.ZERO, Vector2(0.02, 4), Vector2(0.04, 8),
+		Vector2(0.08, 14), Vector2(0.15, 20)]
+const WEIGHT_FLASH: Array[Vector2] = [Vector2.ZERO, Vector2(0.01, 5), Vector2(0.02, 6), Vector2(0.03, 7),
+		Vector2(0.06, 9), Vector2(0.25, 16)]
+const WEIGHT_RUMBLE: Array[Vector3] = [Vector3(0.25, 0.0, 0.03), Vector3(0.3, 0.0, 0.04), Vector3(0.45, 0.0, 0.07),
 		Vector3(0.45, 0.45, 0.12), Vector3(0.3, 0.8, 0.18), Vector3(0.5, 1.0, 0.3)]
+const TICK := 0
+const LIGHT := 2
+const HEAVY := 4
 const MASSIVE := 5
 
 
-## Weight class 1..5 of a HIT/ARMOR event: SimEvent.weight (HitData.Weight) when the hit
-## has one, else derived from the hitstop it applied (old kits).
+## Weight class 0..5 (TICK, BASIC .. MASSIVE) of a HIT/ARMOR event: SimEvent.weight
+## (HitData.Weight) when the hit has one, else derived from the hitstop it applied (old kits).
 static func weight_of(e: SimEvent) -> int:
+	if e.weight == HitData.Weight.TICK:
+		return TICK
 	if e.weight > 0:
 		return clampi(e.weight, 1, 5)
 	if e.hitstop <= 3:
@@ -315,8 +339,30 @@ static func weight_of(e: SimEvent) -> int:
 	return 5
 
 
+## Additive white flash at the contact covering the weight class's share of the screen
+## (design-lost-ark §1.12), scaled by Feel.flash_intensity.
+func impact_flash(at: Vector3, weight: int) -> void:
+	var tier := WEIGHT_FLASH[clampi(weight, 0, 5)]
+	var share := tier.x * Feel.flash_intensity()
+	if share <= 0.0:
+		return
+	flash_at(at, Color(1.0, 0.97, 0.9), flash_size(at, share), tier.y / 60.0)
+
+
+## Quad side (m) at `at` whose soft glow covers `share` of the screen.
+func flash_size(at: Vector3, share: float) -> float:
+	var view_h := 2.0
+	var aspect := 16.0 / 9.0
+	if camera != null and camera.is_inside_tree():
+		var d := maxf(1.0, camera.global_position.distance_to(at))
+		view_h = 2.0 * d * tan(deg_to_rad(camera.fov) * 0.5)
+		aspect = get_viewport().get_visible_rect().size.aspect()
+	# The radial glow lights roughly 40% of its quad's area.
+	return sqrt(share * view_h * view_h * aspect / 0.4)
+
+
 func _rumble(weight: int, scale: float = 1.0) -> void:
-	var r := WEIGHT_RUMBLE[clampi(weight, 1, 5)] * Vector3(scale, scale, 1.0)
+	var r := WEIGHT_RUMBLE[clampi(weight, 0, 5)] * Vector3(scale, scale, 1.0)
 	var k := Feel.rumble_scale()
 	if k <= 0.0:
 		return
@@ -337,9 +383,9 @@ func _play(id: StringName, fallback: StringName) -> bool:
 	return false
 
 
-func _shake(amount: float) -> void:
+func _shake(amplitude: float, decay_frames: float) -> void:
 	if camera != null:
-		camera.add_trauma(amount)
+		camera.shake(amplitude, decay_frames)
 
 
 func _punch(amount: float) -> void:

@@ -76,6 +76,7 @@ class Writer {
       const sid = this.extId('Script', TYPES[v.type]);
       return `Array[ExtResource("${sid}")]([${v.$extArray.map(p => `ExtResource("${this.extId('Resource', p)}")`).join(', ')}])`;
     }
+    if (Array.isArray(v) && v.every((x) => Number.isInteger(x))) return `PackedInt32Array(${v.join(', ')})`;
     if (Array.isArray(v)) {
       const type = CHILD_TYPE[key];
       const sid = this.extId('Script', TYPES[type]);

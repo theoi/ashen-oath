@@ -1,0 +1,42 @@
+[gd_resource type="Resource" script_class="MoveData" format=3]
+
+[ext_resource type="Script" path="res://content/types/move_data.gd" id="1_move_datagd"]
+[ext_resource type="Script" path="res://content/types/hitbox_data.gd" id="2_hitbox_datag"]
+[ext_resource type="Script" path="res://content/types/hit_data.gd" id="3_hit_datagd"]
+
+[sub_resource type="Resource" id="Hit_2"]
+script = ExtResource("3_hit_datagd")
+damage = 40
+weight = 2
+hitstun = 18
+knockback = 1.2
+cue = &"hit_shield"
+
+[sub_resource type="Resource" id="Hitbox_1"]
+script = ExtResource("2_hitbox_datag")
+start_frame = 35
+end_frame = 38
+offset = Vector3(0, 1, 0.6)
+offset_end = Vector3(0, 1, 1.4)
+capsule = true
+radius = 0.6
+hit = SubResource("Hit_2")
+
+[resource]
+script = ExtResource("1_move_datagd")
+id = &"bulwark"
+kind = 6
+skill_type = 6
+aim = 3
+startup = 3
+active = 4
+recovery = 48
+skill_cancel_from = 0
+stance_start = 3
+stance_end = 34
+stance_arc = 180
+counter_move = &"retribution"
+cooldown = 480
+animation = &"Blocking"
+cue = &"bulwark_raise"
+hitboxes = Array[ExtResource("2_hitbox_datag")]([SubResource("Hitbox_1")])
