@@ -1,0 +1,117 @@
+[gd_resource type="Resource" script_class="StoryScene" format=3]
+
+[ext_resource type="Script" path="res://content/types/story_actor.gd" id="1_dgqrg"]
+[ext_resource type="Script" path="res://content/types/story_line.gd" id="2_exv8m"]
+[ext_resource type="Script" path="res://content/types/story_prop.gd" id="3_jvlwn"]
+[ext_resource type="Script" path="res://content/types/story_scene.gd" id="4_d8clk"]
+[ext_resource type="Script" path="res://content/types/story_shot.gd" id="5_fu4yd"]
+
+[sub_resource type="Resource" id="Resource_cerkj"]
+script = ExtResource("1_dgqrg")
+fighter = &"aldric"
+position = Vector3(0.2, 0, 1)
+facing_degrees = -114.80000000000001
+exit_line = 3
+
+[sub_resource type="Resource" id="Resource_iyct8"]
+script = ExtResource("1_dgqrg")
+fighter = &"gorrath"
+position = Vector3(-2.4, 0, -0.2)
+facing_degrees = 65.2
+pose = &"Sit_Floor_Idle"
+exit_line = 3
+
+[sub_resource type="Resource" id="Resource_2y3jq"]
+script = ExtResource("1_dgqrg")
+fighter = &"aldric"
+position = Vector3(0.2, 0, 1)
+facing_degrees = 200.0
+pose = &"Hit_B"
+pose_time = 0.25
+enter_line = 3
+
+[sub_resource type="Resource" id="Resource_dgcpi"]
+script = ExtResource("1_dgqrg")
+fighter = &"oath_shade"
+position = Vector3(3.2, 0, -0.4)
+facing_degrees = -65.0
+pose = &"Idle_Combat"
+enter_line = 5
+
+[sub_resource type="Resource" id="Resource_4wuat"]
+script = ExtResource("2_exv8m")
+speaker = &"gorrath"
+text = "Hold. I have had my answer."
+shot = 0
+
+[sub_resource type="Resource" id="Resource_fpma6"]
+script = ExtResource("2_exv8m")
+speaker = &"gorrath"
+text = "Kill the king, and the chains fall. Mine too."
+
+[sub_resource type="Resource" id="Resource_35tyy"]
+script = ExtResource("2_exv8m")
+speaker = &"aldric"
+text = "Then wait for me."
+
+[sub_resource type="Resource" id="Resource_emnxu"]
+script = ExtResource("2_exv8m")
+text = "Aldric goes deeper. The fire in his chest flares, and keeps flaring."
+shot = 1
+
+[sub_resource type="Resource" id="Resource_pvnrt"]
+script = ExtResource("2_exv8m")
+speaker = &"aldric"
+text = "No. Not here. Not yet."
+shot = 3
+
+[sub_resource type="Resource" id="Resource_met17"]
+script = ExtResource("2_exv8m")
+text = "The Oathfire tears loose from him. It rises out of the black water wearing his face."
+shot = 1
+
+[sub_resource type="Resource" id="Resource_q21k8"]
+script = ExtResource("2_exv8m")
+speaker = &"oath_shade"
+speaker_name = "The Oath-Shade"
+text = "You refused the Oath, Aldric. I am what it left in you instead."
+shot = 2
+
+[sub_resource type="Resource" id="Resource_f7ss1"]
+script = ExtResource("2_exv8m")
+speaker = &"oath_shade"
+speaker_name = "The Oath-Shade"
+text = "Kneel. It is easier than what comes next."
+
+[sub_resource type="Resource" id="Resource_jgvvv"]
+script = ExtResource("5_fu4yd")
+position = Vector3(-1, 1.6, 4.4)
+target = Vector3(-1.2, 0.9, 0.3)
+fov = 42.0
+
+[sub_resource type="Resource" id="Resource_35rjb"]
+script = ExtResource("5_fu4yd")
+position = Vector3(-2.6, 1.9, 4.2)
+target = Vector3(0.6, 1.3, 0.6)
+fov = 44.0
+
+[sub_resource type="Resource" id="Resource_cysai"]
+script = ExtResource("5_fu4yd")
+position = Vector3(-1.6, 1.8, 3)
+target = Vector3(3.2, 1.5, -0.4)
+fov = 36.0
+
+[sub_resource type="Resource" id="Resource_qvc4n"]
+script = ExtResource("5_fu4yd")
+position = Vector3(1, 1.6, 2.4)
+target = Vector3(0.2, 1.4, 1)
+fov = 40.0
+
+[resource]
+script = ExtResource("4_d8clk")
+arena = &"drowned_crypt_depths"
+shots = Array[ExtResource("5_fu4yd")]([SubResource("Resource_jgvvv"), SubResource("Resource_35rjb"), SubResource("Resource_cysai"), SubResource("Resource_qvc4n")])
+actors = Array[ExtResource("1_dgqrg")]([SubResource("Resource_cerkj"), SubResource("Resource_iyct8"), SubResource("Resource_2y3jq"), SubResource("Resource_dgcpi")])
+lines = Array[ExtResource("2_exv8m")]([SubResource("Resource_4wuat"), SubResource("Resource_fpma6"), SubResource("Resource_35tyy"), SubResource("Resource_emnxu"), SubResource("Resource_pvnrt"), SubResource("Resource_met17"), SubResource("Resource_q21k8"), SubResource("Resource_f7ss1")])
+id = &"what_the_fire_left"
+title = "What the Fire Left"

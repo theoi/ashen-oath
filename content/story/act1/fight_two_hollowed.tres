@@ -1,0 +1,39 @@
+[gd_resource type="Resource" script_class="StoryFight" format=3]
+
+[ext_resource type="Script" path="res://content/types/story_prompt.gd" id="1_4owwt"]
+[ext_resource type="Script" path="res://content/types/story_fight.gd" id="2_cdc56"]
+
+[sub_resource type="Resource" id="Resource_5ubsl"]
+script = ExtResource("1_4owwt")
+goal = 7
+title = "Two at once"
+text = "Keep both in sight. Switch your target to the other one."
+actions = Array[StringName]([&"lock_on"])
+timeout_seconds = 10.0
+
+[sub_resource type="Resource" id="Resource_30wrq"]
+script = ExtResource("1_4owwt")
+goal = 6
+title = "Oathfire"
+text = "Your abilities cut through a crowd. Each has its own cooldown."
+actions = Array[StringName]([&"ability_1", &"ability_2", &"ability_3"])
+timeout_seconds = 12.0
+
+[sub_resource type="Resource" id="Resource_3syio"]
+script = ExtResource("1_4owwt")
+goal = 8
+title = "Soul Burst"
+text = "Caught in a combo with 50 Soul or more? Press Super to burst free."
+actions = Array[StringName]([&"super"])
+timeout_seconds = 12.0
+
+[resource]
+script = ExtResource("2_cdc56")
+opponents = Array[StringName]([&"hollowed", &"hollowed"])
+opponent_name = "Two Hollowed"
+rounds_to_win = 1
+opponent_hp_percent = Array[int]([70, 70])
+seed = 202
+prompts = Array[ExtResource("1_4owwt")]([SubResource("Resource_5ubsl"), SubResource("Resource_30wrq"), SubResource("Resource_3syio")])
+id = &"fight_two_hollowed"
+title = "II · Two Hollowed"

@@ -1,0 +1,102 @@
+[gd_resource type="Resource" script_class="StoryScene" format=3]
+
+[ext_resource type="Script" path="res://content/types/story_actor.gd" id="1_65bdv"]
+[ext_resource type="Script" path="res://content/types/story_line.gd" id="2_h48n3"]
+[ext_resource type="Script" path="res://content/types/story_prop.gd" id="3_78ji8"]
+[ext_resource type="Script" path="res://content/types/story_scene.gd" id="4_as77s"]
+[ext_resource type="Script" path="res://content/types/story_shot.gd" id="5_g5wsu"]
+
+[sub_resource type="Resource" id="Resource_tibef"]
+script = ExtResource("1_65bdv")
+fighter = &"aldric"
+position = Vector3(-1.2, 0, 1)
+facing_degrees = 109.30000000000001
+
+[sub_resource type="Resource" id="Resource_j6l86"]
+script = ExtResource("1_65bdv")
+fighter = &"morrigan"
+position = Vector3(2.8, 0, -0.4)
+facing_degrees = -70.7
+
+[sub_resource type="Resource" id="Resource_kt71x"]
+script = ExtResource("1_65bdv")
+fighter = &"hollowed"
+position = Vector3(0.6, 0, 1.9)
+facing_degrees = 160.0
+pose = &"Death_A"
+pose_time = 99.0
+
+[sub_resource type="Resource" id="Resource_jjyvv"]
+script = ExtResource("1_65bdv")
+fighter = &"hollowed"
+position = Vector3(1.4, 0, -1.6)
+facing_degrees = 20.0
+pose = &"Death_B"
+pose_time = 99.0
+
+[sub_resource type="Resource" id="Resource_hm46y"]
+script = ExtResource("2_h48n3")
+text = "The candles gutter. Someone has been tending them."
+shot = 0
+
+[sub_resource type="Resource" id="Resource_6eo41"]
+script = ExtResource("2_h48n3")
+speaker = &"morrigan"
+text = "You broke my dead, knight. I had only just laid them out."
+shot = 1
+
+[sub_resource type="Resource" id="Resource_heok1"]
+script = ExtResource("2_h48n3")
+speaker = &"aldric"
+text = "They came for me. I sent them back."
+shot = 2
+
+[sub_resource type="Resource" id="Resource_846e7"]
+script = ExtResource("2_h48n3")
+speaker = &"morrigan"
+text = "Back where? There is nowhere left to send them."
+shot = 1
+
+[sub_resource type="Resource" id="Resource_88p88"]
+script = ExtResource("2_h48n3")
+speaker = &"morrigan"
+text = "I see it in you. The fire under the skin. The Oath is eating you from the inside."
+
+[sub_resource type="Resource" id="Resource_qg6sr"]
+script = ExtResource("2_h48n3")
+speaker = &"aldric"
+text = "Then I will reach the throne before it finishes. Show me the way."
+shot = 2
+
+[sub_resource type="Resource" id="Resource_pfugr"]
+script = ExtResource("2_h48n3")
+speaker = &"morrigan"
+text = "I do not guide men who hollow halfway down the road. Show me you will last the night."
+shot = 1
+
+[sub_resource type="Resource" id="Resource_fuwsk"]
+script = ExtResource("5_g5wsu")
+position = Vector3(0.6, 1.9, 6)
+target = Vector3(0.8, 1.2, 0.2)
+fov = 46.0
+
+[sub_resource type="Resource" id="Resource_aowxq"]
+script = ExtResource("5_g5wsu")
+position = Vector3(-2.9, 1.75, 2.2)
+target = Vector3(2.8, 1.45, -0.4)
+fov = 36.0
+
+[sub_resource type="Resource" id="Resource_rytkt"]
+script = ExtResource("5_g5wsu")
+position = Vector3(4.4, 1.75, -1.4)
+target = Vector3(-1.2, 1.45, 1)
+fov = 36.0
+
+[resource]
+script = ExtResource("4_as77s")
+arena = &"ashen_chapel_night"
+shots = Array[ExtResource("5_g5wsu")]([SubResource("Resource_fuwsk"), SubResource("Resource_aowxq"), SubResource("Resource_rytkt")])
+actors = Array[ExtResource("1_65bdv")]([SubResource("Resource_tibef"), SubResource("Resource_j6l86"), SubResource("Resource_kt71x"), SubResource("Resource_jjyvv")])
+lines = Array[ExtResource("2_h48n3")]([SubResource("Resource_hm46y"), SubResource("Resource_6eo41"), SubResource("Resource_heok1"), SubResource("Resource_846e7"), SubResource("Resource_88p88"), SubResource("Resource_qg6sr"), SubResource("Resource_pfugr")])
+id = &"the_grave_witch"
+title = "The Grave-Witch"

@@ -67,6 +67,17 @@ func _ready() -> void:
 	# The first round starts inside Sim.new(), before any step: replay those events.
 	_on_stepped(runner.sim.events())
 	_apply_capture_args()
+	if config.on_started.is_valid():
+		config.on_started.call(self)
+
+
+## Adds a Control over the HUD, under the pause / results overlay. It pauses with the match.
+func add_overlay(control: Control) -> void:
+	var layer := CanvasLayer.new()
+	layer.layer = 6
+	layer.process_mode = Node.PROCESS_MODE_PAUSABLE
+	add_child(layer)
+	layer.add_child(control)
 
 
 func is_paused() -> bool:

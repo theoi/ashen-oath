@@ -1,0 +1,131 @@
+[gd_resource type="Resource" script_class="StoryScene" format=3]
+
+[ext_resource type="Script" path="res://content/types/story_actor.gd" id="1_jrt7w"]
+[ext_resource type="Script" path="res://content/types/story_line.gd" id="2_8juuh"]
+[ext_resource type="Script" path="res://content/types/story_prop.gd" id="3_cpijd"]
+[ext_resource type="Script" path="res://content/types/story_scene.gd" id="4_d3r1y"]
+[ext_resource type="Script" path="res://content/types/story_shot.gd" id="5_qowkj"]
+
+[sub_resource type="Resource" id="Resource_q713n"]
+script = ExtResource("1_jrt7w")
+fighter = &"aldric"
+position = Vector3(-3.4, 0, 2)
+facing_degrees = 100.0
+pose = &"Lie_Idle"
+exit_line = 5
+
+[sub_resource type="Resource" id="Resource_i5qxm"]
+script = ExtResource("1_jrt7w")
+fighter = &"aldric"
+position = Vector3(-3.2, 0, 1.6)
+facing_degrees = 65.0
+enter_line = 5
+
+[sub_resource type="Resource" id="Resource_84u20"]
+script = ExtResource("2_8juuh")
+kind = 1
+title = "Vael"
+text = "Vael was a kingdom once. Its king feared death more than he loved his people, and he swore an oath to a nameless dark to escape it. Every soul sworn to him was bound with him. It is called the Ashen Oath."
+
+[sub_resource type="Resource" id="Resource_kucjl"]
+script = ExtResource("2_8juuh")
+kind = 1
+title = "The Reckoning"
+text = "Now he is the Hollow King. Each night his great bell tolls, and the cursed must fight in the old proving grounds. Winners keep their minds for one more night. Losers hollow into the mindless dead."
+
+[sub_resource type="Resource" id="Resource_cfo53"]
+script = ExtResource("2_8juuh")
+kind = 1
+title = "The Oathbreaker"
+text = "One knight refused the Oath. It took him anyway."
+
+[sub_resource type="Resource" id="Resource_i0p6m"]
+script = ExtResource("2_8juuh")
+text = "The Ashen Chapel. Ash falls through the broken roof. Somewhere above the city, a bell begins to toll."
+shot = 1
+cue = &"bell_toll"
+
+[sub_resource type="Resource" id="Resource_6fjjv"]
+script = ExtResource("2_8juuh")
+speaker = &"aldric"
+text = "Ash in my mouth. Ash in my lungs."
+
+[sub_resource type="Resource" id="Resource_d05am"]
+script = ExtResource("2_8juuh")
+speaker = &"aldric"
+text = "I knelt to no dark power. And still it burns in me."
+shot = 2
+
+[sub_resource type="Resource" id="Resource_slu3l"]
+script = ExtResource("2_8juuh")
+speaker = &"aldric"
+text = "That bell. I stood guard beneath it for twenty years."
+
+[sub_resource type="Resource" id="Resource_skjsg"]
+script = ExtResource("2_8juuh")
+speaker = &"aldric"
+text = "Then the throne is where it has always been. And so is he."
+shot = 0
+
+[sub_resource type="Resource" id="Resource_i18jj"]
+script = ExtResource("3_cpijd")
+model = "coffin"
+position = Vector3(-5.2, 0, 3.4)
+yaw_degrees = 80.0
+
+[sub_resource type="Resource" id="Resource_3vvyj"]
+script = ExtResource("3_cpijd")
+model = "coffin_decorated"
+position = Vector3(-1.6, 0, 0.2)
+yaw_degrees = 105.0
+
+[sub_resource type="Resource" id="Resource_g4ler"]
+script = ExtResource("3_cpijd")
+model = "coffin"
+position = Vector3(-4.6, 0, -0.6)
+yaw_degrees = 95.0
+
+[sub_resource type="Resource" id="Resource_d4ex1"]
+script = ExtResource("3_cpijd")
+model = "bone_A"
+position = Vector3(-2.2, 0, 2.9)
+yaw_degrees = 30.0
+
+[sub_resource type="Resource" id="Resource_7pisp"]
+script = ExtResource("3_cpijd")
+model = "skull"
+position = Vector3(-4, 0, 3.6)
+yaw_degrees = -40.0
+
+[sub_resource type="Resource" id="Resource_c0bd6"]
+script = ExtResource("3_cpijd")
+model = "candle_melted"
+position = Vector3(-2.4, 0, 3.6)
+
+[sub_resource type="Resource" id="Resource_hls2x"]
+script = ExtResource("5_qowkj")
+position = Vector3(6.5, 3.6, 7.5)
+target = Vector3(-3, 0.6, 1)
+fov = 48.0
+
+[sub_resource type="Resource" id="Resource_pvqom"]
+script = ExtResource("5_qowkj")
+position = Vector3(-1.6, 1.1, 4.6)
+target = Vector3(-3.4, 0.35, 2)
+fov = 42.0
+
+[sub_resource type="Resource" id="Resource_v8u0j"]
+script = ExtResource("5_qowkj")
+position = Vector3(-0.6, 1.75, 4.9)
+target = Vector3(-3.2, 1.35, 1.6)
+fov = 40.0
+
+[resource]
+script = ExtResource("4_d3r1y")
+arena = &"ashen_chapel"
+shots = Array[ExtResource("5_qowkj")]([SubResource("Resource_hls2x"), SubResource("Resource_pvqom"), SubResource("Resource_v8u0j")])
+actors = Array[ExtResource("1_jrt7w")]([SubResource("Resource_q713n"), SubResource("Resource_i5qxm")])
+props = Array[ExtResource("3_cpijd")]([SubResource("Resource_i18jj"), SubResource("Resource_3vvyj"), SubResource("Resource_g4ler"), SubResource("Resource_d4ex1"), SubResource("Resource_7pisp"), SubResource("Resource_c0bd6")])
+lines = Array[ExtResource("2_8juuh")]([SubResource("Resource_84u20"), SubResource("Resource_kucjl"), SubResource("Resource_cfo53"), SubResource("Resource_i0p6m"), SubResource("Resource_6fjjv"), SubResource("Resource_d05am"), SubResource("Resource_slu3l"), SubResource("Resource_skjsg")])
+id = &"prologue"
+title = "Prologue · The Bell Tolls"

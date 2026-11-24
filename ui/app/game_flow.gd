@@ -17,6 +17,7 @@ const SCREENS: Dictionary[StringName, String] = {
 	&"title": "res://ui/menus/title_screen.tscn",
 	&"mode_select": "res://ui/menus/mode_select.tscn",
 	&"story": "res://ui/story/story_entry.tscn",
+	&"story_chapters": "res://ui/story/story_chapters.tscn",
 	&"versus": "res://ui/versus/versus_select.tscn",
 	&"controls": "res://ui/menus/controls_screen.tscn",
 	&"settings": "res://ui/menus/settings_screen.tscn",
@@ -28,6 +29,9 @@ const SCREENS: Dictionary[StringName, String] = {
 var current_match: MatchConfig
 ## How the last match ended (the results screen shows it).
 var last_result: MatchResult
+## The story run in progress (a StoryDirector), kept here across scene changes. A static
+## var would outlive the engine's resource teardown at quit.
+var story_director: RefCounted
 
 var _hosts: Array[ScreenStack] = []
 var _pending_menu: Array[StringName] = [&"title"]

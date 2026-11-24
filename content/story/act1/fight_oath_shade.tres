@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="StoryFight" format=3]
+
+[ext_resource type="Script" path="res://content/types/story_prompt.gd" id="1_s5kxa"]
+[ext_resource type="Script" path="res://content/types/story_fight.gd" id="2_eqy25"]
+
+[resource]
+script = ExtResource("2_eqy25")
+opponents = Array[StringName]([&"oath_shade"])
+opponent_name = "The Oath-Shade"
+arena = &"drowned_crypt_depths"
+opponent_soul = Array[int]([50])
+seed = 505
+id = &"fight_oath_shade"
+title = "V · The Oath-Shade"

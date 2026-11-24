@@ -32,6 +32,8 @@ var starting_soul: Array[int] = []
 var hp_percent: Array[int] = []
 ## Called with the MatchResult when the match ends, instead of the versus results screen.
 var on_finished: Callable
+## Called with the MatchScreen once it is set up (story mode adds its in-fight prompts).
+var on_started: Callable
 ## Menu screens to return to when leaving the match (bottom first).
 var menu_stack: Array[StringName] = [&"mode_select", &"versus"]
 
@@ -72,5 +74,6 @@ func duplicate_config() -> MatchConfig:
 	copy.starting_soul = starting_soul.duplicate()
 	copy.hp_percent = hp_percent.duplicate()
 	copy.on_finished = on_finished
+	copy.on_started = on_started
 	copy.menu_stack = menu_stack.duplicate()
 	return copy

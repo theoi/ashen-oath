@@ -45,6 +45,9 @@ node tools/web_smoke/smoke.mjs https://theoi.github.io/ashen-oath/ /tmp/pages.pn
 # Record a scene to mp4 with Movie Maker (needs xvfb-run and ffmpeg)
 tools/capture_clip.sh res://ui/app/menu_app.tscn /tmp/clip.mp4 180
 
+# Play story mode Act 1 end to end through the real game (args: tests/story/story_autoplay.gd)
+tools/story_playthrough.sh --fast=8 --skip-scenes
+
 # Screenshot after N frames; --menu= opens a menu screen stack directly (ids in ui/app/game_flow.gd)
 tools/capture_screenshot.sh /tmp/settings.png 30 -- --menu=mode_select,settings
 ```

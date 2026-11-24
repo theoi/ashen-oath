@@ -1,0 +1,80 @@
+[gd_resource type="Resource" script_class="StoryScene" format=3]
+
+[ext_resource type="Script" path="res://content/types/story_actor.gd" id="1_ydhsu"]
+[ext_resource type="Script" path="res://content/types/story_line.gd" id="2_rd0uk"]
+[ext_resource type="Script" path="res://content/types/story_prop.gd" id="3_42518"]
+[ext_resource type="Script" path="res://content/types/story_scene.gd" id="4_ol0am"]
+[ext_resource type="Script" path="res://content/types/story_shot.gd" id="5_ogkdq"]
+
+[sub_resource type="Resource" id="Resource_nwnna"]
+script = ExtResource("1_ydhsu")
+fighter = &"aldric"
+position = Vector3(0, 0, 1)
+facing_degrees = 111.80000000000001
+
+[sub_resource type="Resource" id="Resource_5rlrq"]
+script = ExtResource("1_ydhsu")
+fighter = &"oath_shade"
+position = Vector3(2, 0, 0.2)
+facing_degrees = -68.2
+pose = &"Sit_Floor_Idle"
+exit_line = 3
+
+[sub_resource type="Resource" id="Resource_wn64k"]
+script = ExtResource("2_rd0uk")
+speaker = &"oath_shade"
+speaker_name = "The Oath-Shade"
+text = "You cannot put me out. I am the fire. I am what you are becoming."
+shot = 0
+
+[sub_resource type="Resource" id="Resource_eh37x"]
+script = ExtResource("2_rd0uk")
+speaker = &"aldric"
+text = "Then burn for me, not against me. We have a king to reach."
+
+[sub_resource type="Resource" id="Resource_vgbdc"]
+script = ExtResource("2_rd0uk")
+text = "The shadow folds back into him. The fire settles. For now."
+shot = 1
+
+[sub_resource type="Resource" id="Resource_qjvcc"]
+script = ExtResource("2_rd0uk")
+text = "Far above, the bell tolls. In its tower, something vast and made of bone turns from the window."
+cue = &"bell_toll"
+
+[sub_resource type="Resource" id="Resource_u2wsw"]
+script = ExtResource("2_rd0uk")
+text = "And in the dark of the crypt, a porcelain mask shaped like a bird watches him go."
+shot = 2
+
+[sub_resource type="Resource" id="Resource_uosvx"]
+script = ExtResource("2_rd0uk")
+kind = 1
+title = "End of Act 1"
+text = "The Bell Wakes"
+
+[sub_resource type="Resource" id="Resource_bhqnr"]
+script = ExtResource("5_ogkdq")
+position = Vector3(-1.4, 1.7, 4)
+target = Vector3(1, 1, 0.6)
+fov = 42.0
+
+[sub_resource type="Resource" id="Resource_kw7wu"]
+script = ExtResource("5_ogkdq")
+position = Vector3(-0.4, 2.6, 6.5)
+target = Vector3(0.6, 2.8, -6)
+
+[sub_resource type="Resource" id="Resource_vxsqf"]
+script = ExtResource("5_ogkdq")
+position = Vector3(-6, 1.4, 6)
+target = Vector3(-9, 1.6, -4)
+fov = 34.0
+
+[resource]
+script = ExtResource("4_ol0am")
+arena = &"drowned_crypt_depths"
+shots = Array[ExtResource("5_ogkdq")]([SubResource("Resource_bhqnr"), SubResource("Resource_kw7wu"), SubResource("Resource_vxsqf")])
+actors = Array[ExtResource("1_ydhsu")]([SubResource("Resource_nwnna"), SubResource("Resource_5rlrq")])
+lines = Array[ExtResource("2_rd0uk")]([SubResource("Resource_wn64k"), SubResource("Resource_eh37x"), SubResource("Resource_vgbdc"), SubResource("Resource_qjvcc"), SubResource("Resource_u2wsw"), SubResource("Resource_uosvx")])
+id = &"epilogue"
+title = "Epilogue · The Bell Tolls On"

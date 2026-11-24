@@ -1,0 +1,110 @@
+[gd_resource type="Resource" script_class="StoryScene" format=3]
+
+[ext_resource type="Script" path="res://content/types/story_actor.gd" id="1_ihu1t"]
+[ext_resource type="Script" path="res://content/types/story_line.gd" id="2_8cjil"]
+[ext_resource type="Script" path="res://content/types/story_prop.gd" id="3_rc2ul"]
+[ext_resource type="Script" path="res://content/types/story_scene.gd" id="4_qx66x"]
+[ext_resource type="Script" path="res://content/types/story_shot.gd" id="5_d74ah"]
+
+[sub_resource type="Resource" id="Resource_2a7nl"]
+script = ExtResource("1_ihu1t")
+fighter = &"aldric"
+position = Vector3(-0.8, 0, 1.2)
+facing_degrees = 96.7
+
+[sub_resource type="Resource" id="Resource_arqvs"]
+script = ExtResource("1_ihu1t")
+fighter = &"hollowed"
+position = Vector3(1, 0, 0.4)
+facing_degrees = 230.0
+pose = &"Death_A"
+pose_time = 99.0
+
+[sub_resource type="Resource" id="Resource_fuvc5"]
+script = ExtResource("1_ihu1t")
+fighter = &"hollowed"
+position = Vector3(2.4, 0, -0.4)
+facing_degrees = -63.400000000000006
+pose = &"Idle_Combat"
+enter_line = 2
+
+[sub_resource type="Resource" id="Resource_kg3j0"]
+script = ExtResource("1_ihu1t")
+fighter = &"hollowed"
+position = Vector3(2.9, 0, 2)
+facing_degrees = -102.2
+pose = &"Idle_Combat"
+enter_line = 2
+
+[sub_resource type="Resource" id="Resource_ydqv2"]
+script = ExtResource("2_8cjil")
+text = "The squire falls and does not rise. Around it, the chapel's dead begin to stir."
+shot = 0
+
+[sub_resource type="Resource" id="Resource_u1myt"]
+script = ExtResource("2_8cjil")
+speaker = &"aldric"
+text = "Rest. You owe the king nothing now."
+shot = 1
+
+[sub_resource type="Resource" id="Resource_nk0h5"]
+script = ExtResource("2_8cjil")
+text = "Bones grind against stone. Two more drag themselves from their coffins, blades still in hand."
+shot = 0
+
+[sub_resource type="Resource" id="Resource_e820y"]
+script = ExtResource("2_8cjil")
+speaker = &"hollowed"
+speaker_name = "Hollowed"
+text = "Oathbreaker."
+
+[sub_resource type="Resource" id="Resource_eenak"]
+script = ExtResource("2_8cjil")
+speaker = &"aldric"
+text = "So the bell remembers me."
+shot = 1
+
+[sub_resource type="Resource" id="Resource_4fbdy"]
+script = ExtResource("2_8cjil")
+speaker = &"aldric"
+text = "Come, then. Both of you."
+
+[sub_resource type="Resource" id="Resource_406jm"]
+script = ExtResource("3_rc2ul")
+model = "coffin"
+position = Vector3(3.6, 0, -1.6)
+yaw_degrees = 70.0
+
+[sub_resource type="Resource" id="Resource_h3w66"]
+script = ExtResource("3_rc2ul")
+model = "coffin"
+position = Vector3(4.2, 0, 2.6)
+yaw_degrees = 115.0
+
+[sub_resource type="Resource" id="Resource_muyne"]
+script = ExtResource("3_rc2ul")
+model = "bone_B"
+position = Vector3(1.6, 0, 1.4)
+yaw_degrees = 20.0
+
+[sub_resource type="Resource" id="Resource_lo8jy"]
+script = ExtResource("5_d74ah")
+position = Vector3(-3.6, 2, 3.4)
+target = Vector3(2.4, 0.9, 0.6)
+fov = 46.0
+
+[sub_resource type="Resource" id="Resource_1s5j5"]
+script = ExtResource("5_d74ah")
+position = Vector3(1, 1.65, 2.3)
+target = Vector3(-0.8, 1.35, 1.2)
+fov = 40.0
+
+[resource]
+script = ExtResource("4_qx66x")
+arena = &"ashen_chapel"
+shots = Array[ExtResource("5_d74ah")]([SubResource("Resource_lo8jy"), SubResource("Resource_1s5j5")])
+actors = Array[ExtResource("1_ihu1t")]([SubResource("Resource_2a7nl"), SubResource("Resource_arqvs"), SubResource("Resource_fuvc5"), SubResource("Resource_kg3j0")])
+props = Array[ExtResource("3_rc2ul")]([SubResource("Resource_406jm"), SubResource("Resource_h3w66"), SubResource("Resource_muyne")])
+lines = Array[ExtResource("2_8cjil")]([SubResource("Resource_ydqv2"), SubResource("Resource_u1myt"), SubResource("Resource_nk0h5"), SubResource("Resource_e820y"), SubResource("Resource_eenak"), SubResource("Resource_4fbdy")])
+id = &"the_dead_stir"
+title = "The Dead Stir"
