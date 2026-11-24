@@ -1,0 +1,18 @@
+# Godot
+.godot/
+*.translation
+*.tmp
+
+# Build output
+/build/
+/build_info.json
+
+# Node tooling (local smoke tests)
+node_modules/
+
+# OS / editors
+.DS_Store
+Thumbs.db
+*.swp
+.vscode/
+.idea/
