@@ -62,3 +62,33 @@ godot --headless --path . -s "$PWD/tools/gen_theme.gd"
 Label variations: `TitleLabel`, `HeaderLabel`, `SubheaderLabel`, `BodyLabel`, `StrongLabel`,
 `SubtleLabel`, `HudNumberLabel`. Button variation: `MenuEntryButton`. Panel variation: `RowPanel`.
 Fonts: Cinzel (headings, buttons) and Alegreya Sans (body).
+
+## Versus and matches
+
+- `versus/versus_select.tscn`: fighter, CPU opponent, arena (with variants) and difficulty.
+  Locked fighters are listed but cannot be confirmed. `versus/roster.gd` (`Roster`) holds the
+  display data plus each fighter's FighterData path and each arena's ArenaData and scene
+  paths; `MatchSetup` uses stand-ins (test fighter, training arena) until those exist.
+- `app/profile.gd` (`Profile` autoload): unlocked fighters, saved to `user://profile.cfg`.
+  Story mode calls `Profile.unlock_fighter(&"morrigan")`. "Unlock all fighters" in
+  Settings overrides it.
+- `app/match_config.gd` (`MatchConfig`): the menu-level match description (fighters, teams,
+  arena, difficulty, rounds, starting Soul, HP handicaps, where to return, and an optional
+  `on_finished` callback for story mode). `GameFlow.start_match(config)` opens
+  `match/match_screen.tscn`, which builds the sim's `SimConfig` through `MatchSetup`,
+  runs the sim's `MatchRunner` with a `DeviceInputSource` for the player and
+  `MatchSetup.cpu_source()` for the others, and shows the HUD, pause menu and results.
+  `GameFlow.match_finished(result)` fires when the match ends.
+- `match/match_view.gd`: stand-in view (arena scene, capsules, follow camera) until the
+  fighter presentation lands.
+- Dev runs: `godot --path . -- --match` (Aldric vs Morrigan) or `-- --match=1v2`.
+
+## HUD
+
+`hud/hud.gd` (`Hud`) draws a `HudState` (health with a trailing loss bar, guard gauge,
+Soul with the Burst mark, ability cooldowns, timer, round pips) and announcements and
+callouts from `MatchEvents`. `hud/sim_hud.gd` (`SimHud`) fills the HudState from the sim
+and translates `SimEvent`s into `MatchEvents`, which also drive sounds
+(`presentation/audio/match_sounds.gd`). Team 0 is on the left; extra fighters on a side get
+compact plates (1v2). Preview a mid-fight HUD:
+`SCENE=res://tests/ui/hud_preview.tscn tools/capture_screenshot.sh /tmp/hud.png 40`.

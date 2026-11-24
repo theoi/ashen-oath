@@ -22,6 +22,7 @@ config/icon="res://icon.svg"
 
 Settings="*res://ui/settings/settings.gd"
 Sound="*res://presentation/audio/sound.gd"
+Profile="*res://ui/app/profile.gd"
 GameFlow="*res://ui/app/game_flow.gd"
 
 [debug]

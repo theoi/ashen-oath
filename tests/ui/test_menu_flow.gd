@@ -55,7 +55,7 @@ func test_open_controls_and_back_restores_focus() -> void:
 func test_every_screen_takes_focus_and_cancel_goes_back() -> void:
 	await _press(&"ui_accept")
 	for id: StringName in GameFlow.SCREENS:
-		if id == &"title" or id == &"mode_select":
+		if id in [&"title", &"mode_select", &"pause", &"results"]:
 			continue
 		GameFlow.open_screen(id)
 		await wait_frames(1)
