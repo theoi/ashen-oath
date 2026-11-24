@@ -28,7 +28,7 @@ const GUARD_BREAK := &"guard_break"
 const PERFECT_DODGE := &"perfect_dodge"
 ## {slot}
 const DODGE := &"dodge"
-## {slot, ability: 0..2, cue: StringName (optional, from move data)}
+## {slot, ability: 0..5, cue: StringName (optional, from move data)}
 const ABILITY := &"ability"
 ## {slot}
 const SUPER := &"super"
@@ -38,3 +38,9 @@ const SOUL_BURST := &"soul_burst"
 const WALL_SPLAT := &"wall_splat"
 ## {cue: StringName}
 const HAZARD := &"hazard"
+## {wave: 1-based, waves: total}
+const WAVE := &"wave"
+## {slot}: a boss's stagger bar broke.
+const STAGGER_BREAK := &"stagger_break"
+## {slot, breaker}: a boss's channelled special was broken.
+const CHANNEL_BREAK := &"channel_break"
