@@ -36,6 +36,22 @@ const HIP_HEIGHT := 0.75
 @export var glow_pulse: float = 0.0
 ## Shadow/ember look (Oath-Shade).
 @export_range(0.0, 1.0) var shade: float = 0.0
+@export var shade_edge: Color = Color(1.0, 0.35, 0.08)
+
+@export_group("Wear")
+## Dark dirt patches gathering toward the feet (0..1).
+@export_range(0.0, 1.0) var grime: float = 0.0
+@export var grime_color: Color = Color(0.07, 0.06, 0.05)
+@export var grime_scale: float = 5.0
+## Pale scratches (0..1).
+@export_range(0.0, 1.0) var wear: float = 0.0
+## Bitmask of atlas cells that crack open and glow (Aldric's Oathfire).
+@export var seam_cells: int = 0
+@export var seam_color: Color = Color(1.0, 0.35, 0.06)
+@export var seam_energy: float = 2.5
+@export var seam_scale: float = 4.0
+@export var seam_width: float = 0.06
+@export_range(0.0, 1.0) var seam_density: float = 0.5
 
 @export_group("Weapon")
 ## Mesh that gets the molten-crack material (empty = none).
@@ -177,6 +193,17 @@ func _make_materials() -> void:
 	body_material.set_shader_parameter(&"glow_energy", glow_energy)
 	body_material.set_shader_parameter(&"glow_pulse", glow_pulse)
 	body_material.set_shader_parameter(&"shade_amount", shade)
+	body_material.set_shader_parameter(&"shade_edge", shade_edge)
+	body_material.set_shader_parameter(&"grime", grime)
+	body_material.set_shader_parameter(&"grime_color", grime_color)
+	body_material.set_shader_parameter(&"grime_scale", grime_scale)
+	body_material.set_shader_parameter(&"wear", wear)
+	body_material.set_shader_parameter(&"crack_cells", seam_cells)
+	body_material.set_shader_parameter(&"crack_color", seam_color)
+	body_material.set_shader_parameter(&"crack_energy", seam_energy)
+	body_material.set_shader_parameter(&"crack_scale", seam_scale)
+	body_material.set_shader_parameter(&"crack_width", seam_width)
+	body_material.set_shader_parameter(&"crack_density", seam_density)
 	if molten_mesh != &"":
 		weapon_material = ShaderMaterial.new()
 		weapon_material.shader = MOLTEN_SHADER
@@ -194,9 +221,40 @@ func _apply_materials(node: Node) -> void:
 		elif weapon_material != null and mesh_instance.name == molten_mesh:
 			mesh_instance.material_override = weapon_material
 		else:
+			mesh_instance.mesh = _with_rest_positions(mesh_instance.mesh)
 			mesh_instance.material_override = body_material
 	for child in node.get_children():
 		_apply_materials(child)
+
+
+## A copy of `mesh` with each vertex's bind-pose position in CUSTOM0, so the body shader
+## can pin grime and cracks to the surface while the skeleton animates it. Copies are
+## shared between fighters through TreeCache.
+static func _with_rest_positions(mesh: Mesh) -> Mesh:
+	if mesh == null:
+		return mesh
+	var cache: Dictionary = TreeCache.get_or_make(&"fighter_rest_meshes", func() -> Dictionary: return {})
+	if cache.has(mesh):
+		return cache[mesh]
+	var baked := ArrayMesh.new()
+	var format := Mesh.ARRAY_CUSTOM_RGBA_FLOAT << Mesh.ARRAY_FORMAT_CUSTOM0_SHIFT
+	for s in mesh.get_surface_count():
+		var arrays := mesh.surface_get_arrays(s)
+		var vertices: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+		var rest := PackedFloat32Array()
+		rest.resize(vertices.size() * 4)
+		for i in vertices.size():
+			rest[i * 4] = vertices[i].x
+			rest[i * 4 + 1] = vertices[i].y
+			rest[i * 4 + 2] = vertices[i].z
+		arrays[Mesh.ARRAY_CUSTOM0] = rest
+		var flags := format
+		if arrays[Mesh.ARRAY_BONES] != null and (arrays[Mesh.ARRAY_BONES] as PackedInt32Array).size() > vertices.size() * 4:
+			flags |= Mesh.ARRAY_FLAG_USE_8_BONE_WEIGHTS
+		baked.add_surface_from_arrays(mesh.surface_get_primitive_type(s), arrays, [], {}, flags)
+		baked.surface_set_material(s, mesh.surface_get_material(s))
+	cache[mesh] = baked
+	return baked
 
 
 func _add_hand_prop(prop: PackedScene, bone: StringName, attachment_name: String) -> void:

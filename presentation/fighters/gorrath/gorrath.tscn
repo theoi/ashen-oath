@@ -1,18 +1,39 @@
 [gd_scene format=3]
 
-[ext_resource type="Script" path="res://presentation/fighters/fighter_model.gd" id="1_script"]
+[ext_resource type="Script" path="res://presentation/fighters/gorrath/gorrath_model.gd" id="1_script"]
 [ext_resource type="PackedScene" path="res://assets/kaykit-adventurers/Barbarian.glb" id="2_model"]
 
 [node name="Gorrath" type="Node3D"]
 script = ExtResource("1_script")
 model = ExtResource("2_model")
 model_scale = 0.9
-hide_meshes = PackedStringArray("1H_Axe_Offhand", "Barbarian_Round_Shield", "1H_Axe", "Mug")
-eye_color = Color(1, 0.3, 0.15, 1)
-tint = Color(0.8, 0.76, 0.74, 1)
-desaturate = 0.6
-brightness = 0.8
-rim_color = Color(1, 0.45, 0.3, 1)
+hide_meshes = PackedStringArray("1H_Axe_Offhand", "Barbarian_Round_Shield", "1H_Axe", "Mug", "Barbarian_Hat")
+tint = Color(0.72, 0.66, 0.62, 1)
+desaturate = 0.65
+brightness = 0.62
+contrast = 1.25
+rim_strength = 0.8
+rim_color = Color(0.95, 0.55, 0.35, 1)
+cell_tints = Dictionary[int, Color]({
+0: Color(0.72, 0.64, 0.58, 0.3),
+1: Color(0.35, 0.32, 0.3, 0),
+6: Color(0.5, 0.38, 0.32, 0.4),
+7: Color(0.45, 0.35, 0.3, 0.4),
+8: Color(0.5, 0.5, 0.55, 0),
+9: Color(0.5, 0.5, 0.55, 0),
+10: Color(0.55, 0.5, 0.45, 0.1),
+15: Color(0.5, 0.5, 0.52, 0),
+11: Color(0.5, 0.46, 0.44, 0),
+13: Color(0.55, 0.42, 0.36, 0.3),
+16: Color(0.46, 0.42, 0.4, 0),
+18: Color(0.42, 0.4, 0.44, 0)
+})
+glow_cells = 4
+glow_color = Color(1, 0.2, 0.08, 1)
+glow_energy = 3.0
+grime = 0.75
+grime_color = Color(0.08, 0.05, 0.035, 1)
+wear = 0.5
 trail_tip = Vector3(0, 1.3, 0)
 trail_color = Color(0.9, 0.35, 0.25, 0.55)
 spark_color = Color(1, 0.5, 0.3, 1)
