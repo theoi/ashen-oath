@@ -18,24 +18,27 @@ static func fill(sim: Sim, hud: HudState, human_slots: Array[int] = [0]) -> HudS
 	for team in hud.round_wins.size():
 		hud.round_wins[team] = state.team_wins[team] if team < state.team_wins.size() else 0
 	hud.seconds_left = float(sim.seconds_left())
+	hud.wave_count = sim.config.waves.size()
+	# wave_index equals waves.size() once the last wave has spawned.
+	hud.wave = clampi(state.wave_index + 1, 1, hud.wave_count) if hud.wave_count > 0 else 0
 	while hud.fighters.size() < sim.slot_count():
 		var entry := HudState.Fighter.new()
-		var slot := hud.fighters.size()
-		var data := sim.fighter_data[slot]
-		entry.slot = slot
-		entry.is_player = slot in human_slots
-		entry.name = data.display_name if not data.display_name.is_empty() else Roster.fighter_name(data.id)
-		entry.skills = _skills(data)
-		entry.awakening_name = Roster.fighter(data.id).get("super", "Super")
-		entry.awakening_action = DefaultBindings.AWAKEN
-		entry.dash_action = DefaultBindings.DASH
-		entry.burst_on_dash = data.dash != null
-		if data.dash != null:
-			entry.dash_max = sim.config.dash_charges if sim.config.dash_charges >= 0 else data.dash.charges
+		entry.slot = hud.fighters.size()
+		entry.is_player = entry.slot in human_slots
+		entry.wave_member = entry.slot >= sim.config.slots.size()
 		hud.fighters.append(entry)
 	for slot in sim.slot_count():
 		var f := sim.fighter(slot)
 		var entry := hud.fighters[slot]
+		if entry.roster != f.roster:
+			_bind(sim, entry)
+			entry.roster = f.roster
+		entry.active = f.active
+		entry.stagger = f.stagger
+		entry.stagger_max = f.stagger_max
+		entry.staggered = f.action == FighterState.Action.STAGGERED
+		entry.channel = f.channel
+		entry.channel_max = f.channel_max if f.channel > 0 else 0
 		entry.team = f.team
 		entry.health = f.hp
 		entry.max_health = f.max_hp
@@ -56,10 +59,29 @@ static func fill(sim: Sim, hud: HudState, human_slots: Array[int] = [0]) -> HudS
 				skill.cooldown_total = f.cooldown_totals[i] / 60.0
 			# A combo/chain sequence still running holds the slot until its cooldown starts.
 			skill.usable = not f.ko and not stunned and (sim.skill_ready(f, i) or skill.cooldown_left > 0.0)
+			skill.max_charges = sim.skill_max_charges(f, i)
+			skill.charges = f.skill_charges[i] if i < f.skill_charges.size() else 0
 			if entry.is_player:
 				_fill_follow_up(sim, f, i, skill)
 				_fill_charge(sim, f, i, skill)
 	return hud
+
+
+## Name, skills, awakening and dash of the fighter the slot runs now.
+static func _bind(sim: Sim, entry: HudState.Fighter) -> void:
+	var data := sim.fighter_data[entry.slot]
+	if data == null:
+		entry.skills = []
+		return
+	entry.name = data.display_name if not data.display_name.is_empty() else Roster.fighter_name(data.id)
+	entry.skills = _skills(data)
+	entry.awakening_name = Roster.fighter(data.id).get("super", "Super")
+	entry.awakening_action = DefaultBindings.AWAKEN
+	entry.dash_action = DefaultBindings.DASH
+	entry.burst_on_dash = data.dash != null
+	entry.dash_max = 0
+	if data.dash != null:
+		entry.dash_max = sim.config.dash_charges if sim.config.dash_charges >= 0 else data.dash.charges
 
 
 static func _fill_dash(sim: Sim, f: FighterState, entry: HudState.Fighter) -> void:
@@ -148,6 +170,12 @@ static func translate(sim: Sim, event: SimEvent) -> Dictionary:
 			out = {"type": MatchEvents.WALL_SPLAT, "slot": affected}
 		_T.HAZARD_ACTIVE:
 			out = {"type": MatchEvents.HAZARD}
+		_T.WAVE_START:
+			out = {"type": MatchEvents.WAVE, "wave": event.amount + 1, "waves": sim.config.waves.size()}
+		_T.STAGGER_BREAK:
+			out = {"type": MatchEvents.STAGGER_BREAK, "slot": affected}
+		_T.CHANNEL_BREAK:
+			out = {"type": MatchEvents.CHANNEL_BREAK, "slot": event.target, "breaker": event.source}
 		_T.MOVE_START:
 			var f := sim.fighter(acting)
 			var data := sim.fighter_data[acting]

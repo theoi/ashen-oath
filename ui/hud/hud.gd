@@ -1,8 +1,10 @@
 class_name Hud
 extends Control
 ## In-fight HUD: fighter plates (team 0 on the left, others on the right; extra fighters on a
-## side are shown smaller, so 1v2 fits), round timer and pips, the player's ability bar and
-## center-screen announcements. Fed by apply(HudState) every frame and on_event() per event.
+## side are shown smaller, so 1v2 fits), compact bars for story-wave enemies, a boss bar with
+## stagger and channel-break gauges, round timer and pips, the wave counter, the player's
+## ability bar and center-screen announcements. Fed by apply(HudState) every frame and
+## on_event() per event. Free wave slots are hidden.
 
 const ANNOUNCE_SECONDS := 1.3
 
@@ -10,6 +12,9 @@ const ANNOUNCE_SECONDS := 1.3
 var announced: PackedStringArray = []
 
 var _plates: Array[FighterPlate] = []
+var _mobs: Array[MobBar] = []
+var _boss: BossBar
+var _wave: Label
 var _left: VBoxContainer
 var _right: VBoxContainer
 var _timer: Label
@@ -47,6 +52,18 @@ func _ready() -> void:
 	_round.theme_type_variation = &"SubtleLabel"
 	_round.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	center.add_child(_round)
+	_wave = Label.new()
+	_wave.theme_type_variation = &"StrongLabel"
+	_wave.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_wave.visible = false
+	center.add_child(_wave)
+
+	_boss = BossBar.new()
+	_boss.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
+	_boss.offset_top = 118.0
+	_boss.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	_boss.visible = false
+	add_child(_boss)
 
 	_skills = SkillBar.new()
 	_skills.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM)
@@ -77,13 +94,28 @@ func apply(state: HudState) -> void:
 	_last_state = state
 	if _built_for != state.fighters.size():
 		_build(state)
+	var boss := _boss_of(state)
 	for plate in _plates:
 		var fighter := state.fighters[plate.slot]
-		var wins := state.round_wins[fighter.team] if fighter.team < state.round_wins.size() else 0
+		plate.visible = fighter.active and fighter != boss
+		var wins := state.round_wins[fighter.team] if fighter.team >= 0 and fighter.team < state.round_wins.size() else 0
 		plate.apply(fighter, wins)
+	for mob in _mobs:
+		var fighter := state.fighters[mob.slot]
+		mob.visible = fighter.active and fighter != boss
+		if mob.visible:
+			mob.apply(fighter)
+	_boss.visible = boss != null
+	if boss != null:
+		_boss.apply(boss)
+	_wave.visible = state.wave_count > 0
+	_wave.text = "Wave %d / %d" % [state.wave, state.wave_count]
 	_timer.text = "--" if state.seconds_left < 0.0 else "%d" % ceili(state.seconds_left)
 	_timer.add_theme_color_override("font_color", Palette.EMBER if 0.0 <= state.seconds_left and state.seconds_left <= 10.0 else Palette.BONE)
 	_round.text = "Round %d" % state.round_number
+	# Story wave fights are one round, usually untimed: the wave counter replaces both.
+	_timer.visible = state.wave_count == 0 or state.seconds_left >= 0.0
+	_round.visible = state.wave_count == 0
 	var player := _player(state)
 	_skills.visible = player != null
 	if player != null:
@@ -98,7 +130,17 @@ func on_event(event: Dictionary) -> void:
 		MatchEvents.FIGHT:
 			announce("Fight", "", 0.8)
 		MatchEvents.KO:
-			announce("KO", "%s falls" % _name_of(event.get("slot", -1)), 1.1)
+			var slot: int = event.get("slot", -1)
+			if not _is_mob(slot):
+				announce("KO", "%s falls" % _name_of(slot), 1.1)
+		MatchEvents.WAVE:
+			var wave: int = event.get("wave", 1)
+			var waves: int = event.get("waves", 1)
+			announce("Wave %d" % wave, "Final wave" if wave == waves and waves > 1 else "", 1.0)
+		MatchEvents.STAGGER_BREAK:
+			_callout(event.get("slot", -1), "Staggered", BossBar.STAGGER)
+		MatchEvents.CHANNEL_BREAK:
+			_callout(event.get("slot", -1), "Broken", BossBar.CHANNEL)
 		MatchEvents.TIME_UP:
 			announce("Time", "", 1.0)
 		MatchEvents.ROUND_WON:
@@ -138,6 +180,22 @@ func plate_for(slot: int) -> FighterPlate:
 	return null
 
 
+func mob_for(slot: int) -> MobBar:
+	for mob in _mobs:
+		if mob.slot == slot:
+			return mob
+	return null
+
+
+## The boss bar, or null while no boss is shown.
+func boss_bar() -> BossBar:
+	return _boss if _boss.visible else null
+
+
+func wave_text() -> String:
+	return _wave.text if _wave.visible else ""
+
+
 func skill_bar() -> SkillBar:
 	return _skills
 
@@ -172,11 +230,20 @@ func _next_announcement() -> void:
 func _build(state: HudState) -> void:
 	for plate in _plates:
 		plate.queue_free()
+	for mob in _mobs:
+		mob.queue_free()
 	_plates.clear()
+	_mobs.clear()
 	_built_for = state.fighters.size()
 	var first_on_side := {}
 	for fighter in state.fighters:
 		var left_side := fighter.team == 0
+		if fighter.wave_member:
+			var mob := MobBar.new()
+			(_left if left_side else _right).add_child(mob)
+			mob.setup(fighter, not left_side)
+			_mobs.append(mob)
+			continue
 		var side_key := 0 if left_side else 1
 		var compact := first_on_side.has(side_key)
 		var team_first := not state.fighters.slice(0, fighter.slot).any(func(f: HudState.Fighter) -> bool: return f.team == fighter.team)
@@ -206,7 +273,26 @@ func _player(state: HudState) -> HudState.Fighter:
 	return null
 
 
+## The first boss on screen: an active non-player fighter with a stagger bar.
+func _boss_of(state: HudState) -> HudState.Fighter:
+	for fighter in state.fighters:
+		if fighter.active and fighter.is_boss() and not fighter.is_player:
+			return fighter
+	return null
+
+
+## A wave enemy that is not the boss: its KO gets no announcement.
+func _is_mob(slot: int) -> bool:
+	if _last_state == null or slot < 0 or slot >= _last_state.fighters.size():
+		return false
+	var fighter := _last_state.fighters[slot]
+	return fighter.wave_member and not fighter.is_boss()
+
+
 func _callout(slot: int, text: String, color: Color) -> void:
+	if _boss.visible and _boss.slot == slot:
+		_boss.callout(text, color)
+		return
 	var plate := plate_for(slot)
 	if plate != null:
 		plate.callout(text, color)
@@ -221,7 +307,7 @@ func _name_of(slot: int) -> String:
 func _team_name(team: int) -> String:
 	if _last_state == null:
 		return "Team %d" % (team + 1)
-	var members := _last_state.fighters.filter(func(f: HudState.Fighter) -> bool: return f.team == team)
+	var members := _last_state.fighters.filter(func(f: HudState.Fighter) -> bool: return f.team == team and f.active)
 	if members.is_empty():
 		return "Team %d" % (team + 1)
 	var first: HudState.Fighter = members[0]

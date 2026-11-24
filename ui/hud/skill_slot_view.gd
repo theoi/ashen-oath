@@ -1,8 +1,9 @@
 class_name SkillSlotView
 extends VBoxContainer
 ## One skill on the skill bar: initials (or icon), radial cooldown sweep with seconds left,
-## the button for the active device, a ⚡ mark on counter skills, a draining border while a
-## combo or chain follow-up waits in the slot, and a charge bar with the perfect zone.
+## the button for the active device, a ⚡ mark on counter skills, charge pips on skills with
+## several charges, a draining border while a combo or chain follow-up waits in the slot,
+## and a charge bar with the perfect zone.
 
 const BOX := 60.0
 const CHARGE_HEIGHT := 7.0
@@ -64,6 +65,9 @@ func apply(value: HudState.Skill) -> void:
 	_initials.text = initials(shown_name)
 	_initials.visible = skill.icon == null
 	var left := 0.0 if following else skill.cooldown_left
+	# With a charge left, the slot reads as ready; the pips and a faint sweep show the refill.
+	if skill.max_charges > 0 and skill.charges > 0:
+		left = 0.0
 	_count.text = "" if left <= 0.0 else ("%.1f" % left if left < 1.0 else "%d" % ceili(left))
 	_initials.modulate.a = 1.0 if left <= 0.0 else 0.15
 	var is_ready := skill.ready()
@@ -114,16 +118,32 @@ func _draw_box() -> void:
 		_box.draw_texture_rect(skill.icon, rect.grow(-3.0), false)
 	if skill.cooldown_left > 0.0 and skill.follow_left <= 0.0:
 		var fraction := clampf(skill.cooldown_left / maxf(skill.cooldown_total, 0.001), 0.0, 1.0)
-		_draw_sweep(rect, fraction, Color(0.0, 0.0, 0.0, 0.6))
+		var charge_left := skill.max_charges > 0 and skill.charges > 0
+		_draw_sweep(rect, fraction, Color(0.0, 0.0, 0.0, 0.3 if charge_left else 0.6))
 	var border := Palette.EMBER_BRIGHT if lit else Palette.ASH_EDGE
 	_box.draw_rect(rect, border, false, 2.0 if lit else 1.0)
 	if skill.follow_left > 0.0:
 		_draw_perimeter(rect.grow(-1.5), skill.follow_left / maxf(skill.follow_total, 0.001), Palette.SOUL_FULL, 3.0)
 	if skill.counter:
 		_draw_bolt(Vector2(4.0, 3.0))
+	_draw_charge_pips(rect)
 	if _flash > 0.0:
 		_box.draw_rect(rect, Color(1.0, 0.85, 0.6, 0.5 * _flash))
 		_box.draw_rect(rect.grow(2.0 * _flash), Color(1.0, 0.8, 0.5, _flash), false, 2.0)
+
+
+## One diamond per charge along the top-right edge, lit while the charge is available.
+func _draw_charge_pips(rect: Rect2) -> void:
+	if skill.max_charges < 2:
+		return
+	for i in skill.max_charges:
+		var center := Vector2(rect.end.x - 7.0 - i * 10.0, rect.position.y + 7.0)
+		var points := PackedVector2Array([center + Vector2(0.0, -4.0), center + Vector2(4.0, 0.0),
+				center + Vector2(0.0, 4.0), center + Vector2(-4.0, 0.0)])
+		var lit := skill.max_charges - 1 - i < skill.charges
+		_box.draw_colored_polygon(points, Palette.EMBER_BRIGHT if lit else Color(0.0, 0.0, 0.0, 0.7))
+		points.append(points[0])
+		_box.draw_polyline(points, Palette.EMBER_DIM if lit else Palette.ASH_EDGE, 1.0)
 
 
 ## The counter mark, drawn because the UI fonts have no ⚡ glyph.

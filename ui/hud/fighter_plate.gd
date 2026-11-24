@@ -150,6 +150,11 @@ func _process(delta: float) -> void:
 
 
 func _bar(color: Color, with_background: bool) -> ProgressBar:
+	return make_bar(color, with_background, _mirrored)
+
+
+## A flat 0..1 bar; mirrored bars fill from the right.
+static func make_bar(color: Color, with_background: bool, mirrored: bool) -> ProgressBar:
 	var bar := ProgressBar.new()
 	bar.min_value = 0.0
 	bar.max_value = 1.0
@@ -157,7 +162,7 @@ func _bar(color: Color, with_background: bool) -> ProgressBar:
 	bar.value = 1.0
 	bar.show_percentage = false
 	bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	bar.fill_mode = ProgressBar.FILL_END_TO_BEGIN if _mirrored else ProgressBar.FILL_BEGIN_TO_END
+	bar.fill_mode = ProgressBar.FILL_END_TO_BEGIN if mirrored else ProgressBar.FILL_BEGIN_TO_END
 	var fill := StyleBoxFlat.new()
 	fill.bg_color = color
 	bar.add_theme_stylebox_override("fill", fill)

@@ -29,9 +29,13 @@ class Skill:
 	var charge_levels: PackedFloat32Array = []
 	var perfect_from := 0.0
 	var perfect_to := 0.0
+	## Charged skills (max_charges 2+; 0 = not charged): charges left. cooldown_left then
+	## counts to the next charge.
+	var charges := 0
+	var max_charges := 0
 
 	func ready() -> bool:
-		return cooldown_left <= 0.0 or follow_left > 0.0
+		return cooldown_left <= 0.0 or follow_left > 0.0 or (max_charges > 0 and charges > 0)
 
 
 class Fighter:
@@ -61,6 +65,22 @@ class Fighter:
 	var dash_action: StringName
 	## Soul Burst is cast with the dash button (true) or the awakening button (false).
 	var burst_on_dash := false
+	## False for a free wave slot (not spawned yet, or freed after a KO): hidden.
+	var active := true
+	## A story-wave combatant (not one of the match's own slots): shown as a compact bar.
+	var wave_member := false
+	## Boss stagger bar (stagger_max 0 = none) and whether it is broken right now.
+	var stagger := 0.0
+	var stagger_max := 0.0
+	var staggered := false
+	## Channel-break gauge of a special being channelled (channel_max 0 = none showing).
+	var channel := 0.0
+	var channel_max := 0.0
+	## The Sim.roster entry name and skills were read from (wave slots change fighters).
+	var roster := -1
+
+	func is_boss() -> bool:
+		return stagger_max > 0.0
 
 
 var fighters: Array[Fighter] = []
@@ -70,3 +90,6 @@ var rounds_to_win := 2
 var round_wins: Array[int] = [0, 0]
 ## Negative means no timer.
 var seconds_left := 99.0
+## Story waves: the current wave, 1-based, of wave_count (0 = no waves).
+var wave := 0
+var wave_count := 0

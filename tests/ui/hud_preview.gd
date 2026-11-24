@@ -3,6 +3,7 @@ extends Node
 ## running, damage taken, Soul at Burst and Super). For screenshots of HUD states the
 ## simulation cannot reach yet:
 ##   SCENE=res://tests/ui/hud_preview.tscn tools/capture_screenshot.sh /tmp/hud.png 60
+## With -- --story: a story wave with a boss mid-channel, six wave enemies and skill charges.
 
 const ARENA := "res://presentation/arenas/ashen_chapel/ashen_chapel.tscn"
 
@@ -21,6 +22,10 @@ func _ready() -> void:
 	var hud := Hud.new()
 	layer.add_child(hud)
 
+	if "--story" in OS.get_cmdline_user_args():
+		hud.apply(_story_state())
+		hud.on_event({"type": MatchEvents.STAGGER_BREAK, "slot": 1})
+		return
 	var state := HudState.new()
 	state.round_number = 2
 	state.round_wins = [1, 0]
@@ -49,6 +54,50 @@ func _ready() -> void:
 	hud.on_event({"type": MatchEvents.PARRY, "slot": 0})
 	hud.on_event({"type": MatchEvents.GUARD_BREAK, "slot": 2})
 	hud.announce("Counter", "Aldric breaks Gorrath's guard", 30.0)
+
+
+## Final wave: Gorrath channelling a special (gauge 70%, stagger 40%), six Hollowed (one
+## down, one free slot), Aldric's Oathfire Lunge on its second charge.
+func _story_state() -> HudState:
+	var state := HudState.new()
+	state.seconds_left = -1.0
+	state.wave = 3
+	state.wave_count = 3
+	for slot in 8:
+		var fighter := HudState.Fighter.new()
+		fighter.slot = slot
+		fighter.team = 0 if slot == 0 else 1
+		fighter.wave_member = slot > 1
+		fighter.max_health = 300.0
+		fighter.health = [300.0, 300.0, 300.0, 120.0, 0.0, 210.0, 60.0, 300.0][slot]
+		fighter.knocked_out = slot == 4
+		fighter.active = slot != 6
+		fighter.name = "Hollowed"
+		state.fighters.append(fighter)
+	var player := state.fighters[0]
+	player.name = "Aldric Vane"
+	player.is_player = true
+	player.max_health = 1500.0
+	player.health = 1110.0
+	player.soul = 64.0
+	player.guard = 80.0
+	_pilot_skills(player)
+	player.skills[0].max_charges = 2
+	player.skills[0].charges = 1
+	player.skills[0].cooldown_left = 2.4
+	player.skills[2].follow_left = 0.0
+	player.skills[5].charging = false
+	var boss := state.fighters[1]
+	boss.name = "Gorrath, the Bone Tyrant"
+	boss.max_health = 4200.0
+	boss.health = 2650.0
+	boss.stagger_max = 600.0
+	boss.stagger = 240.0
+	boss.channel_max = 200.0
+	boss.channel = 140.0
+	state.fighters[7].channel_max = 100.0
+	state.fighters[7].channel = 55.0
+	return state
 
 
 ## Aldric's pilot kit (design-lost-ark §4) mid-fight: a chain follow-up waiting on R, Verdict
