@@ -134,6 +134,9 @@ var _counter_key: int = -1
 var _stance_key: int = -1
 var _whiff_key: int = -1
 var _dash_ok: bool = false
+## Last tick the CPU or its target lost HP, for breaking zoning stalemates.
+var _last_damage_tick: int = 0
+var _last_hp_pair: int = -1
 
 ## Tick the fighter entered its current action (stable through hitstop, unlike action_tick).
 var _action_entry: int = 0
@@ -214,6 +217,10 @@ func next_frame(sim: Sim, slot: int) -> int:
 	_target_prev_action = _target.action
 	_target_prev_tick = _target.action_tick
 	_aim_set = false
+	var hp_pair := _me.hp * 100003 + _target.hp
+	if hp_pair != _last_hp_pair:
+		_last_hp_pair = hp_pair
+		_last_damage_tick = _tick
 	_observe()
 	_manage_lock()
 	if _tick >= _next_strategy:
@@ -258,6 +265,8 @@ func _reset_round() -> void:
 	_hesitate_until = 0
 	_unstick_until = 0
 	_charge_until = 0
+	_last_damage_tick = _tick
+	_last_hp_pair = -1
 	intent = Intent.IDLE
 	if tokens != null:
 		tokens.release(_me.slot, _tick)
@@ -1905,6 +1914,13 @@ func _strategy() -> void:
 		retreat += 30
 	scores[Intent.RETREAT] = retreat
 
+	# Without guard nobody takes chip: two fighters that only shoot and dodge can stall. After
+	# 8 s without damage, close in.
+	if _tick - _last_damage_tick > 480:
+		scores[Intent.APPROACH] += 60
+		scores[Intent.PRESSURE] += 40
+		scores[Intent.RETREAT] = 0
+		scores[Intent.ZONE] /= 2
 	var aggression := difficulty.aggression * profile.aggression / 100
 	scores[Intent.APPROACH] = scores[Intent.APPROACH] * aggression * profile.approach / 10000
 	scores[Intent.PRESSURE] = scores[Intent.PRESSURE] * aggression * profile.pressure / 10000
