@@ -76,6 +76,8 @@ enum Aim {
 @export var stance_start: int = 0
 @export var stance_end: int = 0
 @export var stance_arc: float = 180.0
+## Freeze on both fighters when the stance absorbs a hit (-1 = CombatRules.stance_hitstop).
+@export var stance_hitstop: int = -1
 @export var counter_move: StringName = &""
 
 @export_group("Strings and cancels")

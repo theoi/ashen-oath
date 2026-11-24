@@ -279,6 +279,16 @@ func test_stance_absorbs_a_frontal_hit_and_counters() -> void:
 	assert_eq(F.first(ticks, T.HIT).source, 0, "Retribution lands")
 
 
+func test_stance_hitstop_defaults_to_the_rule_and_is_overridable_per_move() -> void:
+	var trigger := F.first(F.play(sim, [BULWARK], [0, F.L], 8), T.STANCE_TRIGGER)
+	assert_eq(trigger.hitstop, CombatRules.new().stance_hitstop)
+	var data := _fighter()
+	data.moves[5].stance_hitstop = 6
+	_duel(1.2, F.config(2, data))
+	trigger = F.first(F.play(sim, [BULWARK], [0, F.L], 8), T.STANCE_TRIGGER)
+	assert_eq(trigger.hitstop, 6)
+
+
 func test_stance_destroys_projectiles_but_not_hits_from_behind() -> void:
 	_duel(4.0)
 	var ticks := F.play(sim, [BULWARK], [REND], 30)
