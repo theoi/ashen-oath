@@ -11,7 +11,8 @@ extends InputSource
 ## - Tactics, every frame: picks moves by reach, startup and on-block safety from the
 ##   fighter's own MoveData (AiMoveBook), runs strings, cancels, juggles and punishes.
 ## - Reaction: answers attacks, projectiles, eruptions and grabs after the difficulty's
-##   reaction delay, with its probability: block, parry, dodge, jump, tech or Burst.
+##   reaction delay, with its probability: dodge (or dash), stance, tech or Burst. Block,
+##   parry and jump only with `allow_guard` (design-lost-ark 1.5 and §4 Pilot scope drop them).
 ##
 ## Deterministic: decisions use an AiRng seeded from the match seed and the slot, so the same
 ## config and difficulties replay the same match; the recorded Replay reproduces it exactly.
@@ -28,6 +29,8 @@ const Entry := AiMoveBook.Entry
 const WALL_MARGIN := 14000
 ## Buttons skill-kit fighters have no binding for (design-lost-ark 1.5, 6.2).
 const KIT_UNUSED := SimInput.GUARD | SimInput.HEAVY | SimInput.GRAB | SimInput.JUMP
+## Buttons no player has any more (design-lost-ark 1.5, 6.2): old kits keep heavy and grab.
+const UNGUARDED_UNUSED := SimInput.GUARD | SimInput.JUMP
 const THREAT_TTL := 120
 
 
@@ -46,6 +49,8 @@ var difficulty: AiDifficulty
 var profile: AiProfile
 ## Shared by the CPU fighters of one team (null = no sharing, e.g. 1v1).
 var tokens: AiAttackTokens
+## Old-kit CPUs guard, parry and jump only when set (the pre-skill-kit behavior).
+var allow_guard: bool = false
 ## Current intent, for debugging and the soak report.
 var intent: Intent = Intent.IDLE
 ## Decision counters for the soak report (threats seen, responses, punishes...).
@@ -265,6 +270,9 @@ func _finish() -> int:
 	if _kit:
 		pulse &= ~KIT_UNUSED
 		_hold &= ~KIT_UNUSED
+	elif not allow_guard:
+		pulse &= ~UNGUARDED_UNUSED
+		_hold &= ~UNGUARDED_UNUSED
 	# A press needs the button up on the previous frame: re-press next frame instead.
 	var blocked := pulse & _last_buttons
 	_deferred = blocked & ~_hold if _me != null and not _me.ko else 0
@@ -413,7 +421,7 @@ func _on_enemy_move(e: FighterState) -> void:
 		t.kind = ThreatKind.GRAB
 		var roll := rng.below(100)
 		t.response = Response.JUMP if roll < 40 else (Response.DODGE if roll < 80 else Response.COUNTER)
-		if _kit and t.response == Response.JUMP:
+		if _unguarded() and t.response == Response.JUMP:
 			t.response = _pick_defense(true)
 	else:
 		t.kind = ThreatKind.MELEE
@@ -443,8 +451,8 @@ func _on_effect(e: EffectState) -> void:
 
 
 func _pick_defense(unblockable: bool) -> Response:
-	if _kit:
-		# No guard: a stance skill when one is ready, else the dash.
+	if _unguarded():
+		# No guard: a stance skill when one is ready, else the dash (old kits: the dodge).
 		if _stance_skill() != null and rng.chance(difficulty.stance_chance):
 			return Response.STANCE
 		return Response.DODGE
@@ -558,7 +566,7 @@ func _respond(t: Threat) -> int:
 			return -1
 		if d > Fx.m(1.6) and absi(Fx.angle_diff(e.facing, _angle_from(e, _me))) > Fx.deg(50.0):
 			return -1
-		if e.charging and _kit:
+		if e.charging and _unguarded():
 			# Nothing lands until the charge is released: keep playing (counter windows) meanwhile.
 			return -1
 		frames_to_hit = entry.hit_frame - e.move_frame
@@ -588,8 +596,8 @@ func _respond(t: Threat) -> int:
 			hit_end = frames_to_hit + 3
 	var data := _sim.fighter_data[_me.slot]
 	var away := Fx.angle_of(_me.pos.x - source.x, _me.pos.z - source.z)
-	if _kit:
-		return _respond_kit(t, frames_to_hit, source, away)
+	if _unguarded():
+		return _respond_unguarded(t, frames_to_hit, source, away)
 	match t.response:
 		Response.BLOCK:
 			_hold |= SimInput.GUARD
@@ -641,10 +649,13 @@ func _respond(t: Threat) -> int:
 	return -1
 
 
-## Skill-kit responses: Bulwark-style stance timed so the hit lands in its window, else a
-## dash whose i-frames cover the hit, else running out of an eruption.
-func _respond_kit(t: Threat, frames_to_hit: int, source: Vector3i, away: int) -> int:
-	var dash := _sim.fighter_data[_me.slot].dash
+## Responses without guard: a stance skill timed so the hit lands in its window, else a dash
+## (old kits: the dodge roll) whose i-frames cover the hit, else running out of an eruption.
+func _respond_unguarded(t: Threat, frames_to_hit: int, source: Vector3i, away: int) -> int:
+	var data := _sim.fighter_data[_me.slot]
+	var invuln_start := data.dash.invuln_start if _kit else data.dodge_invuln_start
+	var invuln_end := data.dash.invuln_end if _kit else data.dodge_invuln_end
+	var ready := _me.dash_charges > 0 if _kit else _me.dodge_lockout == 0
 	if t.response == Response.STANCE:
 		var stance := _stance_skill()
 		# Pressed now, the stance's frame 1 is this tick: the hit lands on frame frames_to_hit + 1.
@@ -661,21 +672,21 @@ func _respond_kit(t: Threat, frames_to_hit: int, source: Vector3i, away: int) ->
 		t.response = Response.DODGE
 	match t.response:
 		Response.DODGE, Response.ESCAPE:
-			if frames_to_hit <= 0:
+			if frames_to_hit < invuln_start:
 				t.response = Response.NONE
 				return -1
-			if frames_to_hit > dash.invuln_end - 2:
+			if frames_to_hit > invuln_end - 2:
 				if t.response == Response.ESCAPE:
 					_escape_until = _tick + frames_to_hit
 					_escape_angle = _steer(away)
 					_run_toward(away)
 				return 0
-			if _me.dash_charges <= 0:
+			if not ready:
 				if t.response == Response.ESCAPE:
 					_run_toward(away)
 				t.response = Response.NONE
 				return -1
-			_count("dashes")
+			_count("dashes" if _kit else "dodges")
 			_press(SimInput.DASH)
 			_stick(_dodge_angle(away))
 			return 1
@@ -685,6 +696,11 @@ func _respond_kit(t: Threat, frames_to_hit: int, source: Vector3i, away: int) ->
 				_stick_mag = 0
 			return 1
 	return -1
+
+
+## No block, parry or jump: skill-kit fighters always, old kits unless allow_guard.
+func _unguarded() -> bool:
+	return _kit or not allow_guard
 
 
 func _stance_skill() -> Entry:
@@ -840,7 +856,7 @@ func _attacking() -> void:
 			return
 	if not hit or _cancel_key == _action_entry:
 		return
-	if level >= 3 and entry.has(AiMoveBook.TAG_JUMP_CANCEL) and _target.action == Action.AIR_HITSTUN \
+	if allow_guard and level >= 3 and entry.has(AiMoveBook.TAG_JUMP_CANCEL) and _target.action == Action.AIR_HITSTUN \
 			and frame > entry.last_hit_frame:
 		_cancel_key = _action_entry
 		_press(SimInput.JUMP)
@@ -939,7 +955,7 @@ func _approach() -> void:
 			_press(SimInput.DASH)
 			_stick(_steer(angle))
 			return
-		if _jump_in_ok and dist > Fx.m(2.2) and dist < Fx.m(4.0) and _book.air_heavy != null:
+		if allow_guard and _jump_in_ok and dist > Fx.m(2.2) and dist < Fx.m(4.0) and _book.air_heavy != null:
 			_jump_in_ok = false
 			_press(SimInput.JUMP)
 			_stick(angle)
@@ -1031,7 +1047,7 @@ func _bait() -> void:
 
 
 func _defend() -> void:
-	if _kit:
+	if _unguarded():
 		# Without guard, defending means staying at the edge of their reach.
 		_bait()
 		return
@@ -1138,7 +1154,7 @@ func _escape_corner() -> void:
 
 
 func _should_guard_preemptively() -> bool:
-	if _kit:
+	if _unguarded():
 		return false
 	if intent == Intent.APPROACH or intent == Intent.PUNISH:
 		return false
