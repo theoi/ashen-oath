@@ -183,6 +183,13 @@ var carried_by: int = -1
 
 ## Frames left rooted (HitData.root_frames).
 var rooted: int = 0
+## Channel-break gauge points left and its size (MoveData.channel_gauge; 0 = none showing).
+var channel: int = 0
+var channel_max: int = 0
+## Frames until counter windows show again (SlotConfig.counter_window_cooldown), and
+## whether the current move's counter window is suppressed.
+var counter_cooldown: int = 0
+var counter_blocked: bool = false
 
 var ko: bool = false
 ## Storage for the fighter's FighterTrait script (stored charges and similar).

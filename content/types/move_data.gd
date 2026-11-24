@@ -80,6 +80,16 @@ enum Aim {
 @export var stance_hitstop: int = -1
 @export var counter_move: StringName = &""
 
+@export_group("Channel gauge")
+## Orange channel-break gauge (boss specials): stagger points that break the channel while
+## the move is on frames channel_start..channel_end. Breaking it staggers the user like a
+## stagger-bar break (CombatRules.stagger_frames, +stagger_soul to the breaker; counters
+## add nothing extra). If the window ends unbroken the move carries on (the special fires).
+## 0 = no gauge.
+@export var channel_gauge: int = 0
+@export var channel_start: int = 1
+@export var channel_end: int = 0
+
 @export_group("Strings and cancels")
 ## Move id started by pressing light/heavy from the end of the active frames on.
 @export var next_light: StringName = &""

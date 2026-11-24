@@ -201,7 +201,7 @@ func is_invulnerable(f: FighterState) -> bool:
 
 ## Whether `f` is in a counter window of its current move (the blue flash).
 func in_counter_window(f: FighterState) -> bool:
-	if f.action != Action.ATTACK:
+	if f.action != Action.ATTACK or f.counter_blocked:
 		return false
 	var move := current_move(f)
 	return move.in_window(f.move_frame, move.counter_window_start, move.counter_window_end)
@@ -943,6 +943,7 @@ func start_move(f: FighterState, move_index: int, bit: int = 0) -> void:
 	f.move_button = bit
 	f.move_contact = 0
 	f.move_cast += 1
+	f.counter_blocked = false
 	f.move_hit_masks.fill(0)
 	f.charge = 0
 	f.charging = false
@@ -1237,7 +1238,18 @@ func _move_frame_effects(f: FighterState, move: MoveData) -> void:
 	_move_motion(f, move)
 	var frame := f.move_frame
 	if move.counter_window_end > 0 and frame == move.counter_window_start:
-		_emit(EventType.COUNTER_WINDOW, f.slot, -1, move.id, f.pos, move.counter_window_end - frame + 1)
+		if f.counter_cooldown > 0:
+			f.counter_blocked = true
+		else:
+			f.counter_cooldown = config.slots[f.slot].counter_window_cooldown
+			_emit(EventType.COUNTER_WINDOW, f.slot, -1, move.id, f.pos, move.counter_window_end - frame + 1)
+	if move.channel_gauge > 0 and frame == move.channel_start:
+		f.channel = move.channel_gauge
+		f.channel_max = move.channel_gauge
+		_emit(EventType.CHANNEL_START, f.slot, -1, move.id, f.pos, move.channel_gauge)
+	elif f.channel > 0 and move.channel_gauge > 0 and frame > move.channel_end:
+		f.channel = 0
+		_emit(EventType.CHANNEL_END, f.slot, -1, move.id, f.pos, 1)
 	if move.teleport != null and frame == move.teleport.frame:
 		_teleport(f, move.teleport)
 	for hb in move.hitboxes:
@@ -2353,7 +2365,8 @@ func _apply_contact(c: Contact) -> void:
 		if _try_parry(c) or _try_block(c):
 			_after_contact(c)
 			return
-		c.counter_attack = c.hit.counter and c.attacker != null and in_counter_window(v)
+		c.counter_attack = c.hit.counter and c.attacker != null and in_counter_window(v) \
+				and (v.stagger_max <= 0 or _in_front(v, c.source, rules.boss_counter_arc))
 		if not c.counter_attack and (_try_super_armor(c) or _try_armor(c)):
 			_after_contact(c)
 			return
@@ -2465,6 +2478,14 @@ func _chip_percent_of(c: Contact) -> int:
 
 
 ## Whether `v` faces `source` within the guard arc.
+## Whether `source` is within `arc` degrees of `v`'s facing.
+func _in_front(v: FighterState, source: Vector3i, arc: float) -> bool:
+	if Fx.dist2_xz(v.pos, source) == 0:
+		return true
+	var to := Fx.angle_of(source.x - v.pos.x, source.z - v.pos.z)
+	return absi(Fx.angle_diff(v.facing, to)) * 2 <= Fx.deg(arc)
+
+
 func _facing_source(v: FighterState, source: Vector3i) -> bool:
 	if Fx.dist2_xz(v.pos, source) == 0:
 		return true
@@ -2693,7 +2714,11 @@ func _deal_soul(c: Contact, damage: int) -> void:
 
 
 ## Drains a boss stagger bar; at 0 the fighter is STAGGERED and the bar refills, bigger.
+## While a channel-break gauge shows, it takes the drain instead (see _drain_channel).
 func _drain_stagger(v: FighterState, attacker: FighterState, amount: int) -> void:
+	if v.channel > 0:
+		_drain_channel(v, attacker, amount)
+		return
 	if v.stagger_max <= 0 or v.ko or v.action == Action.STAGGERED or amount <= 0:
 		return
 	v.stagger -= amount
@@ -2701,6 +2726,24 @@ func _drain_stagger(v: FighterState, attacker: FighterState, amount: int) -> voi
 		return
 	v.stagger_max = v.stagger_max * rules.stagger_growth_percent / 100
 	v.stagger = v.stagger_max
+	_stagger(v, attacker)
+	_emit(EventType.STAGGER_BREAK, attacker.slot if attacker != null else -1, v.slot, &"", v.pos, v.stagger_max)
+
+
+func _drain_channel(v: FighterState, attacker: FighterState, amount: int) -> void:
+	if v.ko or amount <= 0:
+		return
+	v.channel -= amount
+	if v.channel > 0:
+		return
+	v.channel = 0
+	var id := current_move(v).id if v.action == Action.ATTACK else &""
+	_stagger(v, attacker)
+	_emit(EventType.CHANNEL_BREAK, attacker.slot if attacker != null else -1, v.slot, id, v.pos, v.channel_max)
+
+
+## Puts `v` in STAGGERED (stagger-bar or channel break); the breaker gains Soul.
+func _stagger(v: FighterState, attacker: FighterState) -> void:
 	_release_grab(v)
 	_set_action(v, Action.STAGGERED)
 	v.stun = rules.stagger_frames
@@ -2711,7 +2754,6 @@ func _drain_stagger(v: FighterState, attacker: FighterState, amount: int) -> voi
 	v.splat_armed = false
 	if attacker != null:
 		_gain_soul(attacker, rules.stagger_soul * 100)
-	_emit(EventType.STAGGER_BREAK, attacker.slot if attacker != null else -1, v.slot, &"", v.pos, v.stagger_max)
 
 
 func _try_armor(c: Contact) -> bool:
@@ -2811,7 +2853,7 @@ func _land_hit(c: Contact) -> void:
 		_emit(EventType.LAUNCH, a.slot if a != null else -1, v.slot, id, v.pos, v.vel.y)
 	if c.counter_attack:
 		_emit(EventType.COUNTER_STUN, a.slot, v.slot, id, v.pos, v.stun)
-	_drain_stagger(v, a, _stagger_of(c) + (rules.counter_stagger if c.counter_attack else 0))
+	_drain_stagger(v, a, _stagger_of(c) + (rules.counter_stagger if c.counter_attack and v.channel == 0 else 0))
 	_on_connect(c)
 	if hit.root_frames > 0 and v.grounded and v.action != Action.KNOCKDOWN and v.action != Action.TECH:
 		v.rooted = maxi(v.rooted, hit.root_frames)
@@ -3052,6 +3094,11 @@ func _post_tick(f: FighterState) -> void:
 			f.marks[s] -= 1
 	if f.rooted > 0 and f.hitstop == 0:
 		f.rooted -= 1
+	if f.counter_cooldown > 0:
+		f.counter_cooldown -= 1
+	if f.channel > 0 and (f.action != Action.ATTACK or current_move(f).channel_gauge <= 0):
+		f.channel = 0
+		_emit(EventType.CHANNEL_END, f.slot, -1, &"", f.pos, 0)
 	if f.dash_recharge > 0:
 		f.dash_recharge -= 1
 		if f.dash_recharge == 0:
