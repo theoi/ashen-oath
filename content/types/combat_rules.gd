@@ -12,6 +12,12 @@ extends Resource
 ## Boss stagger drain per HitData.Weight in enum order: BASIC, LIGHT, MEDIUM, HEAVY, MASSIVE, TICK.
 @export var weight_stagger: PackedInt32Array = PackedInt32Array([5, 15, 30, 50, 80, 5])
 
+@export_group("Waves")
+## Spawned combatants rise for this many frames, invincible (Action.SPAWN).
+@export var spawn_rise_frames: int = 60
+## Frames a KO'd wave combatant stays (ash dissolve) before its slot is freed.
+@export var wave_corpse_frames: int = 60
+
 @export_group("Counters and stagger")
 @export var counter_stun_frames: int = 60
 ## Counter stun on fighters with a stagger bar (bosses).

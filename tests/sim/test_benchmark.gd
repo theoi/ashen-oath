@@ -1,14 +1,14 @@
 extends TestCase
-## Sim cost budget (design §8): one tick for 3-4 fighters well under 1 ms, so an 8-frame
-## rollback fits in a frame later. Measured headless on random brawls with the test fighter.
+## Sim cost budget (design §8): one tick for 3-4 fighters, and 8 wave combatants, well under
+## 1 ms, so an 8-frame rollback fits in a frame later. Measured headless on random brawls with the test fighter.
 ## Prints the numbers; asserts generous ceilings so slow CI machines don't flake.
 
 const F := preload("res://tests/sim/sim_fixtures.gd")
 const TICKS := 3000
 
 
-func test_tick_cost_for_3_and_4_fighters() -> void:
-	for count: int in [3, 4]:
+func test_tick_cost_for_3_4_and_8_fighters() -> void:
+	for count: int in [3, 4, 8]:
 		var stats := measure(count, TICKS, 21)
 		print("    sim bench %d fighters: mean %.3f ms/tick, p99 %.3f ms, max %.3f ms, snapshot+restore %.3f ms, checksum %.3f ms, %d hits" % [
 				count, stats["mean"], stats["p99"], stats["max"], stats["snapshot"], stats["checksum"], stats["hits"]])

@@ -67,6 +67,12 @@ enum Type {
 	## Source's gauge went away unbroken (amount 1 = channel completed, the special fires;
 	## 0 = the move was interrupted some other way).
 	CHANNEL_END,
+	## A wave started (amount = wave index).
+	WAVE_START,
+	## Source slot was spawned (id = fighter id, amount = wave index or -1).
+	SPAWN,
+	## Source slot was freed after its KO (hide its view).
+	DESPAWN,
 }
 
 const FLAG_COUNTER := 1

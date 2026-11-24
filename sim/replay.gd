@@ -21,7 +21,7 @@ const FORMAT_VERSION := 2
 static func create(sim_config: SimConfig) -> Replay:
 	var replay := Replay.new()
 	replay.config = sim_config
-	replay.slot_count = sim_config.slots.size()
+	replay.slot_count = sim_config.total_slots()
 	return replay
 
 

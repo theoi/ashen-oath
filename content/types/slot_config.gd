@@ -9,6 +9,8 @@ extends Resource
 @export var start_soul: int = 0
 ## Max HP as percent of the fighter's (handicaps, story grunts).
 @export var hp_percent: int = 100
+## Absolute max HP (boss HP); replaces hp_percent when > 0.
+@export var hp_override: int = 0
 ## Spawn point index in ArenaData.spawn_points (-1 = slot index).
 @export var spawn: int = -1
 ## Boss stagger bar size (0 = none).
