@@ -193,10 +193,26 @@ func test_hollowed_burn_to_ash_on_ko() -> void:
 	for _i in 60:
 		view._update_ash(1.0 / 60.0)
 	assert_false(view.model.visible, "gone after the dissolve")
+	view._update_ground()
+	var ground := view.get_node(^"Ground") as MeshInstance3D
+	assert_almost_eq(float((ground.material_override as ShaderMaterial).get_shader_parameter(&"fade")), 0.0, 0.01, "its ground pool fades with it")
 	var round_start := SimEvent.new()
 	round_start.type = SimEvent.Type.ROUND_START
 	view.on_event(round_start)
 	assert_true(view.model.visible, "back for the next round")
+
+func test_fighters_are_grounded_by_a_soft_pool_under_their_feet() -> void:
+	var fight := _fight()
+	for view in fight.views:
+		view._update(0.0)
+		var ground := view.get_node(^"Ground") as MeshInstance3D
+		assert_not_null(ground)
+		var p := fight.runner.fighter_position(view.slot)
+		assert_almost_eq(ground.global_position.x, p.x, 0.001)
+		assert_almost_eq(ground.global_position.z, p.z, 0.001)
+		assert_true(ground.global_position.y < 0.1, "on the floor")
+		assert_almost_eq(float((ground.material_override as ShaderMaterial).get_shader_parameter(&"fade")), 1.0, 0.01)
+
 
 func test_slow_enemy_attacks_get_a_red_telegraph() -> void:
 	var config := _config()

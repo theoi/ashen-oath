@@ -5,6 +5,7 @@ extends Node3D
 ## shake, hit flashes and a weapon trail. Reads the sim; never writes it.
 
 const FALLBACK_SCENE := "res://presentation/fighters/hollowed/hollowed.tscn"
+const GROUND_SHADER := preload("res://presentation/fighters/shaders/fighter_ground.gdshader")
 const Action := FighterState.Action
 
 var runner: MatchRunner
@@ -38,6 +39,10 @@ var _time := 0.0
 ## Ash dissolve: seconds since KO (-1 = not dissolving).
 var _ash := -1.0
 var _ash_embers: CPUParticles3D
+## Soft light pool and contact shadow on the floor under the fighter.
+var _ground: MeshInstance3D
+## Side of the ground quad (m).
+const GROUND_SIZE := 2.6
 
 ## Ash timing (design-lost-ark §1.12): 6 f freeze, then 40 f of dissolve.
 const ASH_HOLD := 0.1
@@ -70,6 +75,8 @@ func setup(match_runner: MatchRunner, fighter_slot: int) -> void:
 	_trail.name = "Trail"
 	_trail.color = model.trail_color
 	add_child(_trail)
+	_ground = _make_ground()
+	add_child(_ground)
 	var f := runner.sim.fighter(slot)
 	_prev_facing = f.facing
 	_cur_facing = f.facing
@@ -172,6 +179,7 @@ func _update(delta: float) -> void:
 		flash(Color(0.3, 0.6, 1.0), 0.45 + 0.25 * absf(sin(_time * 14.0)))
 	model.set_flash(_flash_color, _flash)
 	_update_ash(delta)
+	_update_ground()
 	_trail.feed(model.trail_segment(), _pose.trail and not frozen, 0.0 if frozen else delta)
 	model.update_extras(sim, f, delta)
 
@@ -218,6 +226,30 @@ func _update_ash(delta: float) -> void:
 	if _ash_embers != null:
 		_ash_embers.emitting = t > 0.0 and t < 0.95
 		_ash_embers.global_position = global_position + Vector3.UP * lerpf(1.4, 0.3, t)
+
+
+func _update_ground() -> void:
+	var p := global_position
+	_ground.global_position = Vector3(p.x, 0.03, p.z)
+	var lift := clampf(1.0 - p.y / 4.0, 0.35, 1.0)
+	var gone := clampf((_ash - ASH_HOLD) / ASH_TIME, 0.0, 1.0) if _ash >= 0.0 else 0.0
+	(_ground.material_override as ShaderMaterial).set_shader_parameter(&"fade", lift * (1.0 - gone))
+
+
+func _make_ground() -> MeshInstance3D:
+	var material := ShaderMaterial.new()
+	material.shader = GROUND_SHADER
+	material.set_shader_parameter(&"glow_color", model.rim_color.lerp(Color.WHITE, 0.35))
+	material.render_priority = -1
+	var quad := PlaneMesh.new()
+	quad.size = Vector2(GROUND_SIZE, GROUND_SIZE)
+	var ground := MeshInstance3D.new()
+	ground.name = "Ground"
+	ground.mesh = quad
+	ground.material_override = material
+	ground.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	ground.top_level = true
+	return ground
 
 
 func _make_ash_embers() -> CPUParticles3D:
