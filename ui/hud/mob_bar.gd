@@ -21,7 +21,6 @@ func setup(fighter: HudState.Fighter, mirrored: bool) -> void:
 	_name = Label.new()
 	_name.theme_type_variation = &"SubtleLabel"
 	_name.add_theme_font_size_override("font_size", 13)
-	_name.add_theme_color_override("font_color", Palette.TEAMS[maxi(fighter.team, 0) % Palette.TEAMS.size()].lerp(Palette.BONE, 0.55))
 	var bars := VBoxContainer.new()
 	bars.add_theme_constant_override("separation", 2)
 	bars.size_flags_vertical = Control.SIZE_SHRINK_CENTER
@@ -38,6 +37,9 @@ func setup(fighter: HudState.Fighter, mirrored: bool) -> void:
 
 func apply(fighter: HudState.Fighter) -> void:
 	_name.text = fighter.name
+	# Wave slots are free (team -1) until something spawns in them.
+	if fighter.team >= 0:
+		_name.add_theme_color_override("font_color", Palette.TEAMS[fighter.team % Palette.TEAMS.size()].lerp(Palette.BONE, 0.55))
 	_health.value = clampf(fighter.health / maxf(fighter.max_health, 1.0), 0.0, 1.0)
 	_channel.value = clampf(fighter.channel / maxf(fighter.channel_max, 1.0), 0.0, 1.0)
 	_channel.modulate.a = 1.0 if fighter.channel_max > 0.0 else 0.0
