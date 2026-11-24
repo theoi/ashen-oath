@@ -155,9 +155,9 @@ func _build_upper_walls() -> void:
 ## Charred roof beams survive over the east half only.
 func _build_roof() -> void:
 	for x: float in [1.0, 4.5, 8.0, 11.5]:
-		block(Vector3(0.5, 0.6, 2.0 * HALF.y + 3.0), Vector3(x, 8.3, 0.0), Vector3.ZERO, CHAR_COLOR)
-	block(Vector3(0.4, 0.5, 9.0), Vector3(-1.8, 8.6, -7.0), Vector3(-18.0, 0.0, 8.0), CHAR_COLOR)
-	block(Vector3(2.0 * HALF.x + 2.0, 0.5, 0.5), Vector3(5.0, 8.0, 0.0), Vector3.ZERO, CHAR_COLOR)
+		overhead(block(Vector3(0.5, 0.6, 2.0 * HALF.y + 3.0), Vector3(x, 8.3, 0.0), Vector3.ZERO, CHAR_COLOR))
+	overhead(block(Vector3(0.4, 0.5, 9.0), Vector3(-1.8, 8.6, -7.0), Vector3(-18.0, 0.0, 8.0), CHAR_COLOR))
+	overhead(block(Vector3(2.0 * HALF.x + 2.0, 0.5, 0.5), Vector3(5.0, 8.0, 0.0), Vector3.ZERO, CHAR_COLOR))
 
 
 func _build_pillars() -> void:
@@ -169,8 +169,8 @@ func _build_pillars() -> void:
 			dungeon("rubble_half", pos + Vector3(0.4, 0.0, -0.3), 40.0 + 70.0 * float(i), Vector3(0.22, 0.2, 0.22))
 		else:
 			dungeon("pillar_decorated", pos, 90.0 if p.x < 0.0 else -90.0)
-			dungeon("pillar", pos + Vector3(0.0, WALL_HEIGHT, 0.0))
-			block(Vector3(1.0, 0.5, 2.0 * HALF.y + 2.0), Vector3(p.x, 8.0, 0.0), Vector3.ZERO, CHAR_COLOR)
+			overhead(dungeon("pillar", pos + Vector3(0.0, WALL_HEIGHT, 0.0)))
+			overhead(block(Vector3(1.0, 0.5, 2.0 * HALF.y + 2.0), Vector3(p.x, 8.0, 0.0), Vector3.ZERO, CHAR_COLOR))
 
 
 ## The altar recess behind the east balustrade.
@@ -186,7 +186,7 @@ func _build_chancel() -> void:
 	for side: float in [-1.0, 1.0]:
 		dungeon("wall", Vector3(x0 + 2.5, 0.0, side * 4.5), 0.0 if side < 0.0 else 180.0)
 		dungeon("wall", Vector3(x0 + 2.5, WALL_HEIGHT, side * 4.5), 0.0 if side < 0.0 else 180.0)
-	block(Vector3(2.0 * 2.5, 0.2, 9.5), Vector3(x0 + 2.5, 8.1, 0.0), Vector3.ZERO, CHAR_COLOR)
+	overhead(block(Vector3(2.0 * 2.5, 0.2, 9.5), Vector3(x0 + 2.5, 8.1, 0.0), Vector3.ZERO, CHAR_COLOR))
 	var altar := Vector3(x0 + 3.4, 0.0, 0.0)
 	halloween("shrine_candles", altar, -90.0, Vector3(1.4, 1.4, 1.4))
 	for tip: Vector3 in [Vector3(0.03, 1.73, -0.11), Vector3(0.03, 1.69, -0.01), Vector3(-0.1, 1.62, -0.01), Vector3(-0.08, 1.13, 0.3)]:
@@ -211,13 +211,32 @@ func _build_entrance() -> void:
 	halloween("gravestone", Vector3(x0 - 6.5, 0.0, -0.2), 95.0)
 
 
-func _build_atmosphere() -> void:
-	# Moonlight through the collapsed west roof and the clerestory windows.
-	light_shaft(Vector3(-11.0, 14.0, -11.0), Vector3(-5.5, 0.0, -2.0), 2.2, 3.4, 1.4)
-	light_shaft(Vector3(-6.0, 14.0, -12.0), Vector3(-0.5, 0.0, -2.5), 1.6, 2.6, 1.0)
+## Bones, rubble and dead candles along the walls (outside where fighters stand), so the
+## nave reads as long abandoned.
+func _build_decay() -> void:
+	var spots: Array[Vector3] = [
+		Vector3(-3.0, 0.0, -HALF.y + 0.5), Vector3(3.5, 0.0, HALF.y - 0.5), Vector3(8.5, 0.0, -HALF.y + 0.45),
+		Vector3(-9.0, 0.0, HALF.y - 0.45), Vector3(HALF.x - 0.45, 0.0, 6.5), Vector3(-HALF.x + 0.45, 0.0, 3.0),
+	]
+	for i in spots.size():
+		var p := spots[i]
+		halloween(["bone_A", "bone_B", "bone_C"][i % 3] as String, p + Vector3(0.0, 0.06, 0.0), 37.0 * float(i))
+		if i % 2 == 0:
+			halloween("skull", p + Vector3(0.6, 0.0, 0.0), 70.0 * float(i), Vector3(0.4, 0.4, 0.4))
+		else:
+			dungeon("rubble_half", p + Vector3(-0.7, 0.0, 0.0), 50.0 * float(i), Vector3(0.14, 0.12, 0.14))
+		dungeon("candle_melted", p + Vector3(-0.3, 0.0, 0.25 * signf(-p.z)), 0.0, Vector3(0.7, 0.5, 0.7))
+
+
+func _build_atmosphere() -> void:	# Moonlight through the collapsed west roof: one heavy shaft onto the middle of the nave
+	# (the fighters' light pool), thinner ones through the roof gap and clerestory windows.
+	light_shaft(Vector3(-6.5, 16.0, -6.0), Vector3(-0.5, 0.0, 0.0), 2.6, 4.6, 1.3)
+	light_shaft(Vector3(-11.0, 14.0, -11.0), Vector3(-6.5, 0.0, -3.0), 1.4, 2.4, 0.8)
 	for x: float in [-2.0, 2.0, 6.0]:
-		light_shaft(Vector3(x - 2.0, 7.0, -HALF.y - 1.5), Vector3(x + 1.0, 0.0, -HALF.y + 5.0), 0.8, 1.3, 0.55)
+		light_shaft(Vector3(x - 2.0, 7.0, -HALF.y - 1.5), Vector3(x + 1.0, 0.0, -HALF.y + 5.0), 0.7, 1.2, 0.45)
+	dust(Vector3(-3.5, 7.0, -3.0), Vector3(2.5, 6.0, 2.5), 60)
 	ash(Vector3(-3.0, 7.0, -1.0), Vector3(9.0, 1.0, 8.0), look.ash_amount)
+	_build_decay()
 	embers(Vector3(-HALF.x + 2.0, 0.6, -HALF.y + 2.0), Vector3(1.5, 0.4, 1.5), look.ember_amount, look.ember_color)
 	if burning:
 		fire_light(Vector3(-10.0, 1.4, -8.6), 1.6, 9.0)
