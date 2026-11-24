@@ -16,27 +16,21 @@ timeout_seconds = 15.0
 script = ExtResource("1_4owwt")
 goal = 6
 ability_slot = 0
-title = "Oathfire Lunge"
-text = "Ability 1. A burning thrust that closes the distance."
-actions = Array[StringName]([&"ability_1"])
+text = "A burning thrust that closes the distance."
 timeout_seconds = 15.0
 
 [sub_resource type="Resource" id="Resource_3syio"]
 script = ExtResource("1_4owwt")
 goal = 6
 ability_slot = 1
-title = "Brand Rise"
-text = "Ability 2. A rising slash that throws them into the air."
-actions = Array[StringName]([&"ability_2"])
+text = "A rising slash that throws them into the air."
 timeout_seconds = 15.0
 
 [sub_resource type="Resource" id="Resource_ln14i"]
 script = ExtResource("1_4owwt")
 goal = 6
 ability_slot = 2
-title = "Bulwark Charge"
-text = "Ability 3. A shield bash that leaves them reeling."
-actions = Array[StringName]([&"ability_3"])
+text = "A shield bash that leaves them reeling."
 timeout_seconds = 15.0
 
 [sub_resource type="Resource" id="Resource_evs1t"]
@@ -44,8 +38,7 @@ script = ExtResource("1_4owwt")
 goal = 11
 trigger = 1
 title = "Soul full"
-text = "Unleash Pyre of the Forsworn."
-actions = Array[StringName]([&"super"])
+text = "Unleash your super."
 
 [sub_resource type="Resource" id="Resource_riug3"]
 script = ExtResource("1_4owwt")
@@ -53,7 +46,6 @@ goal = 8
 trigger = 2
 title = "Caught"
 text = "Burst free. It costs 50 Soul."
-actions = Array[StringName]([&"super"])
 
 [resource]
 script = ExtResource("2_cdc56")

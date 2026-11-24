@@ -43,9 +43,11 @@ enum Trigger {
 @export var amount: int = 1
 ## Ability slot 0-2 for ABILITY goals (-1 = any ability).
 @export var ability_slot: int = -1
+## Empty for an ability tip = the fighter's name for that ability.
 @export var title: String = ""
 @export_multiline var text: String = ""
 ## Actions whose buttons are shown (DefaultBindings names; &"move" for the move stick/keys).
+## Empty = the input of the goal: the ability slot's action, or super for SUPER / BURST.
 @export var actions: Array[StringName] = []
 ## > 0: move on after this many seconds even if the goal was not met.
 @export var timeout_seconds: float = 0.0
