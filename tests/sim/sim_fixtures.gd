@@ -94,10 +94,92 @@ static func random_frames(ticks: int, slots: int, seed_value: int) -> Array[Pack
 		for s in slots:
 			if rng.randi() % 6 == 0:
 				var buttons := 0
-				var roll := rng.randi() % 12
-				if roll < 10:
+				var roll := rng.randi() % 13
+				if roll < 11:
 					buttons = 1 << roll
+				elif roll == 11:
+					buttons = SimInput.GUARD
 				held[s] = SimInput.make(buttons, rng.randi_range(-127, 127), rng.randi_range(-127, 127))
 			inputs[s] = held[s]
 		result.append(inputs)
 	return result
+
+
+# --- Combat helpers ------------------------------------------------------------------------
+
+static func test_fighter() -> FighterData:
+	return load("res://content/test_fighter/test_fighter.tres") as FighterData
+
+
+## A fighting sim with test fighters: slot 0 at the origin facing +Z, slot 1 `distance`
+## meters in front facing it, further slots (team 1) behind slot 1.
+static func duel(distance: float = 1.2, count: int = 2, data: FighterData = null) -> Sim:
+	var sim := fighting_sim(config(count, data if data != null else test_fighter()))
+	place(sim, 0, 0.0, 0.0, 0)
+	place(sim, 1, 0.0, distance, Fx.HALF_TURN)
+	for slot in range(2, count):
+		place(sim, slot, 1.0 * slot, distance + 2.0, Fx.HALF_TURN)
+	return sim
+
+
+static func place(sim: Sim, slot: int, x: float, z: float, facing: int) -> void:
+	var f := sim.fighter(slot)
+	f.pos = Vector3i(Fx.m(x), 0, Fx.m(z))
+	f.vel = Vector3i.ZERO
+	f.facing = facing
+	f.grounded = true
+
+
+## Steps through per-tick frames for slots 0 and 1 (missing entries are neutral) and returns
+## the events of each tick (index 0 = first step).
+static func play(sim: Sim, frames0: Array, frames1: Array = [], ticks: int = -1) -> Array[Array]:
+	var count := ticks if ticks >= 0 else maxi(frames0.size(), frames1.size())
+	var result: Array[Array] = []
+	for t in count:
+		var a: int = frames0[t] if t < frames0.size() else 0
+		var b: int = frames1[t] if t < frames1.size() else 0
+		result.append(step(sim, a, b))
+	return result
+
+
+## Frames: `frame` for `count` ticks.
+static func held(frame: int, count: int) -> Array:
+	var out: Array = []
+	for _i in count:
+		out.append(frame)
+	return out
+
+
+## 1-based tick of the first event of `type` in `per_tick` (from play), or -1.
+static func tick_of(per_tick: Array[Array], type: SimEvent.Type) -> int:
+	for t in per_tick.size():
+		for e: SimEvent in per_tick[t]:
+			if e.type == type:
+				return t + 1
+	return -1
+
+
+static func first(per_tick: Array[Array], type: SimEvent.Type) -> SimEvent:
+	for events in per_tick:
+		for e: SimEvent in events:
+			if e.type == type:
+				return e
+	return null
+
+
+static func count_of(per_tick: Array[Array], type: SimEvent.Type) -> int:
+	var n := 0
+	for events in per_tick:
+		for e: SimEvent in events:
+			if e.type == type:
+				n += 1
+	return n
+
+
+## Steps neutral until `f` is in `action` (max ticks); returns ticks stepped or -1.
+static func until_action(sim: Sim, f: FighterState, action: FighterState.Action, max_ticks: int = 300) -> int:
+	for t in max_ticks:
+		if f.action == action:
+			return t
+		step(sim)
+	return -1

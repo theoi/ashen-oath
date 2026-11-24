@@ -34,6 +34,9 @@ var _events: Array[SimEvent] = []
 var _jump_speed: PackedInt32Array = PackedInt32Array()
 var _gravity: PackedInt32Array = PackedInt32Array()
 var _juggle_gravity: int = 0
+## Per slot body radius and height in units.
+var _radius: PackedInt32Array = PackedInt32Array()
+var _height: PackedInt32Array = PackedInt32Array()
 
 
 func _init(sim_config: SimConfig) -> void:
@@ -57,6 +60,8 @@ func _init(sim_config: SimConfig) -> void:
 		var airtime := maxi(2, data.jump_airtime)
 		_jump_speed.append(4 * apex / airtime)
 		_gravity.append(maxi(1, 8 * apex / (airtime * airtime)))
+		_radius.append(Fx.m(data.radius))
+		_height.append(Fx.m(data.height))
 		var f := FighterState.new()
 		f.slot = i
 		f.team = slot_config.team
@@ -86,6 +91,7 @@ func step(inputs: PackedInt32Array) -> Array[SimEvent]:
 	_update_targets()
 	for f in state.fighters:
 		_update_fighter(f)
+	_update_holds()
 	_push_bodies()
 	_update_effects()
 	_resolve_combat()
@@ -533,6 +539,7 @@ func _set_action(f: FighterState, action: Action, length: int = 0) -> void:
 	f.action = action
 	f.action_tick = 1
 	f.action_len = length
+	f.action_variant = 0
 	if action != Action.ATTACK:
 		f.move_index = -1
 		f.move_frame = 0
@@ -574,11 +581,13 @@ func _guarding(f: FighterState) -> void:
 	_guard_move(f)
 
 
+## Guarding moves slowly without turning (hard lock still faces the target), so hits
+## from behind stay possible.
 func _guard_move(f: FighterState) -> void:
+	var facing := f.facing
 	_run(f, rules.guard_speed_percent)
-	var target := _target_of(f)
-	if target != null:
-		f.facing = Fx.turn_toward(f.facing, _angle_to(f, target), Fx.deg(fighter_data[f.slot].turn_degrees))
+	if not f.hard_lock:
+		f.facing = facing
 
 
 ## Whether guard blocks hits now (guard up and not in startup).
@@ -754,12 +763,11 @@ func _cancel_mask(f: FighterState, move: MoveData) -> int:
 	var frame := f.move_frame
 	var mask := 0
 	var window_end := move.last_active_frame() + rules.cancel_window_frames
-	if move.cancels.is_empty():
-		if frame >= move.startup and frame <= window_end:
-			if move.is_basic() and f.move_contact >= 1:
-				mask |= CancelData.INTO_ABILITY
-			if move.kind == MoveData.Kind.ABILITY and f.move_contact >= 2:
-				mask |= CancelData.INTO_SUPER
+	if frame >= move.startup and frame <= window_end:
+		if move.is_basic() and f.move_contact >= 1:
+			mask |= CancelData.INTO_ABILITY
+		if move.kind == MoveData.Kind.ABILITY and f.move_contact >= 2:
+			mask |= CancelData.INTO_SUPER
 	for cancel in move.cancels:
 		if frame < cancel.start_frame or frame > cancel.end_frame:
 			continue
@@ -840,7 +848,7 @@ func _teleport(f: FighterState, tp: TeleportData) -> void:
 			var away := Fx.angle_of(target.pos.x - f.pos.x, target.pos.z - f.pos.z)
 			f.pos = Vector3i(target.pos.x, f.pos.y, target.pos.z) + Fx.dir(away, Fx.m(tp.distance))
 			f.facing = Fx.wrap_angle(away + Fx.HALF_TURN)
-	f.pos = arena.push_circle(f.pos, Fx.m(fighter_data[f.slot].radius))
+	f.pos = arena.push_circle(f.pos, _radius[f.slot])
 	_emit(EventType.TELEPORT, f.slot, -1, &"", from, 0)
 
 
@@ -1017,27 +1025,226 @@ func _air_dodge(f: FighterState) -> void:
 		_air(f)
 
 
-## Hit reactions and other non-player-controlled actions (filled in by combat).
+## Hit reactions and other non-player-controlled actions.
 func _reaction(f: FighterState) -> void:
 	match f.action:
-		Action.RECOVER, Action.HITSTUN, Action.BLOCKSTUN, Action.GUARD_BREAK:
+		Action.HITSTUN, Action.BLOCKSTUN, Action.GUARD_BREAK, Action.RECOVER:
+			if f.action == Action.HITSTUN and _try_burst(f):
+				return
 			if f.stun > 0:
 				f.stun -= 1
-			if f.stun <= 0:
+				if f.grounded:
+					_brake(f)
+				return
+			if f.action == Action.BLOCKSTUN and (f.buttons & SimInput.GUARD) and f.grounded:
+				_set_action(f, Action.GUARD)
+				f.action_tick = rules.guard_startup + 1
+				_guarding(f)
+				return
+			_to_idle(f)
+		Action.AIR_HITSTUN:
+			if _try_burst(f):
+				return
+			if f.stun > 0:
+				f.stun -= 1
+			elif f.buffer == SimInput.DODGE:
+				_air_tech(f)
+		Action.WALL_SPLAT:
+			if _try_burst(f):
+				return
+			if f.stun > 0:
+				f.stun -= 1
+				return
+			if f.grounded:
+				_knockdown(f)
+			else:
+				_set_action(f, Action.AIR_HITSTUN)
+				f.stun = 999
+		Action.KNOCKDOWN:
+			if f.action_tick > rules.knockdown_frames:
+				_get_up(f)
+		Action.GETUP:
+			if f.action_tick > f.action_len:
+				_to_idle(f)
+			elif f.action_variant == 1:
+				var v := Fx.dir(f.move_dir, Fx.m(rules.getup_roll_distance) / maxi(1, rules.getup_roll_frames - 6))
+				f.vel = Vector3i(v.x, 0, v.z) if f.action_tick <= rules.getup_roll_frames - 6 else Vector3i.ZERO
+		Action.TECH:
+			match f.action_variant:
+				1:
+					if f.action_tick > f.action_len:
+						_to_idle(f)
+					else:
+						var v := Fx.dir(f.move_dir, Fx.m(rules.tech_roll_distance) / maxi(1, rules.tech_roll_frames))
+						f.vel = Vector3i(v.x, 0, v.z)
+				2:
+					if f.action_tick > f.action_len:
+						_set_action(f, Action.AIR)
+						_air(f)
+		Action.GRABBED:
+			var thrower := state.fighters[f.grab_partner] if f.grab_partner >= 0 else null
+			if thrower == null or thrower.grab_partner != f.slot:
+				f.grab_partner = -1
+				_to_idle(f)
+			elif f.grab_tech_left > 0:
+				if f.pressed & SimInput.GRAB:
+					_grab_tech(f, thrower)
+				else:
+					f.grab_tech_left -= 1
+		Action.BURST:
+			if f.action_tick > f.action_len:
 				_to_idle(f)
 			elif f.grounded:
 				_brake(f)
+		Action.KO:
+			pass
 		_:
 			if f.action_len > 0 and f.action_tick > f.action_len:
 				_to_idle(f)
+
+
+func _air_tech(f: FighterState) -> void:
+	f.buffer = 0
+	_set_action(f, Action.TECH, rules.air_tech_frames)
+	f.action_variant = 2
+	f.invuln = rules.air_tech_invuln
+	f.vel = Vector3i(0, maxi(f.vel.y, 0), 0)
+	f.knock_ticks = 0
+	f.bounce_pending = 0
+	_emit(EventType.AIR_TECH, f.slot, -1, &"", f.pos, 0)
+
+
+func _knockdown(f: FighterState) -> void:
+	_set_action(f, Action.KNOCKDOWN)
+	f.vel = Vector3i.ZERO
+	f.knock_ticks = 0
+	_emit(EventType.KNOCKDOWN, f.last_attacker, f.slot, &"", f.pos, 0)
+
+
+func _get_up(f: FighterState) -> void:
+	var data := fighter_data[f.slot]
+	var wants_attack := f.buffer == SimInput.LIGHT or (f.buttons & SimInput.LIGHT) != 0
+	var wants_roll := f.buffer == SimInput.DODGE or (f.buttons & SimInput.DODGE) != 0
+	if wants_attack and data.find_move(data.getup_attack) >= 0:
+		start_move(f, data.find_move(data.getup_attack), SimInput.LIGHT)
+		_emit(EventType.GET_UP, f.slot, -1, data.getup_attack, f.pos, 2)
+		return
+	f.buffer = 0
+	if wants_roll:
+		_set_action(f, Action.GETUP, rules.getup_roll_frames)
+		f.action_variant = 1
+		f.invuln = rules.getup_roll_invuln
+		f.move_dir = _stick_angle(f) if _stick_active(f) else Fx.wrap_angle(f.facing + Fx.HALF_TURN)
+	else:
+		_set_action(f, Action.GETUP, rules.getup_stand_frames)
+		f.action_variant = 0
+		f.invuln = rules.getup_stand_invuln
+	_emit(EventType.GET_UP, f.slot, -1, &"", f.pos, f.action_variant)
+
+
+## Soul Burst out of hitstun, juggles and wall splats (not guard break or throws).
+func _try_burst(f: FighterState) -> bool:
+	if f.buffer != SimInput.SUPER or f.soul < rules.burst_cost * 100:
+		return false
+	f.buffer = 0
+	f.soul -= rules.burst_cost * 100
+	_set_action(f, Action.BURST, rules.burst_frames)
+	f.invuln = rules.burst_invuln
+	f.stun = 0
+	f.knock_ticks = 0
+	f.carried_ticks = 0
+	f.bounce_pending = 0
+	f.splat_armed = false
+	f.vel = Vector3i(0, mini(f.vel.y, 0), 0)
+	var reach := Fx.m(rules.burst_radius)
+	var push := Fx.m(rules.burst_knockback) / KNOCK_TICKS
+	for enemy in enemies_of(f):
+		if Fx.dist2_xz(f.pos, enemy.pos) > reach * reach:
+			continue
+		if enemy.grab_partner >= 0:
+			_release_grab(enemy)
+		_set_action(enemy, Action.RECOVER)
+		enemy.stun = rules.burst_push_stun
+		enemy.hitstop = 0
+		enemy.knock = Fx.dir(_angle_to(f, enemy), push)
+		enemy.knock_ticks = KNOCK_TICKS
+		enemy.vel = Vector3i(0, enemy.vel.y, 0)
+	_emit(EventType.BURST, f.slot, -1, &"", f.pos, rules.burst_cost)
+	return true
+
+
+func _grab_tech(victim: FighterState, thrower: FighterState) -> void:
+	var push := Fx.m(rules.grab_tech_push) / KNOCK_TICKS
+	var away := _angle_to(thrower, victim)
+	for f: FighterState in [victim, thrower]:
+		_set_action(f, Action.RECOVER)
+		f.stun = rules.grab_tech_stun
+		f.grab_partner = -1
+		f.grab_tech_left = 0
+		f.vel = Vector3i.ZERO
+		f.knock_ticks = KNOCK_TICKS
+	victim.knock = Fx.dir(away, push)
+	thrower.knock = Fx.dir(away + Fx.HALF_TURN, push)
+	_emit(EventType.GRAB_TECH, victim.slot, thrower.slot, &"", victim.pos, 0)
+
+
+## Lets go of whoever `f` holds or is held by.
+func _release_grab(f: FighterState) -> void:
+	if f.grab_partner < 0:
+		return
+	var other := state.fighters[f.grab_partner]
+	f.grab_partner = -1
+	if other.grab_partner == f.slot:
+		other.grab_partner = -1
+		if other.action == Action.GRABBED:
+			_set_action(other, Action.IDLE)
+	if f.action == Action.GRABBED:
+		_set_action(f, Action.IDLE)
+
+
+## Keeps thrown fighters in the thrower's hands and carried fighters in front of dashes.
+func _update_holds() -> void:
+	for f in state.fighters:
+		if f.grab_partner >= 0 and f.action != Action.GRABBED:
+			var victim := state.fighters[f.grab_partner]
+			var move := current_move(f)
+			if f.action == Action.ATTACK and move.kind == MoveData.Kind.THROW \
+					and victim.action == Action.GRABBED and victim.grab_partner == f.slot:
+				var held := f.pos + Fx.dir(f.facing, Fx.m(move.hold_distance))
+				victim.pos = Vector3i(held.x, f.pos.y, held.z)
+				victim.facing = Fx.wrap_angle(f.facing + Fx.HALF_TURN)
+				victim.grounded = f.grounded
+				victim.vel = Vector3i.ZERO
+			else:
+				if victim.grab_partner == f.slot:
+					victim.grab_partner = -1
+					if victim.action == Action.GRABBED:
+						_set_action(victim, Action.IDLE)
+						_emit(EventType.THROW_RELEASE, f.slot, victim.slot, &"", victim.pos, 0)
+				f.grab_partner = -1
+		if f.carried_ticks > 0:
+			var carrier := state.fighters[f.carried_by]
+			if carrier.action != Action.ATTACK or carrier.ko:
+				f.carried_ticks = 0
+				continue
+			if f.hitstop > 0:
+				continue
+			f.carried_ticks -= 1
+			var reach := _radius[carrier.slot] + _radius[f.slot] + Fx.m(0.1)
+			var spot := carrier.pos + Fx.dir(carrier.facing, reach)
+			f.pos = arena.push_circle(Vector3i(spot.x, f.pos.y, spot.z), _radius[f.slot])
+			if arena.contact and arena.contact_splat and f.splat_armed:
+				_wall_splat(f)
 
 
 # --- Physics ----------------------------------------------------------------------------
 
 func _gravity_of(f: FighterState) -> int:
 	match f.action:
-		Action.AIR_HITSTUN, Action.KO:
+		Action.AIR_HITSTUN, Action.KO, Action.TECH, Action.BURST:
 			return _juggle_gravity
+		Action.WALL_SPLAT:
+			return 0
 		Action.AIR_DODGE:
 			return _gravity[f.slot] / 2
 		Action.ATTACK:
@@ -1046,7 +1253,7 @@ func _gravity_of(f: FighterState) -> int:
 
 
 func _physics(f: FighterState) -> void:
-	if f.action == Action.GRABBED:
+	if f.action == Action.GRABBED or f.carried_ticks > 0:
 		return
 	var delta := Vector3i(f.vel.x, 0, f.vel.z)
 	if not f.grounded:
@@ -1054,7 +1261,8 @@ func _physics(f: FighterState) -> void:
 		var g := _gravity_of(f)
 		delta.y = f.vel.y - g / 2
 		f.vel.y -= g
-	if f.knock_ticks > 0:
+	var knocked := f.knock_ticks > 0
+	if knocked:
 		delta += f.knock
 		f.knock_ticks -= 1
 	f.pos += delta
@@ -1065,9 +1273,9 @@ func _physics(f: FighterState) -> void:
 		_on_land(f)
 	elif f.grounded:
 		f.pos.y = 0
-	f.pos = arena.push_circle(f.pos, Fx.m(fighter_data[f.slot].radius))
-	if arena.contact:
-		_on_wall(f)
+	f.pos = arena.push_circle(f.pos, _radius[f.slot])
+	if arena.contact and knocked and f.splat_armed and arena.contact_splat:
+		_wall_splat(f)
 
 
 func _on_land(f: FighterState) -> void:
@@ -1089,10 +1297,47 @@ func _on_land(f: FighterState) -> void:
 				f.vel.x = 0
 				f.vel.z = 0
 				_emit(EventType.LAND, f.slot, -1, move.id, f.pos, lag)
+		Action.AIR_HITSTUN:
+			if f.bounce_pending > 0:
+				var height := f.bounce_pending
+				f.bounce_pending = 0
+				_launch(f, height, maxi(f.stun, 20))
+				_emit(EventType.LAUNCH, f.last_attacker, f.slot, &"ground_bounce", f.pos, height)
+			elif f.dodge_age <= rules.tech_roll_window:
+				_set_action(f, Action.TECH, rules.tech_roll_frames)
+				f.action_variant = 1
+				f.invuln = rules.tech_roll_frames - 4
+				f.move_dir = _stick_angle(f) if _stick_active(f) else Fx.wrap_angle(f.facing + Fx.HALF_TURN)
+				f.knock_ticks = 0
+				_emit(EventType.TECH_ROLL, f.slot, -1, &"", f.pos, f.move_dir)
+			else:
+				_knockdown(f)
+		Action.TECH:
+			if f.action_variant == 3:
+				f.invuln = 0
+			_set_action(f, Action.LAND, rules.landing_frames)
+			f.vel = Vector3i.ZERO
+			_emit(EventType.LAND, f.slot, -1, &"", f.pos, 0)
+		Action.KO:
+			f.vel = Vector3i.ZERO
 
 
-func _on_wall(_f: FighterState) -> void:
-	pass
+func _wall_splat(f: FighterState) -> void:
+	f.splat_armed = false
+	f.wall_splat_used = true
+	f.carried_ticks = 0
+	_set_action(f, Action.WALL_SPLAT)
+	f.stun = rules.wall_splat_frames
+	f.knock_ticks = 0
+	f.vel = Vector3i.ZERO
+	var bonus := f.splat_bonus
+	f.splat_bonus = 0
+	if bonus > 0:
+		f.hp -= bonus
+		f.combo_damage += bonus
+	_emit(EventType.WALL_SPLAT, f.last_attacker, f.slot, &"", f.pos, bonus)
+	if f.hp <= 0:
+		_ko(f)
 
 
 func _push_bodies() -> void:
@@ -1105,9 +1350,9 @@ func _push_bodies() -> void:
 			var b := fighters[j]
 			if b.ko or b.action == Action.GRABBED:
 				continue
-			var ra := Fx.m(fighter_data[a.slot].radius)
-			var rb := Fx.m(fighter_data[b.slot].radius)
-			if absi(a.pos.y - b.pos.y) >= Fx.m(fighter_data[a.slot].height):
+			var ra := _radius[a.slot]
+			var rb := _radius[b.slot]
+			if absi(a.pos.y - b.pos.y) >= _height[a.slot]:
 				continue
 			var reach := ra + rb
 			var d2 := Fx.dist2_xz(a.pos, b.pos)
@@ -1183,8 +1428,718 @@ func _update_hazards() -> void:
 
 # --- Combat -----------------------------------------------------------------------------
 
+## Ticks over which knockback distance is applied.
+const KNOCK_TICKS := 10
+const PULL_TICKS := 8
+## Pop height for grounded knockdowns (units).
+const KNOCKDOWN_POP := 3500
+## Bounce height after a spike when the hit has no launch height (units).
+const DEFAULT_BOUNCE := 10000
+## Hurtbox height of a knocked-down fighter (units).
+const DOWN_HEIGHT := 6000
+## Stun value meaning "until landing".
+const UNTIL_LANDING := 999
+
+
+## One overlap found this tick, applied after all are collected so trades are symmetric.
+class Contact:
+	var attacker: FighterState
+	var victim: FighterState
+	## The attacker's move for hitboxes and throws; the spawning move for effects.
+	var move: MoveData
+	var hit: HitData
+	var effect: EffectState
+	var hazard: int = -1
+	## A throw move hitting its held partner.
+	var held: bool = false
+	var counter: bool = false
+	var point: Vector3i
+	## Where the hit comes from (guard arc) and the knockback direction.
+	var source: Vector3i
+	var direction: int = 0
+	var charge: int = 0
+
+
 func _resolve_combat() -> void:
-	pass
+	var contacts: Array[Contact] = []
+	_collect_hitbox_contacts(contacts)
+	_destroy_effects_by_hitboxes()
+	_collect_effect_contacts(contacts)
+	_collect_hazard_contacts(contacts)
+	_collect_throw_contacts(contacts)
+	for c in contacts:
+		_apply_contact(c)
+	_remove_dead_effects()
+
+
+func _collect_hitbox_contacts(contacts: Array[Contact]) -> void:
+	for a in state.fighters:
+		if a.action != Action.ATTACK or a.hitstop > 0 or a.ko:
+			continue
+		var move := current_move(a)
+		if move.kind == MoveData.Kind.THROW:
+			continue
+		var group_counts := PackedInt32Array([0, 0, 0, 0, 0, 0, 0, 0])
+		for hb in move.hitboxes:
+			if hb.hit == null or not _hitbox_active(move, hb, a.move_frame):
+				continue
+			var group := clampi(hb.group, 0, 7)
+			for v in state.fighters:
+				if v.team == a.team or v.ko or v.action == Action.GRABBED:
+					continue
+				if a.move_hit_masks[group] & (1 << v.slot):
+					continue
+				if move.max_targets > 0 and group_counts[group] >= move.max_targets:
+					break
+				if not _hitbox_overlaps(a, hb, v):
+					continue
+				if not _can_be_hit(v, hb.hit, false, a.slot):
+					continue
+				a.move_hit_masks[group] |= 1 << v.slot
+				group_counts[group] += 1
+				var c := Contact.new()
+				c.attacker = a
+				c.victim = v
+				c.move = move
+				c.hit = hb.hit
+				c.counter = _is_counter(v)
+				c.point = a.pos + Fx.rotate(Fx.v3(hb.offset), a.facing)
+				c.source = a.pos
+				c.direction = _angle_to(a, v) if Fx.dist2_xz(a.pos, v.pos) > 0 else a.facing
+				c.charge = a.charge
+				contacts.append(c)
+
+
+func _hitbox_active(move: MoveData, hb: HitboxData, frame: int) -> bool:
+	var first := hb.start_frame if hb.start_frame >= 0 else move.startup
+	var last := hb.end_frame if hb.end_frame >= 0 else move.last_active_frame()
+	return frame >= first and frame <= last
+
+
+func _hitbox_overlaps(a: FighterState, hb: HitboxData, v: FighterState) -> bool:
+	var r := Fx.m(hb.radius)
+	var p1 := a.pos + Fx.rotate(Fx.v3(hb.offset), a.facing)
+	if not hb.capsule:
+		return _sphere_hits_body(p1, r, v)
+	var p2 := a.pos + Fx.rotate(Fx.v3(hb.offset_end), a.facing)
+	var d := p2 - p1
+	var length := Fx.isqrt(d.x * d.x + d.y * d.y + d.z * d.z)
+	var steps := maxi(1, length / maxi(1, r))
+	for i in steps + 1:
+		var p := Vector3i(p1.x + d.x * i / steps, p1.y + d.y * i / steps, p1.z + d.z * i / steps)
+		if _sphere_hits_body(p, r, v):
+			return true
+	return false
+
+
+func _sphere_hits_body(c: Vector3i, r: int, v: FighterState) -> bool:
+	var rv := _radius[v.slot]
+	var height := DOWN_HEIGHT if v.action == Action.KNOCKDOWN else _height[v.slot]
+	var y0 := v.pos.y + rv
+	var y1 := v.pos.y + maxi(height - rv, rv)
+	var cy := clampi(c.y, y0, y1)
+	var dx := c.x - v.pos.x
+	var dy := c.y - cy
+	var dz := c.z - v.pos.z
+	var reach := r + rv
+	return dx * dx + dy * dy + dz * dz <= reach * reach
+
+
+## Vertical capsule (base at `pos`) against a fighter body.
+func _cylinder_hits_body(pos: Vector3i, r: int, h: int, v: FighterState) -> bool:
+	var rv := _radius[v.slot]
+	var height := DOWN_HEIGHT if v.action == Action.KNOCKDOWN else _height[v.slot]
+	if pos.y - r > v.pos.y + height or pos.y + h + r < v.pos.y:
+		return false
+	var reach := r + rv
+	return Fx.dist2_xz(pos, v.pos) <= reach * reach
+
+
+## Whether `v` can take `hit` right now; also grants perfect-dodge Soul on dodged hits.
+func _can_be_hit(v: FighterState, hit: HitData, projectile: bool, attacker: int) -> bool:
+	if is_invulnerable(v):
+		_check_perfect_dodge(v, attacker)
+		return false
+	if projectile and v.action == Action.ATTACK:
+		var move := current_move(v)
+		if move.projectile_invuln_end > 0 and v.move_frame >= move.projectile_invuln_start \
+				and v.move_frame <= move.projectile_invuln_end:
+			return false
+	if v.action == Action.KNOCKDOWN and not hit.otg:
+		return false
+	if hit.throw:
+		if not v.grounded or v.action == Action.KNOCKDOWN or v.action == Action.GRABBED:
+			return false
+		if not hit.throw_beats_attacks and v.action == Action.ATTACK \
+				and v.move_frame <= current_move(v).last_active_frame():
+			return false
+	return true
+
+
+func _check_perfect_dodge(v: FighterState, attacker: int) -> void:
+	if v.perfect_dodge_used or v.ko:
+		return
+	var data := fighter_data[v.slot]
+	var first := 0
+	if v.action == Action.DODGE:
+		first = data.dodge_invuln_start
+	elif v.action == Action.AIR_DODGE:
+		first = data.air_dodge_invuln_start
+	else:
+		return
+	if v.action_tick < first or v.action_tick >= first + rules.perfect_dodge_frames:
+		return
+	v.perfect_dodge_used = true
+	_gain_soul(v, rules.perfect_dodge_soul * 100)
+	_emit(EventType.PERFECT_DODGE, attacker, v.slot, &"", v.pos, rules.perfect_dodge_soul)
+
+
+## Counter hit: the victim is in an attack's startup, or was guard broken.
+func _is_counter(v: FighterState) -> bool:
+	if v.guard_broken:
+		return true
+	return v.action == Action.ATTACK and v.move_frame < current_move(v).startup
+
+
+func _destroy_effects_by_hitboxes() -> void:
+	if state.effects.is_empty():
+		return
+	for a in state.fighters:
+		if a.action != Action.ATTACK or a.ko:
+			continue
+		var move := current_move(a)
+		for hb in move.hitboxes:
+			if not hb.destroys_projectiles or not _hitbox_active(move, hb, a.move_frame):
+				continue
+			var p := a.pos + Fx.rotate(Fx.v3(hb.offset), a.facing)
+			var r := Fx.m(hb.radius)
+			for e in state.effects:
+				if e.dead or e.team == a.team:
+					continue
+				var ed := effect_data(e)
+				if not ed.destroyable or e.age <= ed.delay:
+					continue
+				var reach := r + e.radius
+				if Fx.dist2_xz(p, e.pos) <= reach * reach and absi(p.y - e.pos.y) <= reach + Fx.m(ed.height):
+					_kill_effect(e, true)
+
+
+func _collect_effect_contacts(contacts: Array[Contact]) -> void:
+	for e in state.effects:
+		if e.dead:
+			continue
+		var ed := effect_data(e)
+		if ed.hit == null or e.age <= ed.delay:
+			continue
+		var owner := state.fighters[e.owner]
+		var height := Fx.m(ed.height)
+		for v in state.fighters:
+			if v.team == e.team or v.ko or v.action == Action.GRABBED:
+				continue
+			if e.hit_counts[v.slot] >= ed.hits_per_target:
+				continue
+			if e.hit_counts[v.slot] > 0 and state.tick - e.last_hit_tick[v.slot] < ed.hit_interval:
+				continue
+			if not _cylinder_hits_body(e.pos, e.radius, height, v):
+				continue
+			if not _can_be_hit(v, ed.hit, ed.projectile, e.owner):
+				continue
+			e.hit_counts[v.slot] += 1
+			e.last_hit_tick[v.slot] = state.tick
+			var c := Contact.new()
+			c.attacker = owner
+			c.victim = v
+			c.move = fighter_data[e.owner].moves[e.move_index]
+			c.hit = ed.hit
+			c.effect = e
+			c.counter = _is_counter(v)
+			c.point = e.pos
+			c.source = e.pos
+			c.direction = Fx.angle_of(e.vel.x, e.vel.z) if (e.vel.x != 0 or e.vel.z != 0) \
+					else Fx.angle_of(v.pos.x - e.pos.x, v.pos.z - e.pos.z)
+			contacts.append(c)
+			if ed.destroy_on_contact:
+				break
+
+
+func _collect_hazard_contacts(contacts: Array[Contact]) -> void:
+	for i in arena.hazards.size():
+		var h := arena.hazards[i]
+		if h.hit == null or hazard_phase(i) != 2:
+			continue
+		var center := arena.hazard_centers[i]
+		for v in state.fighters:
+			if v.ko or state.hazard_hits[i] & (1 << v.slot):
+				continue
+			if not _cylinder_hits_body(center, Fx.m(h.radius), Fx.m(h.height), v):
+				continue
+			if not _can_be_hit(v, h.hit, false, -1):
+				continue
+			state.hazard_hits[i] |= 1 << v.slot
+			var c := Contact.new()
+			c.victim = v
+			c.hit = h.hit
+			c.hazard = i
+			c.point = Vector3i(v.pos.x, v.pos.y, v.pos.z)
+			c.source = center
+			c.direction = Fx.angle_of(v.pos.x - center.x, v.pos.z - center.z)
+			contacts.append(c)
+
+
+func _collect_throw_contacts(contacts: Array[Contact]) -> void:
+	for a in state.fighters:
+		if a.action != Action.ATTACK or a.grab_partner < 0 or a.hitstop > 0:
+			continue
+		var move := current_move(a)
+		if move.kind != MoveData.Kind.THROW:
+			continue
+		var v := state.fighters[a.grab_partner]
+		if v.action != Action.GRABBED or v.grab_partner != a.slot or v.grab_tech_left > 0:
+			continue
+		for hb in move.hitboxes:
+			var group := clampi(hb.group, 0, 7)
+			if hb.hit == null or not _hitbox_active(move, hb, a.move_frame) or a.move_hit_masks[group] & (1 << v.slot):
+				continue
+			a.move_hit_masks[group] |= 1 << v.slot
+			var c := Contact.new()
+			c.attacker = a
+			c.victim = v
+			c.move = move
+			c.hit = hb.hit
+			c.held = true
+			c.point = v.pos + Vector3i(0, _height[v.slot] / 2, 0)
+			c.source = a.pos
+			c.direction = a.facing
+			contacts.append(c)
+
+
+func _apply_contact(c: Contact) -> void:
+	var v := c.victim
+	if v.ko or (c.effect != null and c.effect.dead and effect_data(c.effect).destroy_on_contact):
+		return
+	if c.hit.throw:
+		_connect_grab(c)
+		return
+	if not c.held:
+		if _try_parry(c) or _try_block(c) or _try_armor(c):
+			_after_contact(c)
+			return
+	_land_hit(c)
+	_after_contact(c)
+
+
+func _after_contact(c: Contact) -> void:
+	if c.effect != null and effect_data(c.effect).destroy_on_contact:
+		_kill_effect(c.effect, false)
+
+
+func _kind_of(c: Contact) -> MoveData.Kind:
+	return c.move.kind if c.move != null else MoveData.Kind.ABILITY
+
+
+func _hitstop_of(c: Contact) -> int:
+	if c.hit.hitstop >= 0:
+		return c.hit.hitstop
+	match _kind_of(c):
+		MoveData.Kind.LIGHT, MoveData.Kind.AIR_LIGHT, MoveData.Kind.GETUP_ATTACK:
+			return rules.hitstop_light
+		MoveData.Kind.HEAVY, MoveData.Kind.AIR_HEAVY, MoveData.Kind.GRAB, MoveData.Kind.THROW:
+			return rules.hitstop_heavy
+		MoveData.Kind.SUPER:
+			return rules.hitstop_super
+		MoveData.Kind.BURST:
+			return 0
+	return rules.hitstop_ability
+
+
+func _guard_damage_of(c: Contact) -> int:
+	if c.hit.guard_damage >= 0:
+		return c.hit.guard_damage
+	match _kind_of(c):
+		MoveData.Kind.LIGHT, MoveData.Kind.AIR_LIGHT, MoveData.Kind.GETUP_ATTACK:
+			return rules.guard_damage_light
+		MoveData.Kind.HEAVY, MoveData.Kind.AIR_HEAVY:
+			return rules.guard_damage_heavy
+		MoveData.Kind.SUPER:
+			return rules.guard_damage_super
+	return rules.guard_damage_ability
+
+
+func _chip_percent_of(c: Contact) -> int:
+	if c.hit.chip_percent >= 0:
+		return c.hit.chip_percent
+	match _kind_of(c):
+		MoveData.Kind.ABILITY:
+			return rules.chip_ability_percent
+		MoveData.Kind.SUPER:
+			return rules.chip_super_percent
+	return 0
+
+
+## Whether `v` faces `source` within the guard arc.
+func _facing_source(v: FighterState, source: Vector3i) -> bool:
+	if Fx.dist2_xz(v.pos, source) == 0:
+		return true
+	var to := Fx.angle_of(source.x - v.pos.x, source.z - v.pos.z)
+	return absi(Fx.angle_diff(v.facing, to)) * 2 <= Fx.deg(rules.guard_arc)
+
+
+## Freezes both fighters (melee) or just the victim (effects, hazards).
+func _apply_hitstop(c: Contact, frames: int) -> void:
+	c.victim.hitstop = frames
+	if c.attacker != null and c.effect == null:
+		c.attacker.hitstop = frames
+
+
+func _try_parry(c: Contact) -> bool:
+	var v := c.victim
+	if v.parry_timer <= 0 or not c.hit.parryable:
+		return false
+	if v.action != Action.GUARD and v.action != Action.BLOCKSTUN:
+		return false
+	if not _facing_source(v, c.source):
+		return false
+	v.parry_timer = 0
+	var hitstop := rules.hitstop_heavy
+	v.hitstop = hitstop
+	var guard_max := rules.guard_gauge * 100
+	v.guard = mini(guard_max, v.guard + rules.parry_guard_refill * 100)
+	_gain_soul(v, rules.parry_soul * 100)
+	var a := c.attacker
+	if a != null and c.effect == null:
+		a.move_contact = maxi(a.move_contact, 1)
+		if a.grab_partner >= 0:
+			_release_grab(a)
+		_set_action(a, Action.HITSTUN)
+		a.stun = rules.parry_stagger
+		a.hitstop = hitstop
+		a.vel = Vector3i(0, a.vel.y, 0)
+	var data := fighter_data[v.slot]
+	if data.parry_buff != null:
+		apply_buff(v, data.parry_buff, -1)
+	var e := _emit(EventType.PARRY, v.slot, a.slot if a != null else -1, c.move.id if c.move != null else &"",
+			c.point, rules.parry_soul)
+	e.hitstop = hitstop
+	if c.effect != null:
+		e.flags |= SimEvent.FLAG_PROJECTILE
+		_kill_effect(c.effect, true)
+	var hook := traits[v.slot]
+	if hook != null:
+		hook.on_parry(self, v, a.slot if a != null else -1)
+	return true
+
+
+func _try_block(c: Contact) -> bool:
+	var v := c.victim
+	if c.hit.unblockable or not guard_up(v) or not _facing_source(v, c.source):
+		return false
+	var a := c.attacker
+	var hitstop := _hitstop_of(c)
+	var chip := c.hit.damage * _chip_percent_of(c) / 100
+	if chip > 0 and _kind_of(c) != MoveData.Kind.SUPER:
+		chip = mini(chip, v.hp - 1)
+	chip = maxi(chip, 0)
+	v.hp -= chip
+	v.guard -= _guard_damage_of(c) * 100
+	v.guard_idle = 0
+	if a != null:
+		_gain_soul(a, chip * rules.soul_per_100_dealt)
+		if c.effect == null:
+			a.move_contact = maxi(a.move_contact, 1)
+	var full_charge := c.move != null and c.move.chargeable and c.move.full_charge_guard_break \
+			and c.effect == null and c.charge >= c.move.charge_max
+	var flags := SimEvent.FLAG_CHIP if chip > 0 else 0
+	if c.effect != null:
+		flags |= SimEvent.FLAG_PROJECTILE
+	if c.hit.guard_break or full_charge or v.guard <= 0:
+		_set_action(v, Action.GUARD_BREAK)
+		v.stun = rules.guard_break_frames
+		v.guard = rules.guard_gauge * 100
+		v.guard_broken = true
+		v.parry_timer = 0
+		v.vel = Vector3i.ZERO
+		_apply_hitstop(c, hitstop)
+		var e := _emit(EventType.GUARD_BREAK, a.slot if a != null else -1, v.slot,
+				c.move.id if c.move != null else &"", c.point, chip)
+		e.hitstop = hitstop
+		e.flags = flags | (SimEvent.FLAG_FULL_CHARGE if full_charge else 0)
+		e.cue = c.hit.cue
+	else:
+		_set_action(v, Action.BLOCKSTUN)
+		v.stun = c.hit.blockstun
+		v.vel = Vector3i.ZERO
+		var push := Fx.m(c.hit.block_pushback)
+		if push > 0:
+			v.knock = Fx.dir(c.direction, push / KNOCK_TICKS)
+			v.knock_ticks = KNOCK_TICKS
+		_apply_hitstop(c, hitstop)
+		var e := _emit(EventType.BLOCK, a.slot if a != null else -1, v.slot,
+				c.move.id if c.move != null else &"", c.point, chip)
+		e.hitstop = hitstop
+		e.flags = flags
+		e.cue = c.hit.cue
+	if a != null:
+		var hook := traits[a.slot]
+		if hook != null:
+			hook.on_hit_dealt(self, a, v, c.move, c.hit, true)
+	if v.hp <= 0:
+		_ko(v)
+	return true
+
+
+func _try_armor(c: Contact) -> bool:
+	var v := c.victim
+	if v.action != Action.ATTACK or v.armor_left <= 0:
+		return false
+	var move := current_move(v)
+	if v.move_frame < move.armor_start or v.move_frame > move.armor_end:
+		return false
+	v.armor_left -= 1
+	var damage := c.hit.damage * move.armor_damage_percent / 100
+	v.hp -= damage
+	if c.attacker != null:
+		_gain_soul(c.attacker, damage * rules.soul_per_100_dealt)
+		if c.effect == null:
+			c.attacker.move_contact = maxi(c.attacker.move_contact, 1)
+	_gain_soul(v, damage * rules.soul_per_100_taken)
+	var hitstop := _hitstop_of(c)
+	_apply_hitstop(c, hitstop)
+	var e := _emit(EventType.ARMOR, c.attacker.slot if c.attacker != null else -1, v.slot,
+			c.move.id if c.move != null else &"", c.point, damage)
+	e.hitstop = hitstop
+	e.cue = c.hit.cue
+	if v.hp <= 0:
+		_ko(v)
+	return true
+
+
+func _land_hit(c: Contact) -> void:
+	var v := c.victim
+	var a := c.attacker
+	var hit := c.hit
+	var kind := _kind_of(c)
+	var was_airborne := not v.grounded
+	var damage := hit.damage
+	if c.move != null and c.move.chargeable and c.effect == null and c.move.charge_max > 0:
+		damage += damage * c.move.charge_damage_percent * c.charge / (100 * c.move.charge_max)
+	if c.counter:
+		damage = damage * rules.counter_damage_percent / 100
+	if a != null:
+		damage = damage * (100 + _use_damage_buffs(a)) / 100
+		var hook := traits[a.slot]
+		if hook != null:
+			damage = damage * hook.damage_percent(self, a, v, c.move, hit) / 100
+	var scale := 100
+	if v.combo_hits >= rules.scaling_free_hits:
+		var floor_percent := rules.super_scaling_floor_percent if kind == MoveData.Kind.SUPER \
+				else rules.scaling_floor_percent
+		scale = maxi(floor_percent, 100 - rules.scaling_step_percent * (v.combo_hits - rules.scaling_free_hits + 1))
+	if damage > 0:
+		damage = maxi(1, damage * scale / 100)
+	v.hp -= damage
+	v.combo_hits += 1
+	v.combo_damage += damage
+	v.last_attacker = a.slot if a != null else -1
+	v.guard_broken = false
+	v.parry_timer = 0
+	if a != null:
+		_gain_soul(a, damage * rules.soul_per_100_dealt)
+		if c.effect == null:
+			a.move_contact = 2
+	_gain_soul(v, damage * rules.soul_per_100_taken)
+	if v.grab_partner >= 0 and not c.held:
+		_release_grab(v)
+	var hitstun := hit.hitstun
+	if c.counter:
+		hitstun = hitstun * rules.counter_hitstun_percent / 100
+	if v.combo_ticks >= rules.combo_decay_frames:
+		hitstun = hitstun * rules.combo_decay_hitstun_percent / 100
+	var hitstop := _hitstop_of(c)
+	_apply_hitstop(c, hitstop)
+	var flags := 0
+	if c.counter:
+		flags |= SimEvent.FLAG_COUNTER
+	if c.effect != null:
+		flags |= SimEvent.FLAG_PROJECTILE
+	if kind == MoveData.Kind.SUPER:
+		flags |= SimEvent.FLAG_SUPER
+	if c.hazard >= 0:
+		flags |= SimEvent.FLAG_HAZARD
+	if c.held:
+		flags |= SimEvent.FLAG_THROW
+	if c.move != null and c.move.chargeable and c.effect == null and c.charge >= c.move.charge_max:
+		flags |= SimEvent.FLAG_FULL_CHARGE
+	var launched := _react(c, hitstun, was_airborne)
+	if launched:
+		flags |= SimEvent.FLAG_LAUNCH
+	var id := c.move.id if c.move != null else (arena.hazards[c.hazard].id if c.hazard >= 0 else &"")
+	var e := _emit(EventType.HIT, a.slot if a != null else -1, v.slot, id, c.point, damage)
+	e.flags = flags
+	e.hitstop = hitstop
+	e.cue = hit.cue
+	if launched:
+		_emit(EventType.LAUNCH, a.slot if a != null else -1, v.slot, id, v.pos, v.vel.y)
+	if a != null:
+		var hook := traits[a.slot]
+		if hook != null:
+			hook.on_hit_dealt(self, a, v, c.move, hit, false)
+	if v.hp <= 0:
+		_ko(v)
+
+
+## Applies the hit reaction. Returns true if the victim was launched.
+func _react(c: Contact, hitstun: int, was_airborne: bool) -> bool:
+	var v := c.victim
+	var a := c.attacker
+	var hit := c.hit
+	var reaction := hit.reaction
+	if v.action == Action.KNOCKDOWN and (reaction == HitData.Reaction.STAGGER or reaction == HitData.Reaction.PULL):
+		reaction = HitData.Reaction.KNOCKDOWN
+	v.vel = Vector3i(0, v.vel.y, 0)
+	v.bounce_pending = 0
+	var knock := Fx.m(hit.knockback)
+	v.knock = Fx.dir(c.direction, knock / KNOCK_TICKS)
+	v.knock_ticks = KNOCK_TICKS if knock > 0 else 0
+	v.splat_armed = hit.wall_splat and not v.wall_splat_used \
+			and knock * Fx.TICKS_PER_SECOND / KNOCK_TICKS >= Fx.m(rules.wall_splat_min_speed)
+	v.splat_bonus = hit.wall_splat_bonus if v.splat_armed else 0
+	if hit.carry_frames > 0 and a != null and c.effect == null:
+		v.carried_by = a.slot
+		v.carried_ticks = hit.carry_frames
+		v.knock_ticks = 0
+		v.splat_armed = hit.wall_splat and not v.wall_splat_used
+		v.splat_bonus = hit.wall_splat_bonus if v.splat_armed else 0
+	if reaction == HitData.Reaction.PULL and a != null:
+		var spot := a.pos + Fx.dir(a.facing, Fx.m(hit.pull_distance))
+		var delta := Vector3i(spot.x - v.pos.x, 0, spot.z - v.pos.z)
+		v.knock = Vector3i(delta.x / PULL_TICKS, 0, delta.z / PULL_TICKS)
+		v.knock_ticks = PULL_TICKS
+		v.splat_armed = false
+	if c.held and reaction == HitData.Reaction.STAGGER:
+		v.knock_ticks = 0
+		return false
+	if c.held:
+		v.grab_partner = -1
+		if a != null:
+			a.grab_partner = -1
+	var height := roundi(Fx.m(hit.launch_height) * fighter_data[v.slot].weight)
+	if was_airborne:
+		v.juggle_used += hit.juggle_cost
+		if reaction == HitData.Reaction.GROUND_BOUNCE:
+			_set_action(v, Action.AIR_HITSTUN)
+			v.stun = maxi(hitstun, 1)
+			v.vel.y = -_jump_speed[v.slot] * 2
+			v.bounce_pending = height if height > 0 else DEFAULT_BOUNCE
+		else:
+			var pop := maxi(height, roundi(Fx.m(rules.juggle_pop) * fighter_data[v.slot].weight))
+			var stun := UNTIL_LANDING if reaction == HitData.Reaction.KNOCKDOWN else hitstun
+			_launch(v, pop, stun)
+		if v.juggle_used >= rules.juggle_points:
+			_set_action(v, Action.TECH)
+			v.action_variant = 3
+			v.invuln = UNTIL_LANDING
+			v.knock_ticks = 0
+			v.bounce_pending = 0
+			_emit(EventType.JUGGLE_LIMIT, a.slot if a != null else -1, v.slot, &"", v.pos, v.juggle_used)
+			return false
+		return height > 0 and reaction == HitData.Reaction.LAUNCH
+	match reaction:
+		HitData.Reaction.LAUNCH:
+			_launch(v, maxi(height, KNOCKDOWN_POP), hitstun)
+			return true
+		HitData.Reaction.GROUND_BOUNCE:
+			if height > 0:
+				_launch(v, height, hitstun)
+				return true
+			_launch(v, KNOCKDOWN_POP, UNTIL_LANDING)
+		HitData.Reaction.KNOCKDOWN:
+			_launch(v, KNOCKDOWN_POP, UNTIL_LANDING)
+		_:
+			_set_action(v, Action.HITSTUN)
+			v.stun = hitstun
+	return false
+
+
+## Sends `f` up so its apex is `height` units above the current position.
+func _launch(f: FighterState, height: int, stun: int) -> void:
+	_set_action(f, Action.AIR_HITSTUN)
+	f.stun = stun
+	f.grounded = false
+	f.vel.y = Fx.isqrt(2 * _juggle_gravity * maxi(height, 0))
+
+
+func _connect_grab(c: Contact) -> void:
+	var a := c.attacker
+	var v := c.victim
+	if a.action != Action.ATTACK or current_move(a) != c.move or a.hitstop > 0:
+		return
+	if v.in_hitstun() or not v.grounded or v.action == Action.GRABBED:
+		return
+	var data := fighter_data[a.slot]
+	var throw_index := data.find_move(c.move.throw_move)
+	a.move_contact = 2
+	if throw_index < 0:
+		return
+	var techable := c.move.techable
+	start_move(a, throw_index, a.move_button)
+	a.facing = _angle_to(a, v)
+	a.grab_partner = v.slot
+	if v.grab_partner >= 0:
+		_release_grab(v)
+	_set_action(v, Action.GRABBED)
+	v.grab_partner = a.slot
+	v.grab_tech_left = rules.grab_tech_window if techable else 0
+	v.stun = 0
+	v.knock_ticks = 0
+	v.carried_ticks = 0
+	v.vel = Vector3i.ZERO
+	v.parry_timer = 0
+	_emit(EventType.GRAB, a.slot, v.slot, c.move.id, v.pos, 0).cue = c.hit.cue
+	_update_holds()
+
+
+func _ko(f: FighterState) -> void:
+	if f.ko:
+		return
+	f.hp = 0
+	f.ko = true
+	_release_grab(f)
+	_set_action(f, Action.KO)
+	f.stun = 0
+	f.carried_ticks = 0
+	f.splat_armed = false
+	if f.grounded:
+		f.grounded = false
+		f.vel.y = Fx.isqrt(2 * _juggle_gravity * KNOCKDOWN_POP)
+	_emit(EventType.KO, f.last_attacker, f.slot, &"", f.pos, 0)
+
+
+## Sums active damage buffs and spends their uses.
+func _use_damage_buffs(f: FighterState) -> int:
+	var total := 0
+	var i := 0
+	while i < f.buffs.size():
+		var buff := f.buffs[i]
+		if buff.damage_bonus_percent != 0:
+			total += buff.damage_bonus_percent
+			if buff.uses_left > 0:
+				buff.uses_left -= 1
+				if buff.uses_left == 0:
+					f.buffs.remove_at(i)
+					continue
+		i += 1
+	return total
+
+
+## Adds Soul in hundredths, capped, with a SOUL_FULL event when it fills.
+func _gain_soul(f: FighterState, hundredths: int) -> void:
+	if hundredths <= 0 or f.ko:
+		return
+	var cap := rules.soul_max * 100
+	var before := f.soul
+	f.soul = mini(cap, f.soul + hundredths)
+	if before < cap and f.soul == cap:
+		_emit(EventType.SOUL_FULL, f.slot, -1, &"", f.pos, rules.soul_max)
 
 
 # --- Bookkeeping ------------------------------------------------------------------------
@@ -1199,16 +2154,31 @@ func _post_tick(f: FighterState) -> void:
 		f.parry_timer -= 1
 		if f.parry_timer == 0:
 			f.parry_lockout = rules.parry_lockout
+			_emit(EventType.WHIFF_PARRY, f.slot, -1, &"", f.pos, rules.parry_lockout)
 	elif f.parry_lockout > 0:
 		f.parry_lockout -= 1
 	if f.dodge_lockout > 0 and f.action != Action.DODGE:
 		f.dodge_lockout -= 1
-	if f.invuln > 0 and f.hitstop == 0:
+	if f.invuln > 0 and f.hitstop == 0 and f.invuln < UNTIL_LANDING:
 		f.invuln -= 1
 	f.guard_idle += 1
 	var guard_max := rules.guard_gauge * 100
 	if f.guard_idle > rules.guard_regen_delay and f.guard < guard_max:
 		f.guard = mini(guard_max, f.guard + rules.guard_regen_per_second * 100 / 60)
+	match f.action:
+		Action.HITSTUN, Action.AIR_HITSTUN, Action.WALL_SPLAT:
+			if f.hitstop == 0:
+				f.combo_ticks += 1
+		Action.KNOCKDOWN, Action.GUARD_BREAK, Action.GRABBED, Action.KO:
+			pass
+		_:
+			f.combo_hits = 0
+			f.combo_damage = 0
+			f.combo_ticks = 0
+			f.juggle_used = 0
+			f.wall_splat_used = false
+	if f.knock_ticks == 0 and f.carried_ticks == 0:
+		f.splat_armed = false
 	var i := 0
 	while i < f.buffs.size():
 		var buff := f.buffs[i]

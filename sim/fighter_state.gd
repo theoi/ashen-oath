@@ -35,6 +35,8 @@ enum Action {
 	## Neutral recovery with no combo (after a grab tech).
 	RECOVER,
 	KO,
+	## Soul Burst: invincible, pushes enemies away, ends the combo.
+	BURST,
 }
 
 var slot: int = 0
@@ -55,6 +57,9 @@ var action_tick: int = 0
 var action_len: int = 0
 ## Direction (Fx angle) of rolls, techs and dashes.
 var move_dir: int = 0
+## Sub-kind of the action: GETUP 0 stand / 1 roll; TECH 1 ground roll / 2 air tech /
+## 3 juggle-limit flip.
+var action_variant: int = 0
 
 ## Current move (index into FighterData.moves), -1 when not attacking.
 var move_index: int = -1
@@ -122,9 +127,16 @@ var combo_ticks: int = 0
 var juggle_used: int = 0
 var wall_splat_used: bool = false
 var last_attacker: int = -1
+## Set by a wall_splat hit while its knockback (or carry) lasts; a wall contact splats.
+var splat_armed: bool = false
+var splat_bonus: int = 0
+## Pending ground bounce height (units) applied on landing after a spike.
+var bounce_pending: int = 0
 
 ## Throw partner slot (victim for the thrower, thrower for the victim), -1 if none.
 var grab_partner: int = -1
+## Frames the grabbed fighter has left to tech the grab (0 = not techable / expired).
+var grab_tech_left: int = 0
 ## Frames left being carried by a dash (victim side).
 var carried_ticks: int = 0
 var carried_by: int = -1
