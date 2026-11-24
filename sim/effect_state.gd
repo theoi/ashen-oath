@@ -19,3 +19,5 @@ var traveled: int = 0
 var hit_counts: PackedInt32Array = PackedInt32Array([0, 0, 0, 0])
 var last_hit_tick: PackedInt32Array = PackedInt32Array([0, 0, 0, 0])
 var dead: bool = false
+## Skill slot whose cast spawned it (-1 = none), for chain skills armed by effect hits.
+var skill_slot: int = -1

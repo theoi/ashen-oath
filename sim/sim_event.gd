@@ -52,6 +52,12 @@ enum Type {
 	COUNTER_STUN,
 	## The target's stagger bar broke (amount = new bar maximum).
 	STAGGER_BREAK,
+	## A stance absorbed a hit from target and started its counter move.
+	STANCE_TRIGGER,
+	## A combo/chain follow-up is ready (amount = skill slot, id = follow-up move).
+	CHAIN_READY,
+	## A charge level was reached (amount = level; FLAG_PERFECT when the perfect zone opens).
+	CHARGE_LEVEL,
 }
 
 const FLAG_COUNTER := 1
@@ -66,6 +72,8 @@ const FLAG_THROW := 128
 const FLAG_COUNTER_ATTACK := 256
 ## The victim was staggered (boss stagger bar broken) when hit.
 const FLAG_STAGGERED := 512
+## Perfect charge (CHARGE_LEVEL when the zone opens; hits of a perfect release).
+const FLAG_PERFECT := 1024
 
 var type: Type
 var tick: int = 0

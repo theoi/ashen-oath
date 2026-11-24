@@ -48,6 +48,35 @@ enum Aim {
 @export_group("Skill")
 ## What kind of skill this is, for the HUD and AI; behavior comes from the other fields.
 @export var skill_type: SkillType = SkillType.TAP
+## Combo: re-pressing the same slot within `follow_up_window` frames of this part's first
+## hit casts this move (part 2, 3...). Parts ignore the cooldown; the slot's cooldown (the
+## first part's) starts when the last part is cast or the window runs out.
+@export var follow_up: StringName = &""
+@export var follow_up_window: int = 30
+## Chain: after this skill hits (hitboxes or its effects), the slot casts `chain_move` for
+## `chain_frames`; cooldown as for combos.
+@export var chain_move: StringName = &""
+@export var chain_frames: int = 180
+## Hits every enemy carrying this fighter's mark (HitData.mark), at any distance, on
+## `mark_frame` (-1 = startup), and clears those marks.
+@export var mark_hit: HitData
+@export var mark_frame: int = -1
+
+@export_group("Hold")
+## Channel frames: the move advances through them while the slot's button is held;
+## releasing at or after `hold_start` jumps to `hold_end + 1` (the tail). 0 = not a hold.
+@export var hold_start: int = 0
+@export var hold_end: int = 0
+## Stick steering while channeling, percent of run speed (0 = rooted).
+@export var hold_steer_percent: int = 0
+
+@export_group("Stance")
+## The first hit from within `stance_arc` degrees of facing during the window is absorbed
+## (melee, projectiles, grabs) and `counter_move` starts at once.
+@export var stance_start: int = 0
+@export var stance_end: int = 0
+@export var stance_arc: float = 180.0
+@export var counter_move: StringName = &""
 
 @export_group("Strings and cancels")
 ## Move id started by pressing light/heavy from the end of the active frames on.
@@ -109,6 +138,20 @@ enum Aim {
 @export var charge_damage_percent: int = 50
 ## At full charge the hit breaks guard.
 @export var full_charge_guard_break: bool = true
+## Charge levels: charge frames at which L1, L2... start. Empty = the linear bonus above.
+## Reaching `charge_max` while held auto-releases at the top normal level.
+@export var charge_levels: PackedInt32Array = PackedInt32Array()
+## Damage percent per level from L1 (missing = 100).
+@export var charge_level_damage_percent: PackedInt32Array = PackedInt32Array()
+## Releasing by hand with charge in [perfect_start, perfect_end] is a perfect release.
+@export var perfect_start: int = 0
+@export var perfect_end: int = 0
+@export var perfect_damage_percent: int = 100
+## Weight and stagger of this move's hits after a perfect release (AUTO / -1 = unchanged).
+@export var perfect_weight: HitData.Weight = HitData.Weight.AUTO
+@export var perfect_stagger: int = -1
+## Cast instead when released before L1 (a weaker version).
+@export var early_release_move: StringName = &""
 
 @export_group("Resources")
 ## Ability cooldown in frames (abilities only).

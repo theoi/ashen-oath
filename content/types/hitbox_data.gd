@@ -18,3 +18,6 @@ extends Resource
 @export var group: int = 0
 ## Destroys destroyable enemy effects (projectiles) that overlap it.
 @export var destroys_projectiles: bool = true
+## Re-arms the hitbox's group every N frames after its first active frame (multi-hit
+## channels like a spinning blade). 0 = hits each target once.
+@export var rehit_frames: int = 0

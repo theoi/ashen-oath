@@ -28,6 +28,9 @@ enum Weight { AUTO, BASIC, LIGHT, MEDIUM, HEAVY, MASSIVE }
 @export var stagger: int = -1
 ## A ⚡Counter: inside the victim's counter window it beats armor and counter-stuns.
 @export var counter: bool = false
+## Brands the victim for `mark_frames` (MoveData.mark_hit detonates brands).
+@export var mark: bool = false
+@export var mark_frames: int = 180
 ## Percent of damage dealt through guard. -1 = by move kind (basic 0, ability 12, super 20).
 @export var chip_percent: int = -1
 ## Frames of hitstun after hitstop. Counter hits add CombatRules.counter_hitstun_percent.
