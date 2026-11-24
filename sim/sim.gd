@@ -1616,6 +1616,8 @@ func apply_buff(f: FighterState, data: BuffData, source: int) -> void:
 	buff.after_cast = f.move_cast
 	buff.damage_bonus_percent = data.damage_bonus_percent
 	buff.speed_bonus_percent = data.speed_bonus_percent
+	buff.armor = data.armor
+	buff.damage_taken_percent = data.damage_taken_percent
 	f.buffs.append(buff)
 	_emit(EventType.BUFF, f.slot, -1, data.id, f.pos, data.duration).cue = data.cue
 
@@ -1654,6 +1656,26 @@ func _buff_speed(f: FighterState) -> int:
 	for buff in f.buffs:
 		total += buff.speed_bonus_percent
 	return total
+
+
+## Strongest BuffData.Armor among `f`'s buffs (none while staggered or counter-stunned).
+func _buff_armor(f: FighterState) -> int:
+	if f.action == Action.STAGGERED or f.action == Action.COUNTER_STUN:
+		return BuffData.Armor.NONE
+	var best := 0
+	for buff in f.buffs:
+		best = maxi(best, buff.armor)
+	return best
+
+
+## Whether `f` is push immune right now (move window or armor buff).
+func _push_immune(f: FighterState) -> bool:
+	if _buff_armor(f) == BuffData.Armor.PUSH_IMMUNE:
+		return true
+	if f.action != Action.ATTACK:
+		return false
+	var move := current_move(f)
+	return move.in_window(f.move_frame, move.push_immune_start, move.push_immune_end)
 
 
 ## Decelerates horizontal velocity at the fighter's stopping rate.
@@ -2838,12 +2860,12 @@ func _try_stance(c: Contact) -> bool:
 ## Flinch-immune and push-immune windows: no hit cap, full damage, half hitstop, no reaction.
 func _try_super_armor(c: Contact) -> bool:
 	var v := c.victim
-	if v.action != Action.ATTACK:
-		return false
-	var move := current_move(v)
-	var push := move.in_window(v.move_frame, move.push_immune_start, move.push_immune_end)
-	var flinch := move.in_window(v.move_frame, move.flinch_immune_start, move.flinch_immune_end) \
-			and c.hit.reaction == HitData.Reaction.STAGGER and v.grounded
+	var push := _push_immune(v)
+	var flinch := _buff_armor(v) == BuffData.Armor.FLINCH_IMMUNE
+	if v.action == Action.ATTACK:
+		var move := current_move(v)
+		flinch = flinch or move.in_window(v.move_frame, move.flinch_immune_start, move.flinch_immune_end)
+	flinch = flinch and c.hit.reaction == HitData.Reaction.STAGGER and v.grounded
 	if not push and not flinch:
 		return false
 	var damage := _hit_damage(c)
@@ -2904,6 +2926,11 @@ func _hit_damage(c: Contact) -> int:
 			damage = damage * hook.damage_percent(self, a, v, c.move, c.hit) / 100
 	if v.action == Action.STAGGERED:
 		damage = damage * rules.stagger_damage_percent / 100
+	var taken := 0
+	for buff in v.buffs:
+		taken += buff.damage_taken_percent
+	if taken != 0:
+		damage = damage * maxi(0, 100 + taken) / 100
 	return damage
 
 
@@ -3202,10 +3229,8 @@ func _connect_grab(c: Contact) -> void:
 		return
 	if v.in_hitstun() or not v.grounded or v.action == Action.GRABBED:
 		return
-	if v.action == Action.ATTACK:
-		var guarded := current_move(v)
-		if guarded.in_window(v.move_frame, guarded.push_immune_start, guarded.push_immune_end):
-			return
+	if _push_immune(v):
+		return
 	var data := fighter_data[a.slot]
 	var throw_index := data.find_move(c.move.throw_move)
 	a.move_contact = 2

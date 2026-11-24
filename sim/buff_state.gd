@@ -18,3 +18,6 @@ var last_cast: int = -1
 var spent: bool = false
 var damage_bonus_percent: int = 0
 var speed_bonus_percent: int = 0
+## BuffData.Armor and damage_taken_percent.
+var armor: int = 0
+var damage_taken_percent: int = 0
