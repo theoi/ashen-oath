@@ -49,7 +49,7 @@ func _usage() -> String:
 		+ "  [--levels=normal,normal] [--teams=0,1] [--arena=training_arena] [--rounds=N] [--round-seconds=S]\n" \
 		+ "  [--profiles=1:oath_shade] [--start-soul=1:50] [--cap=easy] [--no-swap] [--stuck-seconds=20]\n" \
 		+ "  [--stuck-action-seconds=10] [--verify] [--json=path] [--replays=dir] [--save-all] [--quiet]\n" \
-		+ "  [--fail-on-stuck] [--infinite-hits=20] [--infinite-seconds=8] [--fail-on-infinite]"
+		+ "  [--fail-on-stuck] [--allow-guard] [--infinite-hits=20] [--infinite-seconds=8] [--fail-on-infinite]"
 
 
 func _run() -> int:
@@ -281,8 +281,10 @@ func _sources(cfg: SimConfig, level_names: PackedStringArray, profile_overrides:
 		var profile: AiProfile = null
 		if profile_overrides.has(slot):
 			profile = AiProfile.by_id(StringName(profile_overrides[slot]))
-		sources.append(AiInputSource.new(AiDifficulty.preset(levels[slot], cap), profile,
-				team_tokens.get(cfg.slots[slot].team)))
+		var ai := AiInputSource.new(AiDifficulty.preset(levels[slot], cap), profile,
+				team_tokens.get(cfg.slots[slot].team))
+		ai.allow_guard = _opts.has("allow-guard")
+		sources.append(ai)
 	return sources
 
 

@@ -1,6 +1,7 @@
 extends TestCase
 ## Short soak: CPU matches on the slice arenas (hazards included) and in 1v2 finish without
-## stuck states, and the CPU actually fights (hits, guards, uses abilities). Engine errors
+## stuck states, and the CPU actually fights (hits, dodges, uses abilities; no guard or jump,
+## design-lost-ark §4 Pilot scope). Engine errors
 ## fail the test through the runner. Long soaks: tools/ai_soak.sh.
 
 const A := preload("res://tests/ai/ai_fixtures.gd")
@@ -18,7 +19,9 @@ func _check(bout: AiBout, label: String) -> void:
 func test_one_vs_one_on_slice_arenas() -> void:
 	var arenas: PackedStringArray = ["ashen_chapel", "drowned_crypt", "drowned_crypt_depths"]
 	var pairs: Array[Array] = [[X, H], [N, E], [H, N]]
-	var defended := 0
+	var dodged := 0
+	var guarded := 0
+	var unused_presses := 0
 	for i in arenas.size():
 		var cfg := A.config([0, 1], 40 + i, 60, 1, "res://content/arenas/%s.tres" % arenas[i])
 		var levels: Array[int] = []
@@ -27,11 +30,18 @@ func test_one_vs_one_on_slice_arenas() -> void:
 		_check(bout, arenas[i])
 		for slot in 2:
 			assert_true(int(bout.stats[slot]["hits"]) > 0, "%s: slot %d lands hits" % [arenas[i], slot])
-		for key: String in ["blocks", "parries", "dodges"]:
-			defended += bout.team_stat(0, key) + bout.team_stat(1, key)
+		dodged += bout.team_stat(0, "dodges") + bout.team_stat(1, "dodges")
+		for key: String in ["blocks", "parries"]:
+			guarded += bout.team_stat(0, key) + bout.team_stat(1, key)
+		for t in bout.replay.tick_count():
+			for slot in 2:
+				if SimInput.buttons_of(bout.replay.frame(t, slot)) & AiInputSource.UNGUARDED_UNUSED:
+					unused_presses += 1
 		assert_true(bout.team_stat(0, "abilities") > 0 and bout.team_stat(1, "abilities") > 0,
 				"%s: both use abilities" % arenas[i])
-	assert_true(defended > 10, "the CPUs block, parry and dodge (%d)" % defended)
+	assert_eq(guarded, 0, "no blocks or parries")
+	assert_eq(unused_presses, 0, "no guard or jump presses")
+	assert_true(dodged > 0, "the CPUs dodge (%d)" % dodged)
 
 
 func test_one_vs_two() -> void:
