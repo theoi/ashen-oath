@@ -18,14 +18,16 @@ func after_each() -> void:
 
 func test_defaults_follow_the_design_table() -> void:
 	var expected := {
-		FeelTuning.HITSTOP_SCALE: 1.0, FeelTuning.SHAKE_SCALE: 1.0, FeelTuning.SKILL_SPEED: 100.0,
-		FeelTuning.DASH_DISTANCE: 4.5, FeelTuning.DASH_CHARGES: 2.0, FeelTuning.CAMERA_PITCH: 52.0,
-		FeelTuning.CAMERA_DISTANCE: 15.0, FeelTuning.CAMERA_FOV: 40.0, FeelTuning.CAMERA_SMOOTHING: 0.2,
-		FeelTuning.CAMERA_LEAD: 1.0, FeelTuning.SLOW_MOTION: 0.4,
+		FeelTuning.HITSTOP_SCALE: 1.0, FeelTuning.SHAKE_SCALE: 1.0, FeelTuning.FLASH_INTENSITY: 1.0,
+		FeelTuning.SKILL_SPEED: 100.0, FeelTuning.DASH_DISTANCE: 4.5, FeelTuning.DASH_CHARGES: 2.0,
+		FeelTuning.DASH_RECHARGE: 5.0, FeelTuning.CAMERA_PITCH: 48.0, FeelTuning.CAMERA_DISTANCE: 14.0,
+		FeelTuning.CAMERA_DISTANCE_MAX: 20.0, FeelTuning.CAMERA_FOV: 35.0, FeelTuning.CAMERA_FOLLOW: 14.0,
+		FeelTuning.AIM_LEAD_MOUSE: 0.5, FeelTuning.AIM_LEAD_PAD: 0.0, FeelTuning.SLOW_MOTION: 0.4,
 	}
 	for key: StringName in expected:
 		assert_almost_eq(FeelTuning.value(key), expected[key], 0.0001, String(key))
 	assert_true(FeelTuning.flag(FeelTuning.DAMAGE_NUMBERS))
+	assert_almost_eq(FeelTuning.setting(FeelTuning.HITSTOP_SCALE).max_value, 3.0, 0.0001, "hitstop scales 0-3×")
 
 
 func test_values_clamp_snap_persist_and_signal() -> void:
@@ -36,11 +38,11 @@ func test_values_clamp_snap_persist_and_signal() -> void:
 	FeelTuning.set_value(FeelTuning.SHAKE_SCALE, 0.512)
 	FeelTuning.changed.disconnect(count)
 	assert_eq(seen[0], 2)
-	assert_almost_eq(FeelTuning.value(FeelTuning.CAMERA_PITCH), 60.0, 0.0001, "clamped to the range")
+	assert_almost_eq(FeelTuning.value(FeelTuning.CAMERA_PITCH), 65.0, 0.0001, "clamped to the range")
 	assert_almost_eq(FeelTuning.value(FeelTuning.SHAKE_SCALE), 0.5, 0.0001, "snapped to the step")
 	FeelTuning.reset_to_defaults()
 	FeelTuning.load_values()
-	assert_almost_eq(FeelTuning.value(FeelTuning.CAMERA_PITCH), 60.0, 0.0001, "saved on change")
+	assert_almost_eq(FeelTuning.value(FeelTuning.CAMERA_PITCH), 65.0, 0.0001, "saved on change")
 
 
 func test_sim_values_apply_only_through_the_config_at_match_start() -> void:
@@ -52,10 +54,14 @@ func test_sim_values_apply_only_through_the_config_at_match_start() -> void:
 	assert_eq(config.hitstop_percent, 100)
 	assert_eq(config.dash_charges, -1, "defaults leave the fighter's own dash data")
 	assert_almost_eq(config.dash_distance, -1.0, 0.0001)
-	FeelTuning.set_value(FeelTuning.HITSTOP_SCALE, 0.5)
+	FeelTuning.set_value(FeelTuning.HITSTOP_SCALE, 2.5)
 	FeelTuning.set_value(FeelTuning.DASH_DISTANCE, 6.0)
 	FeelTuning.apply_to(config)
-	assert_eq(config.hitstop_percent, 50)
+	assert_eq(config.hitstop_percent, 250)
+	FeelTuning.set_value(FeelTuning.DASH_RECHARGE, 4.0)
+	FeelTuning.apply_to(config)
+	if &"dash_recharge_frames" in config:
+		assert_eq(config.get(&"dash_recharge_frames"), 240, "seconds to frames")
 	assert_almost_eq(config.dash_distance, 6.0, 0.0001)
 	FeelTuning.set_value(FeelTuning.DASH_CHARGES, 3.0)
 	assert_eq(FeelTuning.pending_restart(), PackedStringArray(["Dash charges"]))
@@ -68,7 +74,7 @@ func test_copy_text_lists_every_value_and_marks_changes() -> void:
 	var text := FeelTuning.as_text()
 	for setting in FeelTuning.settings():
 		assert_true(text.contains(String(setting.key) + " = "), String(setting.key))
-	assert_true(text.contains("camera_fov = 45  # default 40"), text)
+	assert_true(text.contains("camera_fov = 45  # default 35"), text)
 	assert_true(text.contains("damage_numbers = true"))
 
 

@@ -93,7 +93,7 @@ func test_camera_is_high_with_a_fixed_yaw() -> void:
 	_settle(fight)
 	var forward := -fight.camera.global_basis.z
 	var pitch := rad_to_deg(asin(-forward.y))
-	assert_almost_eq(pitch, 52.0, 1.0, "pitch")
+	assert_almost_eq(pitch, rad_to_deg(Feel.camera_pitch()), 1.0, "pitch")
 	var yaw_before := atan2(forward.x, forward.z)
 	# The fighters swap sides: the camera does not orbit after them.
 	SimFixtures.place(fight.runner.sim, 0, 3.0, 2.0, Fx.deg(-90.0))
@@ -101,7 +101,7 @@ func test_camera_is_high_with_a_fixed_yaw() -> void:
 	_settle(fight)
 	forward = -fight.camera.global_basis.z
 	assert_almost_eq(atan2(forward.x, forward.z), yaw_before, 0.001, "yaw stays fixed")
-	assert_almost_eq(fight.camera.fov, 40.0, 0.5, "fov")
+	assert_almost_eq(fight.camera.fov, Feel.camera_fov(), 0.5, "fov")
 
 
 func test_camera_keeps_both_fighters_in_frame_and_settles_back() -> void:
@@ -117,11 +117,11 @@ func test_camera_keeps_both_fighters_in_frame_and_settles_back() -> void:
 		var s := fight.camera.unproject_position(p) / rect.size
 		assert_true(s.x > 0.08 and s.x < 0.92 and s.y > 0.08 and s.y < 0.92, "fighter %d inside the frame (%s)" % [slot, s])
 	var far := fight.camera._distance
-	assert_true(far > 15.0, "pulled back for a wide split (%.1f m)" % far)
+	assert_true(far > Feel.camera_distance(), "pulled back for a wide split (%.1f m)" % far)
 	SimFixtures.place(fight.runner.sim, 0, 0.0, 0.0, 0)
 	SimFixtures.place(fight.runner.sim, 1, 0.0, 2.0, Fx.HALF_TURN)
 	_settle(fight, 360)
-	assert_almost_eq(fight.camera._distance, 15.0, 0.3, "back to the resting distance")
+	assert_almost_eq(fight.camera._distance, Feel.camera_distance(), 0.3, "back to the resting distance")
 
 
 func test_every_fighter_move_names_an_existing_clip() -> void:

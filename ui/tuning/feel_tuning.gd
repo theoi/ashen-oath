@@ -15,18 +15,26 @@ signal panel_toggled(open: bool)
 const DEFAULT_PATH := "user://feel_tuning.cfg"
 
 const SHAKE_SCALE := &"shake_scale"
+const FLASH_INTENSITY := &"flash_intensity"
 const RUMBLE_SCALE := &"rumble_scale"
 const DAMAGE_NUMBERS := &"damage_numbers"
 const SLOW_MOTION := &"slow_motion"
 const CAMERA_PITCH := &"camera_pitch"
+## Distance at rest, and the farthest the camera pulls back to keep everyone framed.
 const CAMERA_DISTANCE := &"camera_distance"
+const CAMERA_DISTANCE_MAX := &"camera_distance_max"
+## Vertical field of view, degrees.
 const CAMERA_FOV := &"camera_fov"
-const CAMERA_SMOOTHING := &"camera_smoothing"
-const CAMERA_LEAD := &"camera_lead"
+## Follow spring angular frequency ω (rad/s); higher follows tighter.
+const CAMERA_FOLLOW := &"camera_follow"
+## How far the camera leads toward the aim point, per aiming device.
+const AIM_LEAD_MOUSE := &"aim_lead_mouse"
+const AIM_LEAD_PAD := &"aim_lead_pad"
 const HITSTOP_SCALE := &"hitstop_scale"
 const SKILL_SPEED := &"skill_speed"
 const DASH_DISTANCE := &"dash_distance"
 const DASH_CHARGES := &"dash_charges"
+const DASH_RECHARGE := &"dash_recharge"
 
 
 class Setting:
@@ -66,22 +74,26 @@ class Setting:
 		return String.num(value, digits) + unit
 
 
-## Display order. Defaults are the §1.13 table.
+## Display order. Defaults are the design-lost-ark §1.13 table (v4).
 static func settings() -> Array[Setting]:
 	return [
 		Setting.new(SHAKE_SCALE, "Shake scale", 1.0, 0.0, 2.0, 0.05, "×"),
-		Setting.new(CAMERA_PITCH, "Camera pitch", 52.0, 45.0, 60.0, 1.0, "°"),
-		Setting.new(CAMERA_DISTANCE, "Camera distance", 15.0, 8.0, 22.0, 0.5, " m"),
-		Setting.new(CAMERA_FOV, "Field of view", 40.0, 25.0, 70.0, 1.0, "°"),
-		Setting.new(CAMERA_SMOOTHING, "Smoothing", 0.2, 0.0, 0.6, 0.02, " s"),
-		Setting.new(CAMERA_LEAD, "Lead", 1.0, 0.0, 3.0, 0.1, " m"),
+		Setting.new(FLASH_INTENSITY, "Flash intensity", 1.0, 0.0, 2.0, 0.05, "×"),
+		Setting.new(CAMERA_PITCH, "Camera pitch", 48.0, 35.0, 65.0, 1.0, "°"),
+		Setting.new(CAMERA_DISTANCE, "Camera distance", 14.0, 8.0, 24.0, 0.5, " m"),
+		Setting.new(CAMERA_DISTANCE_MAX, "Max distance", 20.0, 10.0, 30.0, 0.5, " m"),
+		Setting.new(CAMERA_FOV, "Field of view", 35.0, 20.0, 60.0, 1.0, "°"),
+		Setting.new(CAMERA_FOLLOW, "Follow speed (ω)", 14.0, 2.0, 30.0, 0.5, " rad/s"),
+		Setting.new(AIM_LEAD_MOUSE, "Aim lead (mouse)", 0.5, 0.0, 3.0, 0.1, " m"),
+		Setting.new(AIM_LEAD_PAD, "Aim lead (gamepad)", 0.0, 0.0, 3.0, 0.1, " m"),
 		Setting.new(SLOW_MOTION, "Slow motion", 0.4, 0.1, 1.0, 0.05, "×"),
 		Setting.new(RUMBLE_SCALE, "Rumble scale", 1.0, 0.0, 2.0, 0.05, "×"),
 		Setting.new(DAMAGE_NUMBERS, "Damage numbers", 1.0, 0.0, 1.0, 1.0),
-		Setting.new(HITSTOP_SCALE, "Hitstop scale", 1.0, 0.0, 2.0, 0.05, "×", &"hitstop_percent", 100.0),
+		Setting.new(HITSTOP_SCALE, "Hitstop scale", 1.0, 0.0, 3.0, 0.05, "×", &"hitstop_percent", 100.0),
 		Setting.new(SKILL_SPEED, "Skill speed", 100.0, 50.0, 150.0, 5.0, "%", &"move_speed_percent"),
 		Setting.new(DASH_DISTANCE, "Dash distance", 4.5, 2.0, 8.0, 0.25, " m", &"dash_distance"),
 		Setting.new(DASH_CHARGES, "Dash charges", 2.0, 1.0, 4.0, 1.0, "", &"dash_charges"),
+		Setting.new(DASH_RECHARGE, "Dash recharge", 5.0, 1.0, 10.0, 0.25, " s", &"dash_recharge_frames", 60.0),
 	]
 
 
@@ -152,7 +164,8 @@ func apply_to(config: SimConfig) -> void:
 		if not s.sim:
 			continue
 		_applied[key] = _values[key]
-		if is_equal_approx(_values[key], s.default):
+		# Overrides the sim does not support yet are skipped (still listed for restart).
+		if is_equal_approx(_values[key], s.default) or not s.sim_property in config:
 			continue
 		var current: Variant = config.get(s.sim_property)
 		var scaled := _values[key] * s.sim_factor

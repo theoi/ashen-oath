@@ -183,9 +183,10 @@ awakening button. SimHud reads the newer sim fields (`dash_charges`, `skill_next
 
 `tuning/feel_tuning.gd` (autoload `FeelTuning`) holds the design-lost-ark §1.13 values with
 their defaults, persisted in `user://feel_tuning.cfg`. Presentation reads the live ones
-(`FeelTuning.value(FeelTuning.CAMERA_PITCH)`, `SHAKE_SCALE`, `RUMBLE_SCALE`, `SLOW_MOTION`,
-`CAMERA_DISTANCE / FOV / SMOOTHING / LEAD`, `flag(DAMAGE_NUMBERS)`; signal `changed`). The
-sim ones (hitstop scale, skill speed, dash distance and charges) only reach a match through
+(`FeelTuning.value(FeelTuning.CAMERA_PITCH)`, `CAMERA_DISTANCE`, `CAMERA_DISTANCE_MAX`,
+`CAMERA_FOV`, `CAMERA_FOLLOW` (spring ω), `AIM_LEAD_MOUSE` / `AIM_LEAD_PAD`, `SHAKE_SCALE`,
+`FLASH_INTENSITY`, `RUMBLE_SCALE`, `SLOW_MOTION`, `flag(DAMAGE_NUMBERS)`; signal `changed`). The
+sim ones (hitstop scale 0–3×, skill speed, dash distance, charges and recharge) only reach a match through
 `FeelTuning.apply_to(sim_config)` at match start, so replays record them and a running match
 stays deterministic. The hidden panel (`tuning/tuning_panel.gd`) opens with Ctrl+Shift+F,
 `?tune=1` on web or `-- --tune`, and has sliders, "Copy values" (text to paste back),
