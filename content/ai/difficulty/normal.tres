@@ -13,3 +13,4 @@ aim_error_cm = 80
 stance_chance = 30
 counter_chance = 30
 charge_jitter = 10
+wave_attack_tokens = 2

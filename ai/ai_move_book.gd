@@ -78,6 +78,8 @@ class Entry:
 	var effect_speed: int = 0
 	## Where its first effect starts in front of the user (units).
 	var effect_offset: int = 0
+	## Stagger-bar / channel-gauge drain of all its hits (HitData.stagger, else by weight).
+	var stagger: int = 0
 
 	func has(tag: int) -> bool:
 		return tags & tag != 0
@@ -87,6 +89,8 @@ class Entry:
 
 
 var data: FighterData
+## Weight → stagger table (CombatRules.weight_stagger, BASIC..TICK).
+var weight_stagger: PackedInt32Array = PackedInt32Array([5, 15, 30, 50, 80, 5])
 var entries: Array[Entry] = []
 ## Entries by move index (null for moves with no entry).
 var by_index: Array[Entry] = []
@@ -104,8 +108,10 @@ var abilities: Array[Entry] = []
 var quick_reach: int = 0
 
 
-func _init(fighter: FighterData) -> void:
+func _init(fighter: FighterData, rules: CombatRules = null) -> void:
 	data = fighter
+	if rules != null and rules.weight_stagger.size() >= 6:
+		weight_stagger = rules.weight_stagger
 	for i in fighter.moves.size():
 		var entry := _analyze(i, fighter.moves[i])
 		entries.append(entry)
@@ -199,6 +205,7 @@ func _analyze(index: int, move: MoveData) -> Entry:
 		e.low = mini(e.low, Fx.m(bottom))
 		e.high = maxi(e.high, Fx.m(top))
 		e.damage += hb.hit.damage
+		e.stagger += _stagger_of(hb.hit, move)
 		e.melee = true
 		e.last_hit_frame = maxi(e.last_hit_frame, end)
 		if start < first_frame:
@@ -208,7 +215,9 @@ func _analyze(index: int, move: MoveData) -> Entry:
 		e.tags |= _hit_tags(hb.hit)
 		if hb.rehit_frames > 0 and move.hold_end > 0:
 			# Channel ticks: count a typical hold of about half the channel.
-			e.damage += hb.hit.damage * maxi(0, (move.hold_end - start) / hb.rehit_frames / 2)
+			var ticks := maxi(0, (move.hold_end - start) / hb.rehit_frames / 2)
+			e.damage += hb.hit.damage * ticks
+			e.stagger += _stagger_of(hb.hit, move) * ticks
 	if first_frame < 9999:
 		e.hit_frame = first_frame
 		# Holds can be released at once (the tail follows hold_start).
@@ -236,12 +245,14 @@ func _analyze(index: int, move: MoveData) -> Entry:
 		e.low = mini(e.low, Fx.m(ed.offset.y - ed.radius) if ed.height <= 0.0 else 0)
 		e.high = maxi(e.high, Fx.m(ed.offset.y + maxf(ed.radius, ed.height)))
 		e.damage += ed.hit.damage * maxi(1, ed.count)
+		e.stagger += _stagger_of(ed.hit, move) * maxi(1, ed.count)
 		e.hit_frame = mini(e.hit_frame, start)
 		e.last_hit_frame = maxi(e.last_hit_frame, start)
 		e.tags |= _hit_tags(ed.hit)
 	if move.mark_hit != null:
 		e.tags |= TAG_MARK_HIT | _hit_tags(move.mark_hit)
 		e.damage += move.mark_hit.damage
+		e.stagger += _stagger_of(move.mark_hit, move)
 		e.hit_frame = mini(e.hit_frame, move.mark_frame if move.mark_frame > 0 else move.startup)
 		if not e.melee and e.reach == 0:
 			e.low = 0
@@ -282,6 +293,17 @@ static func _travel(move: MoveData, frame: int) -> int:
 			and move.teleport.frame < frame:
 		total += Fx.m(move.teleport.distance)
 	return total
+
+
+## Stagger drain of one hit: HitData.stagger, else by weight (AUTO: BASIC for basics, LIGHT
+## otherwise), like the sim.
+func _stagger_of(hit: HitData, move: MoveData) -> int:
+	if hit.stagger >= 0:
+		return hit.stagger
+	var weight := hit.weight
+	if weight == HitData.Weight.AUTO:
+		weight = HitData.Weight.BASIC if move.is_basic() else HitData.Weight.LIGHT
+	return weight_stagger[clampi(weight - 1, 0, weight_stagger.size() - 1)]
 
 
 static func _hit_tags(hit: HitData) -> int:

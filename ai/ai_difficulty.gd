@@ -72,6 +72,8 @@ const PRESET_PATHS: PackedStringArray = [
 @export_group("Crowd fights")
 ## Enemies on one team that may commit to an attack at the same time (1v2 fairness).
 @export var attack_tokens: int = 1
+## The same for wave enemies (design-lost-ark 5.4: 2, 3 on Hard, 4 on Nightmare).
+@export var wave_attack_tokens: int = 2
 
 
 ## The preset for `level` (0 Easy .. 3 Nightmare), optionally capped (story fight 1 uses

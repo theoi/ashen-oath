@@ -49,6 +49,9 @@ var difficulty: AiDifficulty
 var profile: AiProfile
 ## Shared by the CPU fighters of one team (null = no sharing, e.g. 1v1).
 var tokens: AiAttackTokens
+## Shared tokens per team (for_match); when set, `tokens` follows the fighter's current team,
+## so wave slots that respawn on another team use that team's pool.
+var team_tokens: Dictionary[int, AiAttackTokens] = {}
 ## Old-kit CPUs guard, parry and jump only when set (the pre-skill-kit behavior).
 var allow_guard: bool = false
 ## Current intent, for debugging and the soak report.
@@ -102,6 +105,9 @@ var _armor_key: int = -1
 var _chain_key: int = -1
 var _cancel_key: int = -1
 var _books: Array[AiMoveBook] = []
+## The FighterData this slot ran when last bound, and whether the profile was given.
+var _my_data: FighterData
+var _profile_given: bool = false
 ## Tick the target entered its current action, for one punish decision per opening.
 var _target_entry: int = 0
 var _target_prev_slot: int = -1
@@ -150,40 +156,58 @@ var _unstick_until: int = 0
 var _unstick_angle: int = 0
 
 
-func _init(level: AiDifficulty = null, fighter_profile: AiProfile = null, team_tokens: AiAttackTokens = null) -> void:
+func _init(level: AiDifficulty = null, fighter_profile: AiProfile = null, shared: AiAttackTokens = null) -> void:
 	difficulty = level if level != null else AiDifficulty.preset(AiDifficulty.Level.NORMAL)
 	profile = fighter_profile
-	tokens = team_tokens
+	tokens = shared
 
 
 ## CPU sources for `cpu_slots` of a match: one per slot (null for other slots), with attack
-## tokens shared per team. `cap` limits the level (story fight 1: AiDifficulty.Level.EASY).
-## `profiles` optionally overrides the profile per slot (e.g. the Oath-Shade).
+## tokens shared per team. Wave slots (SimConfig.waves) always get a CPU source. `cap` limits
+## the level (story fight 1: AiDifficulty.Level.EASY). `profiles` optionally overrides the
+## profile per config slot (e.g. the Oath-Shade).
 static func for_match(config: SimConfig, cpu_slots: PackedInt32Array, level: int, cap: int = -1,
 		profiles: Dictionary = {}) -> Array[InputSource]:
 	var preset := AiDifficulty.preset(level, cap)
-	var team_tokens := shared_tokens(config, cpu_slots, preset.attack_tokens)
+	var all_cpu := cpu_slots.duplicate()
+	for slot in range(config.slots.size(), config.total_slots()):
+		all_cpu.append(slot)
+	var pools := shared_tokens(config, all_cpu, preset.attack_tokens, preset.wave_attack_tokens)
 	var sources: Array[InputSource] = []
-	for slot in config.slots.size():
-		if not slot in cpu_slots:
+	for slot in config.total_slots():
+		if not slot in all_cpu:
 			sources.append(null)
 			continue
 		var fighter_profile: AiProfile = profiles.get(slot, null)
-		sources.append(AiInputSource.new(preset, fighter_profile, team_tokens.get(config.slots[slot].team)))
+		var team := config.slots[slot].team if slot < config.slots.size() else -1
+		var ai := AiInputSource.new(preset, fighter_profile, pools.get(team))
+		ai.team_tokens = pools
+		sources.append(ai)
 	return sources
 
 
-## Attack tokens for each team with two or more CPU fighters (a lone CPU needs none).
-static func shared_tokens(config: SimConfig, cpu_slots: PackedInt32Array, count: int) -> Dictionary[int, AiAttackTokens]:
+## Attack tokens for each team with two or more CPU fighters (a lone CPU needs none). Wave
+## slots among `cpu_slots` count every wave entry of their team; teams with wave enemies get
+## `wave_count` tokens when it is set.
+static func shared_tokens(config: SimConfig, cpu_slots: PackedInt32Array, count: int,
+		wave_count: int = -1) -> Dictionary[int, AiAttackTokens]:
 	var per_team: Dictionary[int, int] = {}
+	var wave_teams: Dictionary[int, bool] = {}
+	var waves_counted := false
 	for slot in cpu_slots:
 		if slot >= 0 and slot < config.slots.size():
 			var team := config.slots[slot].team
 			per_team[team] = per_team.get(team, 0) + 1
+		elif slot >= config.slots.size() and not waves_counted:
+			waves_counted = true
+			for wave in config.waves:
+				for entry in wave.entries:
+					per_team[entry.team] = per_team.get(entry.team, 0) + maxi(1, entry.count)
+					wave_teams[entry.team] = true
 	var result: Dictionary[int, AiAttackTokens] = {}
 	for team: int in per_team:
 		if per_team[team] >= 2:
-			result[team] = AiAttackTokens.new(count)
+			result[team] = AiAttackTokens.new(wave_count if wave_count > 0 and wave_teams.has(team) else count)
 	return result
 
 
@@ -196,16 +220,25 @@ func next_frame(sim: Sim, slot: int) -> int:
 	_stick_mag = 0
 	if not _seeded:
 		_setup(slot)
+	if sim.fighter_data[slot] != _my_data:
+		# A wave slot respawned as another fighter.
+		_bind_fighter(slot)
+		_reset_round()
 	if sim.state.round_number != _round:
 		_reset_round()
-	if sim.state.phase != SimState.Phase.FIGHT or _me.ko:
+	if not _me.active or _me.action == Action.SPAWN or sim.state.phase != SimState.Phase.FIGHT or _me.ko:
 		_give_back_token()
 		return _finish()
+	if not team_tokens.is_empty():
+		var team_pool: AiAttackTokens = team_tokens.get(_me.team)
+		if team_pool != tokens:
+			_give_back_token()
+			tokens = team_pool
 	_target = _choose_target()
 	if _target == null:
 		_give_back_token()
 		return _finish()
-	_tbook = _books[_target.slot]
+	_tbook = _book_of(_target.slot)
 	if _me.action != _prev_action or _me.action_tick < _prev_action_tick:
 		_action_entry = _tick
 	_prev_action = _me.action
@@ -244,13 +277,30 @@ func _count(key: String) -> void:
 func _setup(slot: int) -> void:
 	_seeded = true
 	rng.reseed(_sim.config.seed * 7919 + slot * 104729 + difficulty.level * 31 + 17)
-	for data in _sim.fighter_data:
-		_books.append(AiMoveBook.new(data))
-	_book = _books[slot]
-	_kit = _sim.fighter_data[slot].is_skill_kit()
-	if profile == null:
-		profile = AiProfile.for_fighter(_sim.fighter_data[slot])
+	_profile_given = profile != null
+	_seen_move.resize(_sim.slot_count())
+	_seen_frame.resize(_sim.slot_count())
+	_bind_fighter(slot)
 	_circle_dir = 1 if rng.chance(50) else -1
+
+
+## Reads the fighter this slot runs now (wave slots change fighter when they respawn).
+func _bind_fighter(slot: int) -> void:
+	_my_data = _sim.fighter_data[slot]
+	_book = _book_of(slot)
+	_kit = _my_data.is_skill_kit()
+	if not _profile_given:
+		profile = AiProfile.for_fighter(_my_data)
+
+
+## The move book of the fighter `slot` runs now, rebuilt when the slot changes fighter.
+func _book_of(slot: int) -> AiMoveBook:
+	if _books.size() < _sim.slot_count():
+		_books.resize(_sim.slot_count())
+	var data := _sim.fighter_data[slot]
+	if _books[slot] == null or _books[slot].data != data:
+		_books[slot] = AiMoveBook.new(data, _sim.rules)
+	return _books[slot]
 
 
 func _reset_round() -> void:
@@ -362,6 +412,8 @@ func _choose_target() -> FighterState:
 			score -= Fx.m(2.0)
 		if e.in_hitstun():
 			score -= Fx.m(1.5)
+		if e.channel > 0 and difficulty.level >= AiDifficulty.Level.HARD:
+			score -= Fx.m(8.0)
 		if best == null or score < best_score:
 			best = e
 			best_score = score
@@ -415,7 +467,7 @@ func _delay() -> int:
 
 
 func _on_enemy_move(e: FighterState) -> void:
-	var entry := _books[e.slot].entry(e.move_index)
+	var entry := _book_of(e.slot).entry(e.move_index)
 	if entry == null or not entry.melee:
 		return
 	_count("threats")
@@ -512,6 +564,8 @@ func _neutral() -> void:
 		return
 	if _try_juggle():
 		return
+	if _try_channel_break():
+		return
 	if _kit and (_try_sequence() or _try_counter_window() or _try_oki() or _try_stance_read()):
 		return
 	if _try_armor_answer():
@@ -566,7 +620,7 @@ func _respond(t: Threat) -> int:
 	var reach := 0
 	if t.kind == ThreatKind.MELEE or t.kind == ThreatKind.GRAB:
 		var e := _sim.fighter(t.slot)
-		var entry := _books[t.slot].entry(t.move_index)
+		var entry := _book_of(t.slot).entry(t.move_index)
 		if e.action != Action.ATTACK or e.move_index != t.move_index or e.move_frame > entry.last_hit_frame:
 			t.response = Response.NONE
 			return -1
@@ -1247,7 +1301,7 @@ func _try_armor_answer() -> bool:
 	for e in _sim.state.fighters:
 		if e.team == _me.team or e.ko or e.action != Action.ATTACK or e.move_frame <= difficulty.reaction_delay:
 			continue
-		var threat := _books[e.slot].entry(e.move_index)
+		var threat := _book_of(e.slot).entry(e.move_index)
 		if threat == null or not threat.melee or e.move_frame >= threat.hit_frame:
 			continue
 		var dist := Fx.dist_xz(e.pos, _me.pos)
@@ -1386,7 +1440,8 @@ func _usable(e: Entry) -> bool:
 		# Combo/chain parts come out only while their window is open; it also blocks the root.
 		if e.part:
 			return _me.skill_next[s] == e.index
-		if _me.cooldowns[s] > 0 or _me.skill_next[s] >= 0 or _me.skill_window[s] > 0:
+		# skill_ready counts per-skill charges (usable while a recharge runs).
+		if _me.skill_next[s] >= 0 or not _sim.skill_ready(_me, s):
 			return false
 	if e.soul_cost > 0 and _me.soul < e.soul_cost * 100:
 		return false
@@ -1503,7 +1558,7 @@ func _known_threat() -> bool:
 	for e in _sim.state.fighters:
 		if e.team == _me.team or e.action != Action.ATTACK or e.move_frame <= difficulty.reaction_delay:
 			continue
-		var entry := _books[e.slot].entry(e.move_index)
+		var entry := _book_of(e.slot).entry(e.move_index)
 		if entry == null or not entry.melee or e.move_frame > entry.last_hit_frame:
 			continue
 		if Fx.dist_xz(e.pos, _me.pos) <= entry.reach + _radius(_me) + Fx.m(0.5):
@@ -1756,6 +1811,37 @@ func _try_stance_read() -> bool:
 	_count("stance_reads")
 	_use(stance, _angle_to_target())
 	_aim_at(_target.pos)
+	return true
+
+
+## Hard and up: an enemy channeling a special behind a break gauge (FighterState.channel,
+## CHANNEL_START) gets the highest stagger-per-frame skill that reaches, ignoring the attack
+## gap; out of reach, the CPU runs in.
+func _try_channel_break() -> bool:
+	if difficulty.level < AiDifficulty.Level.HARD or _target.channel <= 0 or not _can_hit_target(null):
+		return false
+	# The gauge shows from the move's channel_start: react after the usual delay.
+	if _target.action == Action.ATTACK and _target.move_frame - _sim.current_move(_target).channel_start < difficulty.reaction_delay:
+		return false
+	var dist := Fx.dist_xz(_me.pos, _target.pos)
+	var best: Entry = null
+	var best_score := 0
+	for e in _candidates(false):
+		if e.stagger <= 0 or (e.use == AiMoveBook.Use.SUPER and difficulty.super_use < 2):
+			continue
+		if e.reach + _radius(_target) < dist or dist < e.min_reach:
+			continue
+		var frames := e.hit_frame + (e.move.charge_levels[0] if e.charged else 0)
+		var score := e.stagger * 100 / maxi(4, frames)
+		if best == null or score > best_score:
+			best = e
+			best_score = score
+	if best != null and _may_attack(true):
+		_count("channel_breaks")
+		_use(best, _angle_to_target(), best.move.charge_levels[0] if best.charged else -1)
+		return true
+	intent = Intent.PRESSURE
+	_run_toward(_angle_to_target())
 	return true
 
 
