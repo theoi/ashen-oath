@@ -82,7 +82,7 @@ static func build(data: FighterData, rules: CombatRules = null) -> Array[Entry]:
 			"Breaks a combo and pushes everyone near you away. Costs %d Soul." % rules.burst_cost,
 			"In hitstun"))
 	entries.append(Entry.new(SOUL, "Gaining Soul", [],
-			"Deal and take damage, perfect dashes (+%d) and ⚡Counters. Soul carries over between rounds." % rules.perfect_dodge_soul))
+			"Deal and take damage, perfect dashes (+%d) and Counters. Soul carries over between rounds." % rules.perfect_dodge_soul))
 
 	entries.append(Entry.new(DEFENSE, "Move", [InputGlyphs.MOVE], ""))
 	entries.append(Entry.new(DEFENSE, "Aim", [InputGlyphs.AIM],
@@ -133,7 +133,7 @@ static func is_counter(move: MoveData) -> bool:
 static func tags(move: MoveData) -> PackedStringArray:
 	var out := PackedStringArray()
 	if is_counter(move):
-		out.append("⚡counter")
+		out.append("counter")
 	if move.chargeable:
 		if move.perfect_end > 0:
 			out.append("hold to charge, release in the perfect zone for a bonus")

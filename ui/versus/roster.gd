@@ -16,7 +16,7 @@ const FIGHTERS: Array[Dictionary] = [
 		"style": "All-rounder · best at punishing",
 		"abilities": ["Oathfire Lunge", "Brand Rise", "Flame Rend", "Bulwark", "Cinder Wheel", "Verdict"],
 		"super": "Pyre of the Forsworn",
-		"trait": "Oathkeeper: a Bulwark Retribution or any ⚡Counter ignites his blade; his next 2 skills deal +25%.",
+		"trait": "Oathkeeper: a Bulwark Retribution or any Counter ignites his blade; his next 2 skills deal +25%.",
 		"ability_details": [
 			"Shoulder-first burst to the aim point; drives the target into a nearby wall.",
 			"Rising crescent that launches; press again to leap and slam them down.",
