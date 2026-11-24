@@ -13,6 +13,8 @@ const MUSIC := &"Music"
 const _IFACE := "res://assets/kenney-interface-sounds/"
 const _IMPACT := "res://assets/kenney-impact-sounds/"
 const _RPG := "res://assets/kenney-rpg-audio/"
+const _SCIFI := "res://assets/kenney-sci-fi-sounds/"
+const _SWISH := "res://assets/oga-swishes/"
 
 ## id: [files, bus, volume_db, pitch_scale, pitch_jitter (+/- fraction)]
 const TABLE: Dictionary[StringName, Array] = {
@@ -40,4 +42,28 @@ const TABLE: Dictionary[StringName, Array] = {
 	&"soul_burst": [[_IMPACT + "impactSoft_heavy_000.ogg"], SFX, 2.0, 0.55, 0.0],
 	&"grave_vent": [[_IMPACT + "impactSoft_heavy_000.ogg"], SFX, 1.0, 0.38, 0.05],
 	&"wall_splat": [[_IMPACT + "impactWood_heavy_000.ogg"], SFX, 0.0, 0.7, 0.05],
+
+	# Fight presentation (FightFx routes sim events here; HitData/MoveData/EffectData cues
+	# name rows).
+	&"swing_light": [[_SWISH + "swish-1.ogg", _SWISH + "swish-2.ogg", _SWISH + "swish-3.ogg", _SWISH + "swish-4.ogg"], SFX, -6.0, 1.05, 0.06],
+	&"swing_heavy": [[_SWISH + "swish-9.ogg", _SWISH + "swish-10.ogg", _SWISH + "swish-11.ogg"], SFX, -3.0, 0.75, 0.05],
+	&"hit_flesh": [[_RPG + "chop.ogg"], SFX, -4.0, 0.7, 0.08],
+	&"hit_blade": [[_IMPACT + "impactPlate_medium_000.ogg", _IMPACT + "impactPlate_medium_001.ogg", _IMPACT + "impactPlate_medium_002.ogg"], SFX, -3.0, 0.85, 0.06],
+	&"hit_heavy_blade": [[_IMPACT + "impactPlate_heavy_000.ogg", _IMPACT + "impactPlate_heavy_001.ogg", _IMPACT + "impactPlate_heavy_002.ogg"], SFX, -1.0, 0.75, 0.05],
+	&"hit_shield": [[_IMPACT + "impactMetal_heavy_000.ogg", _IMPACT + "impactMetal_heavy_001.ogg"], SFX, -1.0, 0.65, 0.04],
+	&"hit_fire": [[_SCIFI + "explosionCrunch_000.ogg", _SCIFI + "explosionCrunch_001.ogg", _SCIFI + "explosionCrunch_002.ogg"], SFX, -3.0, 0.8, 0.06],
+	&"armor": [[_IMPACT + "impactMetal_light_000.ogg", _IMPACT + "impactMetal_light_001.ogg", _IMPACT + "impactMetal_light_002.ogg"], SFX, -3.0, 0.6, 0.04],
+	&"launch": [[_SWISH + "swish-12.ogg", _SWISH + "swish-13.ogg"], SFX, -4.0, 0.6, 0.05],
+	&"body_fall": [[_IMPACT + "impactSoft_heavy_000.ogg", _IMPACT + "impactSoft_heavy_001.ogg", _IMPACT + "impactSoft_heavy_002.ogg"], SFX, -2.0, 0.75, 0.06],
+	&"jump": [[_RPG + "cloth2.ogg"], SFX, -8.0, 0.9, 0.08],
+	&"land": [[_IMPACT + "footstep_concrete_000.ogg", _IMPACT + "footstep_concrete_001.ogg", _IMPACT + "footstep_concrete_002.ogg"], SFX, -6.0, 0.8, 0.08],
+	&"grab": [[_RPG + "beltHandle1.ogg", _RPG + "beltHandle2.ogg"], SFX, -2.0, 0.8, 0.05],
+	# Aldric
+	&"oathfire_lunge": [[_SCIFI + "thrusterFire_000.ogg", _SCIFI + "thrusterFire_001.ogg"], SFX, -2.0, 0.9, 0.05],
+	&"brand_rise": [[_SCIFI + "thrusterFire_002.ogg"], SFX, -2.0, 1.2, 0.05],
+	&"bulwark_charge": [[_RPG + "metalLatch.ogg"], SFX, -2.0, 0.7, 0.04],
+	&"oathfire_ignite": [[_SCIFI + "thrusterFire_003.ogg"], SFX, -1.0, 1.4, 0.0],
+	&"pyre_plant": [[_IMPACT + "impactPlate_heavy_000.ogg"], SFX, 0.0, 0.5, 0.0],
+	&"pyre_pillar": [[_SCIFI + "lowFrequency_explosion_001.ogg"], SFX, 0.0, 0.8, 0.0],
+	&"pyre_wave": [[_SCIFI + "thrusterFire_000.ogg", _SCIFI + "thrusterFire_001.ogg"], SFX, 0.0, 0.6, 0.03],
 }

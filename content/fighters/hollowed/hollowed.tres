@@ -1,0 +1,36 @@
+[gd_resource type="Resource" script_class="FighterData" format=3]
+
+[ext_resource type="Script" path="res://content/types/fighter_data.gd" id="1_fighter_data"]
+[ext_resource type="Script" path="res://content/types/move_data.gd" id="2_move_datagd"]
+[ext_resource type="Resource" path="res://content/fighters/aldric/moves/aldric_l1.tres" id="3_aldric_l1tre"]
+[ext_resource type="Resource" path="res://content/fighters/aldric/moves/aldric_l2.tres" id="4_aldric_l2tre"]
+[ext_resource type="Resource" path="res://content/fighters/aldric/moves/aldric_l3.tres" id="5_aldric_l3tre"]
+[ext_resource type="Resource" path="res://content/fighters/aldric/moves/aldric_lh.tres" id="6_aldric_lhtre"]
+[ext_resource type="Resource" path="res://content/fighters/aldric/moves/aldric_h1.tres" id="7_aldric_h1tre"]
+[ext_resource type="Resource" path="res://content/fighters/aldric/moves/aldric_run_l.tres" id="8_aldric_run_l"]
+[ext_resource type="Resource" path="res://content/fighters/aldric/moves/aldric_air_l1.tres" id="9_aldric_air_l"]
+[ext_resource type="Resource" path="res://content/fighters/aldric/moves/aldric_grab.tres" id="10_aldric_grabt"]
+[ext_resource type="Resource" path="res://content/fighters/aldric/moves/aldric_throw.tres" id="11_aldric_throw"]
+[ext_resource type="Resource" path="res://content/fighters/aldric/moves/aldric_getup.tres" id="12_aldric_getup"]
+
+[resource]
+script = ExtResource("1_fighter_data")
+id = &"hollowed"
+display_name = "Hollowed"
+max_hp = 750
+radius = 0.42
+height = 1.8
+weight = 1.05
+run_speed = 5.6
+parry_window = 6
+light = &"aldric_l1"
+heavy = &"aldric_h1"
+run_light = &"aldric_run_l"
+air_light = &"aldric_air_l1"
+air_heavy = &""
+grab = &"aldric_grab"
+getup_attack = &"aldric_getup"
+abilities = Array[StringName]([])
+super_move = &""
+scene = "res://presentation/fighters/hollowed/hollowed.tscn"
+moves = Array[ExtResource("2_move_datagd")]([ExtResource("3_aldric_l1tre"), ExtResource("4_aldric_l2tre"), ExtResource("5_aldric_l3tre"), ExtResource("6_aldric_lhtre"), ExtResource("7_aldric_h1tre"), ExtResource("8_aldric_run_l"), ExtResource("9_aldric_air_l"), ExtResource("10_aldric_grabt"), ExtResource("11_aldric_throw"), ExtResource("12_aldric_getup")])

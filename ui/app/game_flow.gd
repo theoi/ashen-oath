@@ -48,8 +48,9 @@ func _ready() -> void:
 			start_match.call_deferred(_dev_match(arg.trim_prefix("--match").trim_prefix("=")))
 
 
-## Dev / capture matches: "" (Aldric vs Morrigan) or "1v2" (vs Morrigan and Gorrath).
-## An "-attract" suffix ("attract", "1v2-attract") makes every slot play itself.
+## Dev / capture matches: "" (Aldric vs Morrigan), "1v2" (vs Morrigan and Gorrath) or
+## "hollowed" (vs a Hollowed). An "-attract" suffix ("attract", "1v2-attract",
+## "hollowed-attract") makes every slot a CPU.
 func _dev_match(kind: String) -> MatchConfig:
 	var config := MatchConfig.versus(&"aldric", &"morrigan", &"ashen_chapel", Settings.default_difficulty)
 	match kind:
@@ -57,6 +58,9 @@ func _dev_match(kind: String) -> MatchConfig:
 			config.fighters = [&"aldric", &"morrigan", &"gorrath"]
 			config.teams = [0, 1, 1]
 			config.starting_soul = [100, 0, 50]
+		"hollowed", "hollowed-attract":
+			config.fighters = [&"aldric", &"hollowed"]
+			config.starting_soul = [60, 0]
 	config.attract = kind.ends_with("attract")
 	return config
 

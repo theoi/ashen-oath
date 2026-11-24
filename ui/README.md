@@ -77,10 +77,10 @@ Fonts: Cinzel (headings, buttons) and Alegreya Sans (body).
   `on_finished` callback for story mode). `GameFlow.start_match(config)` opens
   `match/match_screen.tscn`, which builds the sim's `SimConfig` through `MatchSetup`,
   runs the sim's `MatchRunner` with a `DeviceInputSource` for the player and
-  `MatchSetup.cpu_source()` for the others, and shows the HUD, pause menu and results.
+  `MatchSetup.cpu_source()` for the others (the sparring partner until the CPU AI lands),
+  and shows the fight through `FightView` (presentation/fight/) plus the HUD, pause menu and
+  results. FightFx voices combat events; the match screen plays only round-flow sounds.
   `GameFlow.match_finished(result)` fires when the match ends.
-- `match/match_view.gd`: stand-in view (arena scene, capsules, follow camera) until the
-  fighter presentation lands.
 - Dev runs: `godot --path . -- --match` (Aldric vs Morrigan) or `-- --match=1v2`.
 
 ## HUD
