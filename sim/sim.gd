@@ -10,7 +10,7 @@ extends RefCounted
 ## Rules: no Node/scene access, no wall-clock time, no global RNG, no floats in state.
 ## Iterate fighters in slot order and effects in spawn order.
 
-const MAX_SLOTS := 4
+const MAX_SLOTS := 8
 ## BuffState.source of buffs applied by HitData.victim_buff.
 const VICTIM_BUFF := -3
 ## Stick magnitude (of SimInput.STICK_MAX) below which the stick counts as neutral.
@@ -29,9 +29,18 @@ var config: SimConfig
 var rules: CombatRules
 var arena: ArenaCollision
 var state: SimState
-## Per slot: the fighter's data and optional trait hook (null when none).
+## Per slot: the fighter's data and optional trait hook (null when none). Wave slots are
+## rebound when they spawn a different fighter (FighterState.roster).
 var fighter_data: Array[FighterData] = []
 var traits: Array[FighterTrait] = []
+## Every FighterData this match can field (config slots, wave entries, spawn_fighter), with
+## SimConfig.move_speed_percent applied. FighterState.roster indexes it.
+var roster: Array[FighterData] = []
+
+var _roster_sources: Array[FighterData] = []
+var _roster_traits: Array[FighterTrait] = []
+## Roster index each slot's caches are bound to (-1 = none yet).
+var _bound: PackedInt32Array = PackedInt32Array()
 
 var _events: Array[SimEvent] = []
 ## Mark detonations queued during fighter updates, applied with this tick's contacts.
@@ -48,36 +57,45 @@ func _init(sim_config: SimConfig) -> void:
 	config = sim_config
 	rules = config.rules if config.rules != null else CombatRules.new()
 	arena = ArenaCollision.new(config.arena if config.arena != null else ArenaData.new())
-	assert(config.slots.size() >= 1 and config.slots.size() <= MAX_SLOTS, "1-4 slots")
+	var total := config.total_slots()
+	assert(config.slots.size() >= 1 and total <= MAX_SLOTS, "1-8 slots")
 	state = SimState.new()
 	state.rng = (config.seed ^ 0x2545F491) & 0xFFFFFFFF
 	if state.rng == 0:
 		state.rng = 1
-	var scaled: Dictionary[FighterData, FighterData] = {}
 	for i in config.slots.size():
 		var slot_config := config.slots[i]
-		var data := slot_config.fighter
-		if config.move_speed_percent > 0 and config.move_speed_percent != 100:
-			if not scaled.has(data):
-				scaled[data] = MoveSpeed.scaled_fighter(data, config.move_speed_percent)
-			data = scaled[data]
-		fighter_data.append(data)
-		var hook: FighterTrait = null
-		if data.trait_script != null:
-			hook = data.trait_script.new()
-		traits.append(hook)
-		var apex := Fx.m(data.jump_height)
-		var airtime := maxi(2, data.jump_airtime)
-		_jump_speed.append(4 * apex / airtime)
-		_gravity.append(maxi(1, 8 * apex / (airtime * airtime)))
-		_radius.append(Fx.m(data.radius))
-		_height.append(Fx.m(data.height))
 		var f := FighterState.new()
 		f.slot = i
 		f.team = slot_config.team
-		f.max_hp = maxi(1, data.max_hp * slot_config.hp_percent / 100)
+		f.roster = _roster_index(slot_config.fighter)
+		f.max_hp = _max_hp(roster[f.roster], slot_config.hp_percent, slot_config.hp_override)
 		f.soul = clampi(slot_config.start_soul, 0, rules.soul_max) * 100
+		f.counter_limit = slot_config.counter_window_cooldown
 		state.fighters.append(f)
+	var wave_roster := 0
+	for wave in config.waves:
+		for entry in wave.entries:
+			if entry.fighter != null:
+				var index := _roster_index(entry.fighter)
+				if wave_roster == 0:
+					wave_roster = index
+	for i in range(config.slots.size(), total):
+		var f := FighterState.new()
+		f.slot = i
+		f.roster = wave_roster
+		_make_free(f)
+		state.fighters.append(f)
+	fighter_data.resize(total)
+	traits.resize(total)
+	_jump_speed.resize(total)
+	_gravity.resize(total)
+	_radius.resize(total)
+	_height.resize(total)
+	_bound.resize(total)
+	_bound.fill(-1)
+	for f in state.fighters:
+		_bind(f)
 	_juggle_gravity = Fx.mps2(rules.juggle_gravity)
 	state.hazard_hits.resize(arena.hazards.size())
 	_start_round()
@@ -96,6 +114,8 @@ func step(inputs: Variant) -> Array[SimEvent]:
 	var accept := state.phase == Phase.FIGHT
 	var count: int = inputs.size()
 	for f in state.fighters:
+		if not f.active:
+			continue
 		var frame: int = inputs[f.slot] if f.slot < count else 0
 		_read_input(f, SimInput.normalized(frame), accept)
 	if state.freeze > 0:
@@ -103,14 +123,17 @@ func step(inputs: Variant) -> Array[SimEvent]:
 		return _events
 	_update_targets()
 	for f in state.fighters:
-		_update_fighter(f)
+		if f.active:
+			_update_fighter(f)
 	_update_holds()
 	_push_bodies()
 	_update_effects()
 	_resolve_combat()
 	_update_hazards()
 	for f in state.fighters:
-		_post_tick(f)
+		if f.active:
+			_post_tick(f)
+	_update_waves()
 	_check_round_end()
 	return _events
 
@@ -128,6 +151,8 @@ func snapshot() -> SimState:
 ## Makes the current state equal to `snap` (in place: FighterState objects are reused).
 func restore(snap: SimState) -> void:
 	state.copy_from(snap)
+	for f in state.fighters:
+		_bind(f)
 
 
 ## 64-bit hash of the whole state. Equal states give equal checksums on every platform.
@@ -429,7 +454,15 @@ func _start_round() -> void:
 		state.hazard_hits[i] = 0
 	var spawns := arena.data.spawn_points
 	for f in state.fighters:
-		var spawn_index := config.slots[f.slot].spawn
+		if f.slot >= config.slots.size():
+			var free_roster := f.roster
+			f.copy_from(FighterState.new())
+			f.slot = state.fighters.find(f)
+			f.roster = free_roster
+			_make_free(f)
+			continue
+		var slot_config := config.slots[f.slot]
+		var spawn_index := slot_config.spawn
 		if spawn_index < 0:
 			spawn_index = f.slot
 		var spawn := spawns[spawn_index % spawns.size()] if spawns.size() > 0 else Vector2.ZERO
@@ -437,25 +470,28 @@ func _start_round() -> void:
 		var team := f.team
 		var max_hp := f.max_hp
 		var hard_lock := f.hard_lock
+		var roster_index := f.roster
 		f.copy_from(FighterState.new())
 		f.slot = state.fighters.find(f)
 		f.team = team
+		f.roster = roster_index
+		_bind(f)
 		f.max_hp = max_hp
 		f.hp = max_hp
 		f.soul = soul
 		f.hard_lock = hard_lock
-		f.guard = rules.guard_gauge * 100
-		var skills := maxi(SimInput.SKILLS.size(), fighter_data[f.slot].abilities.size())
-		f.cooldowns.resize(skills)
-		f.cooldown_totals.resize(skills)
-		f.skill_charges.resize(skills)
-		for s in fighter_data[f.slot].abilities.size():
-			f.skill_charges[s] = skill_max_charges(f, s)
-		f.dash_charges = dash_max_charges(f)
-		f.stagger_max = config.slots[f.slot].stagger_max
+		_init_kit(f)
+		f.stagger_max = slot_config.stagger_max
 		f.stagger = f.stagger_max
+		f.counter_limit = slot_config.counter_window_cooldown
 		f.pos = Vector3i(Fx.m(spawn.x), 0, Fx.m(spawn.y))
+	state.wave_index = clampi(config.start_wave, 0, config.waves.size()) if not config.waves.is_empty() else -1
+	state.wave_tick = 0
+	state.wave_spawned.clear()
+	state.spawn_cursor = 0
 	for f in state.fighters:
+		if not f.active:
+			continue
 		f.facing = _spawn_facing(f)
 		var hook := traits[f.slot]
 		if hook != null:
@@ -463,11 +499,171 @@ func _start_round() -> void:
 	_emit(EventType.ROUND_START, -1, -1, &"", Vector3i.ZERO, state.round_number)
 
 
+# --- Roster, waves and spawning -------------------------------------------------------
+
+## Roster index of `data` (added, move-speed scaled, on first use).
+func _roster_index(data: FighterData) -> int:
+	var index := _roster_sources.find(data)
+	if index >= 0:
+		return index
+	var scaled := data
+	if config.move_speed_percent > 0 and config.move_speed_percent != 100:
+		scaled = MoveSpeed.scaled_fighter(data, config.move_speed_percent)
+	_roster_sources.append(data)
+	roster.append(scaled)
+	_roster_traits.append(scaled.trait_script.new() if scaled.trait_script != null else null)
+	return roster.size() - 1
+
+
+func _max_hp(data: FighterData, percent: int, override: int) -> int:
+	return override if override > 0 else maxi(1, data.max_hp * percent / 100)
+
+
+## Points the slot's data, trait and body caches at its fighter's roster entry.
+func _bind(f: FighterState) -> void:
+	if _bound[f.slot] == f.roster:
+		return
+	_bound[f.slot] = f.roster
+	var data := roster[f.roster]
+	fighter_data[f.slot] = data
+	traits[f.slot] = _roster_traits[f.roster]
+	var apex := Fx.m(data.jump_height)
+	var airtime := maxi(2, data.jump_airtime)
+	_jump_speed[f.slot] = 4 * apex / airtime
+	_gravity[f.slot] = maxi(1, 8 * apex / (airtime * airtime))
+	_radius[f.slot] = Fx.m(data.radius)
+	_height[f.slot] = Fx.m(data.height)
+
+
+## An empty combatant slot: inactive, KO'd, out of every interaction.
+func _make_free(f: FighterState) -> void:
+	f.active = false
+	f.ko = true
+	f.hp = 0
+	f.max_hp = 0
+	f.team = -1
+	f.wave = -1
+	f.action = Action.KO
+
+
+## Spawns `entry.fighter` into the first free wave slot (rising, invincible for
+## CombatRules.spawn_rise_frames). Returns it, or null when every slot is taken. For
+## waves and boss hooks (FighterTrait.on_tick adds).
+func spawn_fighter(entry: WaveEntry, wave: int = -1) -> FighterState:
+	if entry.fighter == null:
+		return null
+	var f: FighterState = null
+	for candidate in state.fighters:
+		if not candidate.active:
+			f = candidate
+			break
+	if f == null:
+		return null
+	var slot := f.slot
+	f.copy_from(FighterState.new())
+	f.slot = slot
+	f.roster = _roster_index(entry.fighter)
+	_bind(f)
+	var data := fighter_data[slot]
+	f.team = entry.team
+	f.wave = wave
+	f.max_hp = _max_hp(data, entry.hp_percent, entry.hp_override)
+	f.hp = f.max_hp
+	f.soul = clampi(entry.start_soul, 0, rules.soul_max) * 100
+	_init_kit(f)
+	f.stagger_max = entry.stagger_max
+	f.stagger = f.stagger_max
+	f.counter_limit = entry.counter_window_cooldown
+	var spawns := arena.data.spawn_points
+	if spawns.size() > 0:
+		var index := entry.spawn
+		if index < 0:
+			index = config.slots.size() + state.spawn_cursor
+			state.spawn_cursor += 1
+		var point := spawns[index % spawns.size()]
+		f.pos = Vector3i(Fx.m(point.x), 0, Fx.m(point.y))
+	f.facing = _spawn_facing(f)
+	_set_action(f, Action.SPAWN, rules.spawn_rise_frames)
+	f.invuln = rules.spawn_rise_frames
+	var hook := traits[slot]
+	if hook != null:
+		hook.on_round_start(self, f)
+	_emit(EventType.SPAWN, slot, -1, data.id, f.pos, wave)
+	return f
+
+
+## Frees a KO'd wave slot: its effects go, other fighters drop its marks.
+func _free_slot(f: FighterState) -> void:
+	_release_grab(f)
+	var i := state.effects.size() - 1
+	while i >= 0:
+		if state.effects[i].owner == f.slot:
+			state.effects.remove_at(i)
+		i -= 1
+	for other in state.fighters:
+		other.marks[f.slot] = 0
+		if other.carried_by == f.slot:
+			other.carried_by = -1
+			other.carried_ticks = 0
+	f.buffs.clear()
+	f.vel = Vector3i.ZERO
+	_make_free(f)
+	_emit(EventType.DESPAWN, f.slot, -1, fighter_data[f.slot].id, f.pos, 0)
+
+
+func _update_waves() -> void:
+	if state.phase != Phase.FIGHT:
+		return
+	for f in state.fighters:
+		if f.active and f.ko and f.slot >= config.slots.size() and f.action_tick > rules.wave_corpse_frames:
+			_free_slot(f)
+	if state.wave_index < 0 or state.wave_index >= config.waves.size():
+		return
+	var wave := config.waves[state.wave_index]
+	if state.wave_tick == 0:
+		state.wave_spawned.resize(wave.entries.size())
+		state.wave_spawned.fill(0)
+		_emit(EventType.WAVE_START, -1, -1, &"", Vector3i.ZERO, state.wave_index)
+	state.wave_tick += 1
+	var all_spawned := true
+	for i in wave.entries.size():
+		var entry := wave.entries[i]
+		while state.wave_spawned[i] < entry.count \
+				and state.wave_tick > entry.delay + state.wave_spawned[i] * entry.interval:
+			if spawn_fighter(entry, state.wave_index) == null:
+				break
+			state.wave_spawned[i] += 1
+		if state.wave_spawned[i] < entry.count:
+			all_spawned = false
+	if not all_spawned:
+		return
+	var alive := 0
+	for f in state.fighters:
+		if f.active and not f.ko and f.wave == state.wave_index:
+			alive += 1
+	var last := state.wave_index == config.waves.size() - 1
+	if last or alive <= wave.advance_alive or (wave.advance_frames > 0 and state.wave_tick >= wave.advance_frames):
+		state.wave_index += 1
+		state.wave_tick = 0
+
+
+## Guard, cooldown arrays, skill and dash charges for a fresh fighter.
+func _init_kit(f: FighterState) -> void:
+	f.guard = rules.guard_gauge * 100
+	var skills := maxi(SimInput.SKILLS.size(), fighter_data[f.slot].abilities.size())
+	f.cooldowns.resize(skills)
+	f.cooldown_totals.resize(skills)
+	f.skill_charges.resize(skills)
+	for s in fighter_data[f.slot].abilities.size():
+		f.skill_charges[s] = skill_max_charges(f, s)
+	f.dash_charges = dash_max_charges(f)
+
+
 func _spawn_facing(f: FighterState) -> int:
 	var sum := Vector3i.ZERO
 	var count := 0
 	for other in state.fighters:
-		if other.team != f.team:
+		if other.team != f.team and other.active and not other.ko:
 			sum += other.pos
 			count += 1
 	if count == 0:
@@ -506,6 +702,11 @@ func _check_round_end() -> void:
 	for f in state.fighters:
 		if not f.ko and not f.team in alive_teams:
 			alive_teams.append(f.team)
+	if state.wave_index >= 0:
+		for w in range(state.wave_index, config.waves.size()):
+			for entry in config.waves[w].entries:
+				if not entry.team in alive_teams:
+					alive_teams.append(entry.team)
 	var decided := false
 	var winner := -1
 	if alive_teams.size() <= 1:
@@ -539,7 +740,7 @@ func _best_hp_team(teams: PackedInt32Array) -> int:
 		var hp := 0
 		var max_hp := 0
 		for f in state.fighters:
-			if f.team == team:
+			if f.team == team and f.active:
 				hp += maxi(0, f.hp)
 				max_hp += f.max_hp
 		if best < 0 or hp * best_max > best_hp * max_hp:
@@ -779,6 +980,9 @@ func _update_fighter(f: FighterState) -> void:
 			_guarding(f)
 		Action.ATTACK:
 			_attack(f)
+		Action.SPAWN:
+			if f.action_tick > f.action_len:
+				_to_idle(f)
 		_:
 			_reaction(f)
 	_physics(f)
@@ -1241,7 +1445,7 @@ func _move_frame_effects(f: FighterState, move: MoveData) -> void:
 		if f.counter_cooldown > 0:
 			f.counter_blocked = true
 		else:
-			f.counter_cooldown = config.slots[f.slot].counter_window_cooldown
+			f.counter_cooldown = f.counter_limit
 			_emit(EventType.COUNTER_WINDOW, f.slot, -1, move.id, f.pos, move.counter_window_end - frame + 1)
 	if move.channel_gauge > 0 and frame == move.channel_start:
 		f.channel = move.channel_gauge

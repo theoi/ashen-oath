@@ -4,13 +4,22 @@ extends Resource
 
 @export var arena: ArenaData
 @export var rules: CombatRules
-## 1-4 slots.
+## 1-8 slots (with waves, the slots left up to Sim.MAX_SLOTS hold wave combatants).
 @export var slots: Array[SlotConfig] = []
 @export var seed: int = 1
 ## 0 = rules.rounds_to_win.
 @export var rounds_to_win: int = 0
 ## Round length in seconds. 0 = rules.round_seconds, -1 = no timer.
 @export var round_seconds: int = 0
+
+@export_group("Waves")
+## Story waves (empty = a plain match). Wave combatants use extra slots after `slots`.
+@export var waves: Array[WaveData] = []
+## Wave to start from (a checkpoint retry).
+@export var start_wave: int = 0
+## Extra slots for wave combatants and Sim.spawn_fighter (-1 = up to Sim.MAX_SLOTS when
+## there are waves, else 0).
+@export var wave_slots: int = -1
 
 @export_group("Tuning overrides")
 ## Scales every hitstop (percent).
@@ -24,6 +33,12 @@ extends Resource
 @export var dash_charges: int = -1
 ## Frames per dash charge recharge for every skill-kit fighter (-1 = fighter data).
 @export var dash_recharge_frames: int = -1
+
+
+## Config slots plus wave slots: Sim.slot_count() and the replay frame width.
+func total_slots() -> int:
+	var extra := wave_slots if wave_slots >= 0 else (8 - slots.size() if not waves.is_empty() else 0)
+	return slots.size() + maxi(0, extra)
 
 
 func effective_rounds_to_win() -> int:

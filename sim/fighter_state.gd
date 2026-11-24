@@ -43,6 +43,8 @@ enum Action {
 	COUNTER_STUN,
 	## Boss stagger bar broken: kneeling, hittable, does not react, takes extra damage.
 	STAGGERED,
+	## A spawned combatant rising from the floor (CombatRules.spawn_rise_frames, invincible).
+	SPAWN,
 }
 
 var slot: int = 0
@@ -126,7 +128,7 @@ var skill_part: PackedInt32Array = PackedInt32Array([-1, -1, -1, -1, -1, -1])
 var charge_level: int = 0
 var charge_perfect: bool = false
 ## Per slot: frames left on the mark (brand) that slot's fighter put on this one.
-var marks: PackedInt32Array = PackedInt32Array([0, 0, 0, 0])
+var marks: PackedInt32Array = PackedInt32Array([0, 0, 0, 0, 0, 0, 0, 0])
 ## Skill-kit dash charges and frames until the next charge comes back (0 = full).
 var dash_charges: int = 0
 var dash_recharge: int = 0
@@ -192,6 +194,15 @@ var counter_cooldown: int = 0
 var counter_blocked: bool = false
 
 var ko: bool = false
+## False for a free combatant slot (not spawned yet, or freed after a KO); inactive fighters
+## are also `ko` and are skipped by the sim. Presentation should hide them.
+var active: bool = true
+## Index into Sim.roster (which FighterData this slot runs; changes when a slot respawns).
+var roster: int = 0
+## Wave index that spawned this fighter (-1 = a config slot or Sim.spawn_fighter).
+var wave: int = -1
+## SlotConfig/WaveEntry.counter_window_cooldown of this fighter.
+var counter_limit: int = 0
 ## Storage for the fighter's FighterTrait script (stored charges and similar).
 var vars: PackedInt32Array = PackedInt32Array([0, 0, 0, 0, 0, 0, 0, 0])
 var buffs: Array[BuffState] = []

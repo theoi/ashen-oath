@@ -36,3 +36,10 @@ var effects: Array[EffectState] = []
 var next_effect_id: int = 1
 ## Per arena hazard: bitmask of slots hit during its current activation.
 var hazard_hits: PackedInt32Array = PackedInt32Array()
+## Current wave (SimConfig.waves index; = waves.size() once the last one has fully spawned;
+## -1 without waves), ticks since it started, members spawned per entry, and the
+## spawn-point rotation for entries with spawn = -1.
+var wave_index: int = -1
+var wave_tick: int = 0
+var wave_spawned: PackedInt32Array = PackedInt32Array()
+var spawn_cursor: int = 0
