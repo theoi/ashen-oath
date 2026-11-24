@@ -218,6 +218,28 @@ func test_damage_scaling_floor_and_long_combo_decay() -> void:
 	assert_eq(foe.stun, 8, "hitstun halved after 240 frames of combo")
 
 
+func test_combo_clock_survives_short_gaps_and_resets_after_real_ones() -> void:
+	var reset := CombatRules.new().combo_reset_frames
+	foe.combo_ticks = 100
+	foe.combo_free_ticks = 0
+	F.hold(sim, reset - 1)
+	assert_eq(foe.combo_ticks, 100 + reset - 1, "a short free gap keeps the clock running")
+	F.hold(sim, 1)
+	assert_eq(foe.combo_ticks, 0)
+
+
+func test_combo_time_cap_flips_the_victim_out() -> void:
+	foe.action = Action.HITSTUN
+	foe.stun = 100
+	foe.combo_ticks = CombatRules.new().combo_max_frames
+	var ticks := F.play(sim, [F.L], [], 6)
+	assert_not_null(F.first(ticks, T.HIT), "the hit still deals damage")
+	assert_eq(F.tick_of(ticks, T.JUGGLE_LIMIT), F.tick_of(ticks, T.HIT))
+	assert_eq(foe.action, Action.TECH)
+	assert_true(sim.is_invulnerable(foe))
+	assert_eq(foe.combo_ticks, 0)
+
+
 func test_lights_track_8_degrees_heavies_3_per_frame() -> void:
 	# Target 90 degrees to the side; soft lock snaps at the start, so turn the attacker away
 	# after the start and measure how fast startup tracking turns it back.

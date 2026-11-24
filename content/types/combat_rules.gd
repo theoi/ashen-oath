@@ -115,8 +115,16 @@ extends Resource
 @export var scaling_step_percent: int = 8
 @export var scaling_floor_percent: int = 50
 @export var super_scaling_floor_percent: int = 70
+## Hitstun is cut to combo_decay_hitstun_percent once a combo has lasted this long. The
+## combo clock (FighterState.combo_ticks) counts stun ticks outside hitstop and the free
+## ticks of gaps shorter than combo_reset_frames, so frame-trap loops decay too.
 @export var combo_decay_frames: int = 240
 @export var combo_decay_hitstun_percent: int = 50
+## Free ticks in a row (not in stun, knockdown or a grab) that end a combo's clock.
+@export var combo_reset_frames: int = 15
+## A hit on a fighter whose combo clock reached this flips them out (juggle-limit flip,
+## invincible until landing) instead of reacting.
+@export var combo_max_frames: int = 360
 
 @export_group("Soul")
 @export var soul_max: int = 100
