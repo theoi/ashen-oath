@@ -31,6 +31,8 @@ const CUT_REACH := 0.6
 const OCCLUDER_RADIUS := 1.5
 ## Time constant (s) of the light pool easing after the fighters.
 const POOL_FOLLOW_SECONDS := 0.6
+## Light shaft strength under the gameplay camera.
+const GAMEPLAY_SHAFT_SCALE := 0.35
 ## Atlas cells (bit row * 8 + column) that glow: the dungeon candle flame cell, and the
 ## Halloween lantern glass cell.
 const DUNGEON_GLOW_CELLS := 1 << (2 * 8 + 7)
@@ -48,6 +50,7 @@ var _halloween_material: ShaderMaterial
 var _flames: Array[Transform3D] = []
 var _flame_multimesh: MultiMesh
 var _overhead: Array[Node3D] = []
+var _shafts: Array[MeshInstance3D] = []
 var _cut_edges: Array[Vector4] = []
 var _runner: MatchRunner
 var _rim: DirectionalLight3D
@@ -113,6 +116,10 @@ func apply_gameplay_camera(data: ArenaData) -> void:
 		material.set_shader_parameter("cut_height", CUT_HEIGHT)
 	for node in _overhead:
 		node.visible = false
+	# Seen from above, shafts read as bright discs on the floor; the pool light does that job.
+	for shaft in _shafts:
+		var material := shaft.material_override as ShaderMaterial
+		material.set_shader_parameter("intensity", (material.get_shader_parameter("intensity") as float) * GAMEPLAY_SHAFT_SCALE)
 	for child in _props.get_children():
 		var node := child as Node3D
 		if node != null and node.position.y > CUT_HEIGHT and _is_cut(Vector2(node.position.x, node.position.z), CUT_REACH):
@@ -324,6 +331,7 @@ func light_shaft(top: Vector3, bottom: Vector3, radius_top: float, radius_bottom
 	side = side.normalized()
 	instance.transform = Transform3D(Basis(side, up, side.cross(up)), (top + bottom) * 0.5)
 	add_child(instance)
+	_shafts.append(instance)
 
 
 func _build_flames() -> void:

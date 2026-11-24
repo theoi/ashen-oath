@@ -50,6 +50,8 @@ var _shot_path := ""
 var _shot_frame := 45
 var _orbit := false
 var _game := false
+## False when --cam overrides the gameplay camera position (cutaway checks from other angles).
+var _game_camera := true
 var _time := 0.0
 var _neutral := PackedInt32Array()
 var _hold := false
@@ -88,7 +90,9 @@ func _ready() -> void:
 		_camera.projection = Camera3D.PROJECTION_ORTHOGONAL
 		_camera.size = 30.0
 		_camera.near = 0.05
-	if _game:
+	if args.has("cam"):
+		_game_camera = false
+	if _game and _game_camera:
 		_camera.fov = GAME_FOV
 		_focus = _wanted_focus()
 		_place_game_camera(1.0)
@@ -108,7 +112,7 @@ func _process(delta: float) -> void:
 		var angle := _time * 0.18
 		_camera.position = Vector3(sin(angle) * 11.0, 4.5, cos(angle) * 9.0)
 		_camera.look_at(Vector3(0.0, 1.2, 0.0))
-	elif _game:
+	elif _game and _game_camera:
 		_place_game_camera(1.0 - exp(-delta / 0.25))
 	_frames += 1
 	if not _shot_path.is_empty() and _frames == _shot_frame:
