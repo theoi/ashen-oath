@@ -89,8 +89,11 @@ func match_config(fight: StoryFight) -> MatchConfig:
 		config.teams.append(1)
 		config.starting_soul.append(fight.opponent_soul[i] if i < fight.opponent_soul.size() else 0)
 		config.hp_percent.append(fight.opponent_hp_percent[i] if i < fight.opponent_hp_percent.size() else 100)
+		if i < fight.opponent_ai_profiles.size() and not fight.opponent_ai_profiles[i].is_empty():
+			config.ai_profiles[i + 1] = fight.opponent_ai_profiles[i]
 	config.arena = fight.arena
 	config.difficulty = fight_difficulty(fight)
+	config.ai_cap = fight.ai_cap
 	config.rounds_to_win = fight.rounds_to_win
 	config.round_seconds = fight.round_seconds
 	config.seed = fight.seed

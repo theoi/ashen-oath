@@ -236,6 +236,8 @@ func _player_source(config: MatchConfig) -> InputSource:
 			return DebugBot.new(config.seed)
 	var strong := config.duplicate_config()
 	strong.difficulty = MatchConfig.Difficulty.NIGHTMARE
+	strong.ai_cap = -1
+	strong.ai_profiles.clear()
 	var source := MatchSetup.cpu_source(strong, 0)
 	return source if source != null else DebugBot.new(config.seed)
 
