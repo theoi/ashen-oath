@@ -2536,7 +2536,7 @@ func _try_stance(c: Contact) -> bool:
 		if absi(Fx.angle_diff(v.facing, to)) * 2 > Fx.deg(move.stance_arc):
 			return false
 	var a := c.attacker
-	var hitstop := _scaled_hitstop(rules.stance_hitstop)
+	var hitstop := _scaled_hitstop(move.stance_hitstop if move.stance_hitstop >= 0 else rules.stance_hitstop)
 	var e := _emit(EventType.STANCE_TRIGGER, v.slot, a.slot if a != null else -1, move.id, c.point, 0)
 	e.hitstop = hitstop
 	if c.effect != null:
