@@ -78,6 +78,7 @@ func _ready() -> void:
 	for cycler: OptionCycler in [_fighter, _opponent, _arena]:
 		cycler.selection_changed.connect(func(_i: int) -> void: _refresh())
 	Profile.changed.connect(_refresh)
+	ActiveDevice.changed.connect(_refresh)
 	Settings.changed.connect(_refresh)
 
 
@@ -146,6 +147,11 @@ func _card(parent: Container) -> VBoxContainer:
 	return column
 
 
+## The button for `action` on the device in use, as short text ("Q", "A", "R3").
+static func _key(action: StringName) -> String:
+	return InputGlyphs.text(action, ActiveDevice.scheme, ActiveDevice.pad_family, true)
+
+
 func _fill_card(card: VBoxContainer, id: StringName, locked: bool) -> void:
 	for child in card.get_children():
 		card.remove_child(child)
@@ -173,8 +179,9 @@ func _fill_card(card: VBoxContainer, id: StringName, locked: bool) -> void:
 	card.add_child(HSeparator.new())
 	var abilities := Roster.ability_names(id)
 	for i in abilities.size():
-		card.add_child(make_label("%d   %s" % [i + 1, abilities[i]], &"BodyLabel"))
-	var super_label := make_label("Super   %s" % info["super"], &"StrongLabel")
+		card.add_child(make_label("%s   %s" % [_key(DefaultBindings.ability_action(i)), abilities[i]], &"BodyLabel"))
+	var skill_kit := MatchSetup.fighter_data(id).dash != null
+	var super_label := make_label("%s   %s" % [_key(DefaultBindings.AWAKEN) if skill_kit else "Super", info["super"]], &"StrongLabel")
 	super_label.add_theme_color_override("font_color", Palette.SOUL)
 	card.add_child(super_label)
 	var trait_label := make_label(info["trait"], &"SubtleLabel")
