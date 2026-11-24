@@ -9,11 +9,21 @@ script = ExtResource("1_script")
 model = ExtResource("2_model")
 model_scale = 0.8
 right_hand_prop = ExtResource("3_blade")
-eye_color = Color(0.4, 0.9, 1, 1)
-tint = Color(0.78, 0.82, 0.92, 1)
+eye_color = Color(0.55, 0.85, 1, 1)
+tint = Color(0.74, 0.72, 0.62, 1)
 desaturate = 0.7
-brightness = 0.85
-rim_color = Color(0.5, 0.8, 1, 1)
+brightness = 0.8
+contrast = 1.25
+rim_strength = 0.6
+rim_color = Color(0.55, 0.7, 0.85, 1)
+cell_tints = Dictionary[int, Color]({
+3: Color(0.55, 0.48, 0.42, 0.1),
+9: Color(0.85, 0.8, 0.62, 0.2),
+18: Color(0.35, 0.25, 0.25, 0.3)
+})
+grime = 0.9
+grime_color = Color(0.07, 0.08, 0.05, 1)
+wear = 0.4
 trail_tip = Vector3(0, 1.1, 0)
 trail_color = Color(0.55, 0.8, 1, 0.5)
 spark_color = Color(0.6, 0.85, 1, 1)
