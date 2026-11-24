@@ -80,6 +80,14 @@ enum Aim {
 @export var stance_hitstop: int = -1
 @export var counter_move: StringName = &""
 
+@export_group("Echo")
+## A shadow afterimage re-casts this move `echo_frames` after it starts (0 = none), from
+## the cast position and aim, at `echo_damage_percent` (FighterState.echo_percent
+## overrides it, e.g. a boss phase). Hitboxes, effects, motion and FORWARD / AIM_POINT
+## teleports replay; holds and charges play straight through; throws do not echo.
+@export var echo_frames: int = 0
+@export var echo_damage_percent: int = 50
+
 @export_group("Channel gauge")
 ## Orange channel-break gauge (boss specials): stagger points that break the channel while
 ## the move is on frames channel_start..channel_end. Breaking it staggers the user like a

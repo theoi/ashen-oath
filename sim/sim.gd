@@ -128,6 +128,7 @@ func step(inputs: Variant) -> Array[SimEvent]:
 	_update_holds()
 	_push_bodies()
 	_update_effects()
+	_update_echoes()
 	_resolve_combat()
 	_update_hazards()
 	for f in state.fighters:
@@ -328,6 +329,7 @@ func telegraphs() -> Array[SimTelegraph]:
 		_effect_shape(t, ed, e.facing)
 		t.radius = e.radius
 		out.append(t)
+	_echo_telegraphs(out)
 	return out
 
 
@@ -456,6 +458,7 @@ func _start_round() -> void:
 	state.freeze = 0
 	state.freeze_owner = -1
 	state.effects.clear()
+	state.echoes.clear()
 	for i in state.hazard_hits.size():
 		state.hazard_hits[i] = 0
 	var spawns := arena.data.spawn_points
@@ -504,6 +507,179 @@ func _start_round() -> void:
 			hook.on_round_start(self, f)
 	_emit(EventType.ROUND_START, -1, -1, &"", Vector3i.ZERO, state.round_number)
 
+
+# --- Echoes -----------------------------------------------------------------------------
+
+func _record_echo(f: FighterState, move_index: int, move: MoveData) -> void:
+	var echo := EchoState.new()
+	echo.owner = f.slot
+	echo.team = f.team
+	echo.move_index = move_index
+	echo.cast = f.move_cast
+	echo.delay_left = move.echo_frames
+	echo.pos = Vector3i(f.pos.x, 0, f.pos.z)
+	echo.facing = f.facing
+	echo.move_point = f.move_point
+	echo.damage_percent = f.echo_percent if f.echo_percent >= 0 else move.echo_damage_percent
+	state.echoes.append(echo)
+	_emit(EventType.ECHO, f.slot, -1, move.id, echo.pos, move.echo_frames)
+
+
+## Counts echoes down, then plays their move frames: motion, teleports, rehits, effects.
+func _update_echoes() -> void:
+	var i := 0
+	while i < state.echoes.size():
+		var echo := state.echoes[i]
+		var move := fighter_data[echo.owner].moves[echo.move_index]
+		if echo.delay_left > 0:
+			echo.delay_left -= 1
+			i += 1
+			continue
+		if echo.frame == 0:
+			echo.frame = 1
+			_emit(EventType.ECHO_CAST, echo.owner, -1, move.id, echo.pos, echo.facing)
+		else:
+			echo.frame += 1
+		if echo.frame > move.total_frames():
+			state.echoes.remove_at(i)
+			continue
+		_echo_frame(echo, move)
+		i += 1
+
+
+func _echo_frame(echo: EchoState, move: MoveData) -> void:
+	var frame := echo.frame
+	for motion in move.motions:
+		if frame < motion.start_frame or frame > motion.end_frame:
+			continue
+		var point := Vector3i(echo.move_point.x, 0, echo.move_point.z)
+		match motion.aim_travel:
+			MotionData.AimTravel.ARRIVE:
+				echo.pos += (point - echo.pos) / (motion.end_frame - frame + 1)
+			MotionData.AimTravel.STOP_AT:
+				var step := Fx.mps(motion.forward_speed)
+				var left := Fx.dist_xz(echo.pos, point)
+				echo.pos = point if left <= step else echo.pos + Fx.with_length_xz(point - echo.pos, step)
+			_:
+				echo.pos += Fx.rotate(Vector3i(Fx.mps(motion.side_speed), 0, Fx.mps(motion.forward_speed)), echo.facing)
+	if move.teleport != null and frame == move.teleport.frame:
+		match move.teleport.mode:
+			TeleportData.Mode.FORWARD:
+				echo.pos += Fx.dir(echo.facing, Fx.m(move.teleport.distance))
+			TeleportData.Mode.AIM_POINT:
+				echo.pos = _clamp_point(echo.pos, Vector3i(echo.move_point.x, 0, echo.move_point.z), Fx.m(move.teleport.max_range))
+	echo.pos = arena.push_circle(echo.pos, _radius[echo.owner])
+	for hb in move.hitboxes:
+		if hb.rehit_frames > 0:
+			var first := hb.start_frame if hb.start_frame >= 0 else move.startup
+			if frame > first and (frame - first) % hb.rehit_frames == 0:
+				echo.hit_masks[clampi(hb.group, 0, 7)] = 0
+	for i in move.effects.size():
+		var ed := move.effects[i]
+		if ed.spawn_frame == frame and (echo.charge_perfect or not ed.requires_perfect):
+			_spawn_echo_effect(echo, move, i)
+
+
+func _spawn_echo_effect(echo: EchoState, move: MoveData, effect_index: int) -> void:
+	var owner := state.fighters[echo.owner]
+	var ed := move.effects[effect_index]
+	var base := echo.pos + Fx.rotate(Fx.v3(ed.offset), echo.facing)
+	if ed.anchor == EffectData.Anchor.TARGET:
+		base = _echo_target_point(echo, move, ed) + Vector3i(0, Fx.m(ed.offset.y), 0)
+	var count := maxi(1, ed.count)
+	var spread := Fx.deg(ed.spread_degrees)
+	for k in count:
+		var angle := echo.facing
+		if count > 1:
+			angle += -spread / 2 + spread * k / (count - 1)
+		var e := spawn_effect(owner, echo.move_index, effect_index, base, angle)
+		e.skill_slot = -1
+		e.cast = echo.cast
+		e.damage_percent = echo.damage_percent
+
+
+func _echo_target_point(echo: EchoState, move: MoveData, ed: EffectData) -> Vector3i:
+	var reach := Fx.m(ed.max_range)
+	if move.is_aimed():
+		return _clamp_point(echo.pos, Vector3i(echo.move_point.x, 0, echo.move_point.z), reach)
+	return echo.pos + Fx.dir(echo.facing, reach)
+
+
+func _collect_echo_contacts(contacts: Array[Contact]) -> void:
+	for echo in state.echoes:
+		if echo.frame <= 0:
+			continue
+		var owner := state.fighters[echo.owner]
+		var move := fighter_data[echo.owner].moves[echo.move_index]
+		if move.kind == MoveData.Kind.THROW:
+			continue
+		var group_counts := PackedInt32Array([0, 0, 0, 0, 0, 0, 0, 0])
+		for hb in move.hitboxes:
+			if hb.hit == null or hb.hit.throw or not hitbox_active(move, hb, echo.frame):
+				continue
+			var group := clampi(hb.group, 0, 7)
+			for v in state.fighters:
+				if v.team == echo.team or v.ko or v.action == Action.GRABBED:
+					continue
+				if echo.hit_masks[group] & (1 << v.slot):
+					continue
+				if move.max_targets > 0 and group_counts[group] >= move.max_targets:
+					break
+				if not _hitbox_overlaps_at(echo.pos, echo.facing, hb, v):
+					continue
+				if not _can_be_hit(v, hb.hit, false, echo.owner):
+					continue
+				echo.hit_masks[group] |= 1 << v.slot
+				group_counts[group] += 1
+				var c := Contact.new()
+				c.attacker = owner
+				c.victim = v
+				c.move = move
+				c.hit = hb.hit
+				c.echo = echo
+				c.counter = _is_counter(v)
+				c.point = echo.pos + Fx.rotate(Fx.v3(hb.offset), echo.facing)
+				c.source = echo.pos
+				c.direction = Fx.angle_of(v.pos.x - echo.pos.x, v.pos.z - echo.pos.z) \
+						if Fx.dist2_xz(echo.pos, v.pos) > 0 else echo.facing
+				contacts.append(c)
+
+
+func _echo_telegraphs(out: Array[SimTelegraph]) -> void:
+	for echo in state.echoes:
+		var owner := state.fighters[echo.owner]
+		var move := fighter_data[echo.owner].moves[echo.move_index]
+		var frame := echo.frame if echo.frame > 0 else -echo.delay_left
+		for hb in move.hitboxes:
+			if hb.hit == null or hb.hit.throw:
+				continue
+			var first := hb.start_frame if hb.start_frame >= 0 else move.startup
+			var last := hb.end_frame if hb.end_frame >= 0 else move.last_active_frame()
+			if frame > last:
+				continue
+			var base := echo.pos
+			if move.aims_at_point():
+				for motion in move.motions:
+					if motion.aim_travel != MotionData.AimTravel.NONE and motion.start_frame <= first:
+						base = Vector3i(echo.move_point.x, 0, echo.move_point.z)
+			var t := _telegraph(owner, move, move.startup, first - frame, last - maxi(frame, first) + 1)
+			t.echo = true
+			t.from = base + Fx.rotate(Fx.v3(hb.offset), echo.facing)
+			t.radius = Fx.m(hb.radius)
+			if hb.capsule:
+				t.shape = SimTelegraph.Shape.CAPSULE
+				t.to = base + Fx.rotate(Fx.v3(hb.offset_end), echo.facing)
+			out.append(t)
+		for ed in move.effects:
+			if ed.hit == null or ed.spawn_frame <= frame:
+				continue
+			var t := _telegraph(owner, move, move.startup, ed.spawn_frame - frame + ed.delay, ed.lifetime)
+			t.effect = true
+			t.echo = true
+			t.from = _echo_target_point(echo, move, ed) if ed.anchor == EffectData.Anchor.TARGET \
+					else echo.pos + Fx.rotate(Fx.v3(ed.offset), echo.facing)
+			_effect_shape(t, ed, echo.facing)
+			out.append(t)
 
 # --- Roster, waves and spawning -------------------------------------------------------
 
@@ -605,6 +781,11 @@ func _free_slot(f: FighterState) -> void:
 	while i >= 0:
 		if state.effects[i].owner == f.slot:
 			state.effects.remove_at(i)
+		i -= 1
+	i = state.echoes.size() - 1
+	while i >= 0:
+		if state.echoes[i].owner == f.slot:
+			state.echoes.remove_at(i)
 		i -= 1
 	for other in state.fighters:
 		other.marks[f.slot] = 0
@@ -1181,6 +1362,8 @@ func start_move(f: FighterState, move_index: int, bit: int = 0) -> void:
 		state.freeze_owner = f.slot
 		_emit(EventType.SUPER_FLASH, f.slot, -1, move.id, f.pos, move.flash_frames)
 	_emit(EventType.MOVE_START, f.slot, target.slot if target != null else -1, move.id, f.pos, move_index).cue = move.cue
+	if move.echo_frames > 0:
+		_record_echo(f, move_index, move)
 	var hook := traits[f.slot]
 	if hook != null:
 		hook.on_move_start(self, f, move)
@@ -2349,12 +2532,19 @@ class Contact:
 	var charge: int = 0
 	## A ⚡Counter landing inside the victim's counter window.
 	var counter_attack: bool = false
+	## A hitbox of a move echo (MoveData.echo_frames).
+	var echo: EchoState
+
+	## Hit from the attacker's own body (not an effect or echo): freezes and marks the attacker.
+	func melee() -> bool:
+		return effect == null and echo == null
 
 
 func _resolve_combat() -> void:
 	var contacts: Array[Contact] = _mark_contacts
 	_mark_contacts = []
 	_collect_hitbox_contacts(contacts)
+	_collect_echo_contacts(contacts)
 	_destroy_effects_by_hitboxes()
 	_collect_effect_contacts(contacts)
 	_collect_hazard_contacts(contacts)
@@ -2428,11 +2618,15 @@ static func hitbox_active(move: MoveData, hb: HitboxData, frame: int) -> bool:
 
 
 func _hitbox_overlaps(a: FighterState, hb: HitboxData, v: FighterState) -> bool:
+	return _hitbox_overlaps_at(a.pos, a.facing, hb, v)
+
+
+func _hitbox_overlaps_at(pos: Vector3i, facing: int, hb: HitboxData, v: FighterState) -> bool:
 	var r := Fx.m(hb.radius)
-	var p1 := a.pos + Fx.rotate(Fx.v3(hb.offset), a.facing)
+	var p1 := pos + Fx.rotate(Fx.v3(hb.offset), facing)
 	if not hb.capsule:
 		return _sphere_hits_body(p1, r, v)
-	return _capsule_hits_body(p1, a.pos + Fx.rotate(Fx.v3(hb.offset_end), a.facing), r, v)
+	return _capsule_hits_body(p1, pos + Fx.rotate(Fx.v3(hb.offset_end), facing), r, v)
 
 
 ## Capsule p1-p2 of radius r against a fighter body (sampled every radius).
@@ -2782,7 +2976,7 @@ func _facing_source(v: FighterState, source: Vector3i) -> bool:
 ## Freezes both fighters (melee) or just the victim (effects, hazards).
 func _apply_hitstop(c: Contact, frames: int) -> void:
 	c.victim.hitstop = frames
-	if c.attacker != null and c.effect == null:
+	if c.attacker != null and c.melee():
 		c.attacker.hitstop = frames
 
 
@@ -2801,7 +2995,7 @@ func _try_parry(c: Contact) -> bool:
 	v.guard = mini(guard_max, v.guard + rules.parry_guard_refill * 100)
 	_gain_soul(v, rules.parry_soul * 100)
 	var a := c.attacker
-	if a != null and c.effect == null:
+	if a != null and c.melee():
 		a.move_contact = maxi(a.move_contact, 1)
 		if a.grab_partner >= 0:
 			_release_grab(a)
@@ -2839,10 +3033,10 @@ func _try_block(c: Contact) -> bool:
 	v.guard_idle = 0
 	if a != null:
 		_gain_soul(a, chip * rules.soul_per_100_dealt)
-		if c.effect == null:
+		if c.melee():
 			a.move_contact = maxi(a.move_contact, 1)
 	var full_charge := c.move != null and c.move.chargeable and c.move.full_charge_guard_break \
-			and c.effect == null and c.charge >= c.move.charge_max
+			and c.melee() and c.charge >= c.move.charge_max
 	var flags := SimEvent.FLAG_CHIP if chip > 0 else 0
 	if c.effect != null:
 		flags |= SimEvent.FLAG_PROJECTILE
@@ -2901,7 +3095,7 @@ func _try_stance(c: Contact) -> bool:
 	if c.effect != null:
 		e.flags |= SimEvent.FLAG_PROJECTILE
 		_kill_effect(c.effect, true)
-	elif a != null:
+	elif a != null and c.echo == null:
 		a.hitstop = hitstop
 		a.move_contact = maxi(a.move_contact, 1)
 	_gain_soul(v, rules.counter_soul * 100)
@@ -2932,7 +3126,7 @@ func _try_super_armor(c: Contact) -> bool:
 	v.hp -= damage
 	_deal_soul(c, damage)
 	_gain_soul(v, damage * rules.soul_per_100_taken)
-	if c.attacker != null and c.effect == null:
+	if c.attacker != null and c.melee():
 		c.attacker.move_contact = maxi(c.attacker.move_contact, 1)
 	var hitstop := _hitstop_of(c)
 	if hitstop > 0:
@@ -2963,7 +3157,7 @@ func _on_connect(c: Contact) -> void:
 		c.victim.marks[a.slot] = c.hit.mark_frames
 	if c.effect != null:
 		_arm_follow_up(a, c.effect.skill_slot, c.move)
-	elif current_move(a) == c.move:
+	elif c.echo == null and current_move(a) == c.move:
 		_arm_follow_up(a, a.move_slot, c.move)
 
 
@@ -2975,15 +3169,20 @@ func _hit_damage(c: Contact) -> int:
 	var damage := c.hit.damage
 	if c.move != null and c.move.chargeable and not c.move.charge_levels.is_empty():
 		damage = damage * _charge_percent(c) / 100
-	elif c.move != null and c.move.chargeable and c.effect == null and c.move.charge_max > 0:
+	elif c.move != null and c.move.chargeable and c.melee() and c.move.charge_max > 0:
 		damage += damage * c.move.charge_damage_percent * c.charge / (100 * c.move.charge_max)
 	if c.counter:
 		damage = damage * rules.counter_damage_percent / 100
 	if a != null:
-		damage = damage * (100 + _use_damage_buffs(a, c.effect.cast if c.effect != null else a.move_cast)) / 100
+		var cast := c.effect.cast if c.effect != null else (c.echo.cast if c.echo != null else a.move_cast)
+		damage = damage * (100 + _use_damage_buffs(a, cast)) / 100
 		var hook := traits[a.slot]
 		if hook != null:
 			damage = damage * hook.damage_percent(self, a, v, c.move, c.hit) / 100
+	if c.echo != null:
+		damage = damage * c.echo.damage_percent / 100
+	elif c.effect != null and c.effect.damage_percent != 100:
+		damage = damage * c.effect.damage_percent / 100
 	if v.action == Action.STAGGERED:
 		damage = damage * rules.stagger_damage_percent / 100
 	var taken := 0
@@ -3059,7 +3258,7 @@ func _try_armor(c: Contact) -> bool:
 	v.hp -= damage
 	if c.attacker != null:
 		_gain_soul(c.attacker, damage * rules.soul_per_100_dealt)
-		if c.effect == null:
+		if c.melee():
 			c.attacker.move_contact = maxi(c.attacker.move_contact, 1)
 	_gain_soul(v, damage * rules.soul_per_100_taken)
 	var hitstop := _hitstop_of(c)
@@ -3095,7 +3294,7 @@ func _land_hit(c: Contact) -> void:
 	v.guard_broken = false
 	v.parry_timer = 0
 	_deal_soul(c, damage)
-	if a != null and c.effect == null:
+	if a != null and c.melee():
 		a.move_contact = 2
 	_gain_soul(v, damage * rules.soul_per_100_taken)
 	if v.grab_partner >= 0 and not c.held:
@@ -3118,7 +3317,7 @@ func _land_hit(c: Contact) -> void:
 		flags |= SimEvent.FLAG_HAZARD
 	if c.held:
 		flags |= SimEvent.FLAG_THROW
-	if c.move != null and c.move.chargeable and c.effect == null and c.charge >= c.move.charge_max:
+	if c.move != null and c.move.chargeable and c.melee() and c.charge >= c.move.charge_max:
 		flags |= SimEvent.FLAG_FULL_CHARGE
 	if _perfect_of(c):
 		flags |= SimEvent.FLAG_PERFECT
@@ -3204,7 +3403,7 @@ func _react(c: Contact, hitstun: int, was_airborne: bool) -> bool:
 	v.splat_armed = hit.wall_splat and not v.wall_splat_used \
 			and knock * Fx.TICKS_PER_SECOND / KNOCK_TICKS >= Fx.m(rules.wall_splat_min_speed)
 	v.splat_bonus = hit.wall_splat_bonus if v.splat_armed else 0
-	if hit.carry_frames > 0 and a != null and c.effect == null:
+	if hit.carry_frames > 0 and a != null and c.melee():
 		v.carried_by = a.slot
 		v.carried_ticks = hit.carry_frames
 		v.knock_ticks = 0
