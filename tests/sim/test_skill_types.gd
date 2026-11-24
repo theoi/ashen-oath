@@ -233,7 +233,7 @@ func test_perfect_release() -> void:
 				hit = e
 	assert_eq(hit.amount, 120 * 158 / 100)
 	assert_eq(hit.weight, HitData.Weight.MASSIVE)
-	assert_eq(hit.hitstop, 14)
+	assert_eq(hit.hitstop, 10)
 	assert_true(hit.flags & SimEvent.FLAG_PERFECT != 0)
 	var pillar := false
 	for events in ticks:

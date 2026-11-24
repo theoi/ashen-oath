@@ -65,7 +65,7 @@ static func fill(sim: Sim, hud: HudState, human_slots: Array[int] = [0]) -> HudS
 static func _fill_dash(sim: Sim, f: FighterState, entry: HudState.Fighter) -> void:
 	entry.dash_charges = f.dash_charges
 	entry.dash_recharge = 0.0
-	var total := sim.fighter_data[f.slot].dash.recharge_frames
+	var total := sim.dash_recharge_frames(f)
 	if f.dash_charges < entry.dash_max and total > 0:
 		entry.dash_recharge = clampf(1.0 - float(f.dash_recharge) / total, 0.0, 1.0)
 

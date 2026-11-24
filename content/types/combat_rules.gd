@@ -4,13 +4,13 @@ extends Resource
 ## content/rules/default_rules.tres holds the tuned values.
 
 @export_group("Input")
-@export var buffer_frames: int = 10
+@export var buffer_frames: int = 12
 
 @export_group("Weight classes")
-## Hitstop per HitData.Weight BASIC..MASSIVE.
-@export var weight_hitstop: PackedInt32Array = PackedInt32Array([3, 5, 7, 10, 14])
-## Boss stagger drain per HitData.Weight BASIC..MASSIVE.
-@export var weight_stagger: PackedInt32Array = PackedInt32Array([5, 15, 30, 50, 80])
+## Hitstop per HitData.Weight in enum order: BASIC, LIGHT, MEDIUM, HEAVY, MASSIVE, TICK.
+@export var weight_hitstop: PackedInt32Array = PackedInt32Array([3, 4, 5, 8, 10, 1])
+## Boss stagger drain per HitData.Weight in enum order: BASIC, LIGHT, MEDIUM, HEAVY, MASSIVE, TICK.
+@export var weight_stagger: PackedInt32Array = PackedInt32Array([5, 15, 30, 50, 80, 5])
 
 @export_group("Counters and stagger")
 @export var counter_stun_frames: int = 60
@@ -80,7 +80,8 @@ extends Resource
 @export var hitstop_heavy: int = 9
 @export var hitstop_ability: int = 8
 @export var hitstop_super: int = 10
-@export var hitstop_super_final: int = 16
+## Hitstop of an awakening's MASSIVE hit (its finale), in place of weight_hitstop.
+@export var hitstop_super_final: int = 12
 
 @export_group("Counter hits")
 @export var counter_hitstun_percent: int = 150

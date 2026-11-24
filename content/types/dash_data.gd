@@ -6,12 +6,16 @@ extends Resource
 
 ## Dash charges; spent charges come back one at a time, `recharge_frames` each.
 @export var charges: int = 2
-@export var recharge_frames: int = 240
+@export var recharge_frames: int = 300
 ## Total length, travel included.
 @export var frames: int = 18
 ## Frames spent moving (the rest is recovery).
 @export var travel_frames: int = 12
 @export var distance: float = 4.5
+## Front-loaded travel: `burst_percent` of the distance in the first `burst_frames`, the
+## rest over the remaining travel frames.
+@export var burst_frames: int = 6
+@export var burst_percent: int = 70
 @export var invuln_start: int = 1
 @export var invuln_end: int = 10
 ## From this frame, skills, the basic attack, the awakening and another dash can start.

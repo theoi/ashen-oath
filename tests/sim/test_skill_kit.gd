@@ -105,8 +105,10 @@ func test_dash_travels_its_distance_with_charges_and_recharge() -> void:
 	F.step(sim, right)
 	assert_eq(me.action, Action.DASH)
 	assert_eq(me.dash_charges, 1)
-	assert_eq(me.dash_recharge, 239, "counts down from the dash tick")
-	F.hold(sim, 11)
+	assert_eq(me.dash_recharge, 299, "counts down from the dash tick")
+	F.hold(sim, 5)
+	assert_eq(me.pos.x, 31500, "front-loaded: 70% (3.15 m) by frame 6")
+	F.hold(sim, 6)
 	assert_eq(me.pos.x, 45000, "4.5 m in 12 frames")
 	F.hold(sim, 7)
 	assert_eq(me.action, Action.IDLE, "18 frames in total")
@@ -115,9 +117,9 @@ func test_dash_travels_its_distance_with_charges_and_recharge() -> void:
 	assert_eq(me.dash_charges, 0)
 	F.step(sim, right)
 	assert_ne(me.action, Action.DASH, "no charges left")
-	F.hold(sim, 240 - 41)
-	assert_eq(me.dash_charges, 1, "one charge back after 240 frames")
-	assert_eq(me.dash_recharge, 240, "the next charge starts recharging")
+	F.hold(sim, 300 - 41)
+	assert_eq(me.dash_charges, 1, "one charge back after 300 frames")
+	assert_eq(me.dash_recharge, 300, "the next charge starts recharging")
 
 
 func test_dash_is_invincible_on_frames_1_to_10_and_perfect_early() -> void:
@@ -143,15 +145,20 @@ func test_dash_goes_toward_the_aim_without_stick_and_not_in_the_air() -> void:
 	assert_ne(me.action, Action.DASH)
 
 
-func test_tuning_overrides_dash_distance_and_charges() -> void:
+func test_tuning_overrides_dash_distance_charges_and_recharge() -> void:
 	var cfg := F.config(2, kit())
 	cfg.dash_distance = 3.0
 	cfg.dash_charges = 3
+	cfg.dash_recharge_frames = 120
 	_duel(8.0, cfg)
 	assert_eq(me.dash_charges, 3)
+	assert_eq(sim.dash_recharge_frames(me), 120)
 	F.step(sim, SimInput.make(DASH, 127, 0))
+	assert_eq(me.dash_recharge, 119)
 	F.hold(sim, 15)
 	assert_eq(me.pos.x, 30000)
+	F.hold(sim, 104)
+	assert_eq(me.dash_charges, 3, "charge back after 120 frames")
 
 
 func test_dash_cancels_skill_startup_and_the_cooldown_stays_spent() -> void:
@@ -174,7 +181,7 @@ func test_awakening_cannot_be_cancelled() -> void:
 func test_skill_cancels_another_after_its_last_active_frame_from_the_buffer() -> void:
 	_duel(8.0)
 	var ticks := F.play(sim, [LUNGE, 0, QUICK], [], 20)
-	assert_eq(_starts(ticks), ["1:lunge", "13:quick"], "buffered 10 frames, fires on lunge frame 13")
+	assert_eq(_starts(ticks), ["1:lunge", "13:quick"], "buffered, fires on lunge frame 13")
 
 
 func test_basic_can_be_cancelled_by_skill_and_dash_on_any_frame() -> void:
@@ -237,13 +244,40 @@ func test_counter_beats_armor_in_the_window_only() -> void:
 
 func test_weight_sets_hitstop_and_hitstop_percent_scales_it() -> void:
 	var ticks := F.play(sim, [LUNGE], [], 6)
-	assert_eq(F.first(ticks, T.HIT).hitstop, 7)
+	assert_eq(F.first(ticks, T.HIT).hitstop, 5)
 	assert_eq(F.first(ticks, T.HIT).weight, HitData.Weight.MEDIUM)
 	var cfg := F.config(2, kit())
 	cfg.hitstop_percent = 50
 	_duel(1.2, cfg)
 	ticks = F.play(sim, [LUNGE], [], 6)
-	assert_eq(F.first(ticks, T.HIT).hitstop, 3)
+	assert_eq(F.first(ticks, T.HIT).hitstop, 2)
+
+
+func test_weight_hitstop_table_and_tick_class() -> void:
+	var rules := CombatRules.new()
+	var expected := {HitData.Weight.TICK: 1, HitData.Weight.BASIC: 3, HitData.Weight.LIGHT: 4,
+			HitData.Weight.MEDIUM: 5, HitData.Weight.HEAVY: 8, HitData.Weight.MASSIVE: 10}
+	for w: int in expected:
+		assert_eq(rules.weight_hitstop[w - 1], expected[w], "weight %d" % w)
+	assert_eq(rules.weight_stagger.size(), rules.weight_hitstop.size())
+	var data := kit()
+	data.moves[5].hitboxes[0].hit.weight = HitData.Weight.TICK
+	_duel(1.2, F.config(2, data))
+	var ticks := F.play(sim, [QUICK], [], 6)
+	var hit := F.first(ticks, T.HIT)
+	assert_eq(hit.weight, HitData.Weight.TICK)
+	assert_eq(hit.hitstop, 1)
+	assert_eq(me.hitstop + foe.hitstop, 0, "1 frame, already over")
+
+
+func test_awakening_massive_hit_uses_the_final_hit_hitstop() -> void:
+	_duel(1.2)
+	me.soul = 10000
+	var ticks := F.play(sim, [SimInput.AWAKEN], [], 80)
+	var hit := F.first(ticks, T.HIT)
+	assert_not_null(hit)
+	assert_eq(hit.weight, HitData.Weight.MASSIVE)
+	assert_eq(hit.hitstop, 12)
 
 
 func test_stagger_bar_breaks_refills_bigger_and_counter_stun_is_longer_for_bosses() -> void:
