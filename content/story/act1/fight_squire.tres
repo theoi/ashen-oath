@@ -9,14 +9,14 @@ goal = 1
 amount = 4
 title = "Move"
 text = "Find your footing. Circle the squire."
-hint = "Left stick  ·  W A S D"
+actions = Array[StringName]([&"move"])
 
 [sub_resource type="Resource" id="Resource_64tdh"]
 script = ExtResource("1_pbwqa")
 goal = 2
 amount = 3
 title = "Light string"
-text = "Press Light three times in a row. Each blow flows into the next."
+text = "Press Light three times. Each blow flows into the next."
 actions = Array[StringName]([&"attack_light"])
 
 [sub_resource type="Resource" id="Resource_b12ib"]
@@ -24,24 +24,39 @@ script = ExtResource("1_pbwqa")
 goal = 3
 amount = 60
 title = "Guard"
-text = "Hold Guard to block its blade. Blows from behind still land."
+text = "Hold Guard to block. Blows from behind still land."
 actions = Array[StringName]([&"guard"])
 
 [sub_resource type="Resource" id="Resource_jhr7b"]
 script = ExtResource("1_pbwqa")
-goal = 4
-title = "Dodge"
-text = "Roll through an attack. Early in the roll, nothing can touch you."
-actions = Array[StringName]([&"dodge"])
+goal = 9
+title = "Parry"
+text = "Tap Guard just as a blow lands. The attacker staggers."
+actions = Array[StringName]([&"guard"])
+timeout_seconds = 25.0
 
 [sub_resource type="Resource" id="Resource_qqqn7"]
 script = ExtResource("1_pbwqa")
-goal = 5
-title = "Grab"
-text = "A guard will not stop a grab. Seize the squire."
-actions = Array[StringName]([&"grab"])
+goal = 4
+title = "Dodge"
+text = "Roll through an attack. Early in the roll, nothing touches you."
+actions = Array[StringName]([&"dodge"])
 
 [sub_resource type="Resource" id="Resource_vdd3y"]
+script = ExtResource("1_pbwqa")
+goal = 5
+title = "Grab"
+text = "A grab breaks a guard. Seize the squire."
+actions = Array[StringName]([&"grab"])
+
+[sub_resource type="Resource" id="Resource_ty5ip"]
+script = ExtResource("1_pbwqa")
+goal = 10
+title = "Lock on"
+text = "Lock on to keep the squire in front of you."
+actions = Array[StringName]([&"lock_on"])
+
+[sub_resource type="Resource" id="Resource_5jrof"]
 script = ExtResource("1_pbwqa")
 title = "Finish it"
 text = "Put the squire back in its grave."
@@ -55,6 +70,6 @@ rounds_to_win = 1
 round_seconds = -1
 ai_cap = 0
 seed = 101
-prompts = Array[ExtResource("1_pbwqa")]([SubResource("Resource_s2ebi"), SubResource("Resource_64tdh"), SubResource("Resource_b12ib"), SubResource("Resource_jhr7b"), SubResource("Resource_qqqn7"), SubResource("Resource_vdd3y")])
+prompts = Array[ExtResource("1_pbwqa")]([SubResource("Resource_s2ebi"), SubResource("Resource_64tdh"), SubResource("Resource_b12ib"), SubResource("Resource_jhr7b"), SubResource("Resource_qqqn7"), SubResource("Resource_vdd3y"), SubResource("Resource_ty5ip"), SubResource("Resource_5jrof")])
 id = &"fight_squire"
 title = "I · The Squire"

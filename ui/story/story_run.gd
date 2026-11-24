@@ -16,6 +16,8 @@ var chapter_only := false
 var new_unlocks: Array[StringName] = []
 ## How the last fight ended.
 var last_result: MatchResult
+## Fight id -> {prompt index: true} for tips done or skipped, so retries do not repeat them.
+var prompts_done: Dictionary[StringName, Dictionary] = {}
 
 var _end := 0
 
@@ -130,6 +132,13 @@ func advance() -> void:
 		save.completed = true
 		save.next_step = data.steps.size()
 		save.write()
+
+
+## Tips of `fight` already done or skipped in this run (shared, so the overlay fills it).
+func prompt_state(fight: StoryFight) -> Dictionary:
+	if not prompts_done.has(fight.id):
+		prompts_done[fight.id] = {}
+	return prompts_done[fight.id]
 
 
 ## "Retry on lower difficulty" is offered after two losses, while there is a lower level.

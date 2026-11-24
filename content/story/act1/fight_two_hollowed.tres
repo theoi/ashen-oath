@@ -6,26 +6,54 @@
 [sub_resource type="Resource" id="Resource_5ubsl"]
 script = ExtResource("1_4owwt")
 goal = 7
+amount = 2
 title = "Two at once"
-text = "Keep both in sight. Switch your target to the other one."
+text = "Lock on, then switch to the other one."
 actions = Array[StringName]([&"lock_on"])
-timeout_seconds = 10.0
+timeout_seconds = 15.0
 
 [sub_resource type="Resource" id="Resource_30wrq"]
 script = ExtResource("1_4owwt")
 goal = 6
-title = "Oathfire"
-text = "Your abilities cut through a crowd. Each has its own cooldown."
-actions = Array[StringName]([&"ability_1", &"ability_2", &"ability_3"])
-timeout_seconds = 12.0
+ability_slot = 0
+title = "Oathfire Lunge"
+text = "Ability 1. A burning thrust that closes the distance."
+actions = Array[StringName]([&"ability_1"])
+timeout_seconds = 15.0
 
 [sub_resource type="Resource" id="Resource_3syio"]
 script = ExtResource("1_4owwt")
-goal = 8
-title = "Soul Burst"
-text = "Caught in a combo with 50 Soul or more? Press Super to burst free."
+goal = 6
+ability_slot = 1
+title = "Brand Rise"
+text = "Ability 2. A rising slash that throws them into the air."
+actions = Array[StringName]([&"ability_2"])
+timeout_seconds = 15.0
+
+[sub_resource type="Resource" id="Resource_ln14i"]
+script = ExtResource("1_4owwt")
+goal = 6
+ability_slot = 2
+title = "Bulwark Charge"
+text = "Ability 3. A shield bash that leaves them reeling."
+actions = Array[StringName]([&"ability_3"])
+timeout_seconds = 15.0
+
+[sub_resource type="Resource" id="Resource_evs1t"]
+script = ExtResource("1_4owwt")
+goal = 11
+trigger = 1
+title = "Soul full"
+text = "Unleash Pyre of the Forsworn."
 actions = Array[StringName]([&"super"])
-timeout_seconds = 12.0
+
+[sub_resource type="Resource" id="Resource_riug3"]
+script = ExtResource("1_4owwt")
+goal = 8
+trigger = 2
+title = "Caught"
+text = "Burst free. It costs 50 Soul."
+actions = Array[StringName]([&"super"])
 
 [resource]
 script = ExtResource("2_cdc56")
@@ -34,6 +62,6 @@ opponent_name = "Two Hollowed"
 rounds_to_win = 1
 opponent_hp_percent = Array[int]([70, 70])
 seed = 202
-prompts = Array[ExtResource("1_4owwt")]([SubResource("Resource_5ubsl"), SubResource("Resource_30wrq"), SubResource("Resource_3syio")])
+prompts = Array[ExtResource("1_4owwt")]([SubResource("Resource_5ubsl"), SubResource("Resource_30wrq"), SubResource("Resource_3syio"), SubResource("Resource_ln14i"), SubResource("Resource_evs1t"), SubResource("Resource_riug3")])
 id = &"fight_two_hollowed"
 title = "II · Two Hollowed"
