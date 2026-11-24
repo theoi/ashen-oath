@@ -62,6 +62,9 @@ static func scaled_move(move: MoveData, percent: int) -> MoveData:
 	w = _window(move.counter_window_start, move.counter_window_end, percent)
 	m.counter_window_start = w.x
 	m.counter_window_end = w.y
+	w = _window(move.channel_start, move.channel_end, percent)
+	m.channel_start = w.x
+	m.channel_end = w.y
 	w = _window(move.stance_start, move.stance_end, percent)
 	m.stance_start = w.x
 	m.stance_end = w.y

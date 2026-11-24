@@ -60,6 +60,13 @@ enum Type {
 	CHARGE_LEVEL,
 	## The target was rooted (amount = frames).
 	ROOT,
+	## A channel-break gauge appeared on source (amount = gauge points, id = move).
+	CHANNEL_START,
+	## Source emptied target's channel-break gauge (amount = gauge size); target is STAGGERED.
+	CHANNEL_BREAK,
+	## Source's gauge went away unbroken (amount 1 = channel completed, the special fires;
+	## 0 = the move was interrupted some other way).
+	CHANNEL_END,
 }
 
 const FLAG_COUNTER := 1

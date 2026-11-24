@@ -26,6 +26,9 @@ extends Resource
 @export var stagger_growth_percent: int = 120
 ## Freeze on both fighters when a stance absorbs a hit.
 @export var stance_hitstop: int = 4
+## ⚡Counters on fighters with a stagger bar (bosses) must come from within this arc
+## (degrees) of the boss's facing.
+@export var boss_counter_arc: float = 180.0
 
 ## Frames after the last active frame in which lights/heavies can be cancelled into
 ## abilities on contact (and abilities into supers on hit).

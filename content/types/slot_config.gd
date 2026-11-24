@@ -13,3 +13,6 @@ extends Resource
 @export var spawn: int = -1
 ## Boss stagger bar size (0 = none).
 @export var stagger_max: int = 0
+## Frames after a counter window opens during which this fighter's next counter windows
+## are suppressed (no blue flash, not counterable). Bosses: one per 15-20 s. 0 = no limit.
+@export var counter_window_cooldown: int = 0
