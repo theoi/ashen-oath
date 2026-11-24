@@ -120,8 +120,21 @@ func test_loss_screen_offers_lower_difficulty_only_after_two_losses() -> void:
 	await _open_player()
 	assert_true(player.panel is StoryHollowedScreen)
 	assert_eq(_focused_name(), "Retry")
-	(player.panel.find_child("Quit", true, false) as Button).mouse_entered.emit()
+	var quit := player.panel.find_child("Quit", true, false) as Button
+	quit.mouse_entered.emit()
 	assert_eq(_focused_name(), "Retry", "a resting cursor under Quit does not take the focus")
+	assert_eq(quit.mouse_filter, Control.MOUSE_FILTER_IGNORE, "nor show a hover highlight next to the focused Retry")
+	var motion := InputEventMouseMotion.new()
+	motion.relative = Vector2(12.0, 4.0)
+	player.panel._input(motion)
+	assert_eq(quit.mouse_filter, Control.MOUSE_FILTER_STOP, "moving the mouse makes buttons follow it")
+	quit.mouse_entered.emit()
+	assert_eq(_focused_name(), "Quit", "and hovering moves the focus")
+	var down := InputEventAction.new()
+	down.action = &"ui_up"
+	down.pressed = true
+	player.panel._input(down)
+	assert_eq(quit.mouse_filter, Control.MOUSE_FILTER_IGNORE, "keyboard / gamepad navigation drops the hover")
 	assert_null(player.panel.find_child("RetryLower", true, false))
 	assert_not_null(player.panel.find_child("Quit", true, false))
 	player.free()
