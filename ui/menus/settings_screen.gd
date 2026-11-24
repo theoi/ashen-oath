@@ -1,5 +1,5 @@
 extends MenuScreen
-## Settings: bus volumes, default CPU difficulty and the unlock-all-fighters toggle.
+## Settings: bus volumes, brightness, default CPU difficulty and the unlock-all-fighters toggle.
 ## Changes apply at once and are saved shortly after the last change, and on leaving.
 
 const SAVE_DELAY := 0.6
@@ -29,7 +29,7 @@ func _ready() -> void:
 	panel.custom_minimum_size.x = 760.0
 	page.add_child(panel)
 	var rows := VBoxContainer.new()
-	rows.add_theme_constant_override("separation", 14)
+	rows.add_theme_constant_override("separation", 10)
 	panel.add_child(rows)
 
 	for entry in VOLUME_ROWS:
@@ -37,6 +37,17 @@ func _ready() -> void:
 		rows.add_child(_row(entry[0], slider))
 		if _first == null:
 			_first = slider
+
+	rows.add_child(HSeparator.new())
+	rows.add_child(_row("Brightness", _brightness_slider()))
+	var reference := HBoxContainer.new()
+	reference.add_theme_constant_override("separation", 16)
+	reference.alignment = BoxContainer.ALIGNMENT_END
+	var hint := make_label("Adjust until the sword is barely visible.", &"SubtleLabel")
+	hint.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	reference.add_child(hint)
+	reference.add_child(BrightnessReference.new())
+	rows.add_child(reference)
 
 	rows.add_child(HSeparator.new())
 	_difficulty = OptionCycler.new()
@@ -96,6 +107,22 @@ func _volume_slider(bus: StringName) -> HSlider:
 		Settings.set_volume(bus, value)
 		if bus != &"Music":
 			Sound.play(&"ui_cycle")
+		_queue_save())
+	return slider
+
+
+func _brightness_slider() -> HSlider:
+	var slider := HSlider.new()
+	slider.min_value = Settings.BRIGHTNESS_MIN
+	slider.max_value = Settings.BRIGHTNESS_MAX
+	slider.step = 0.05
+	slider.value = Settings.brightness
+	slider.custom_minimum_size = Vector2(300.0, 28.0)
+	slider.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	slider.mouse_entered.connect(slider.grab_focus)
+	slider.value_changed.connect(func(value: float) -> void:
+		Settings.set_brightness(value)
+		Sound.play(&"ui_cycle")
 		_queue_save())
 	return slider
 
