@@ -22,6 +22,8 @@ extends Resource
 @export var dash_distance: float = -1.0
 ## Dash charges for every skill-kit fighter (-1 = fighter data).
 @export var dash_charges: int = -1
+## Frames per dash charge recharge for every skill-kit fighter (-1 = fighter data).
+@export var dash_recharge_frames: int = -1
 
 
 func effective_rounds_to_win() -> int:

@@ -221,6 +221,15 @@ func dash_distance(f: FighterState) -> int:
 	return Fx.m(config.dash_distance if config.dash_distance >= 0.0 else dash.distance)
 
 
+## Frames one dash charge takes to come back for `f` (SimConfig.dash_recharge_frames
+## overrides the fighter's; 0 for fighters without FighterData.dash).
+func dash_recharge_frames(f: FighterState) -> int:
+	var dash := fighter_data[f.slot].dash
+	if dash == null:
+		return 0
+	return config.dash_recharge_frames if config.dash_recharge_frames >= 0 else dash.recharge_frames
+
+
 ## First frame of `move` from which a skill or the awakening may cancel it (0 = never).
 static func skill_cancel_frame(move: MoveData) -> int:
 	if move.skill_cancel_from >= 0:
@@ -1472,7 +1481,7 @@ func _air_dodge(f: FighterState) -> void:
 func _start_dash(f: FighterState) -> void:
 	var dash := fighter_data[f.slot].dash
 	f.buffer = 0
-	_spend_dash_charge(f, dash)
+	_spend_dash_charge(f)
 	_set_action(f, Action.DASH, dash.frames)
 	if _stick_active(f):
 		f.move_dir = _stick_angle(f)
@@ -1496,7 +1505,7 @@ func _dashing(f: FighterState) -> void:
 	_dash_motion(f, dash)
 
 
-## Travel is spread so the total is exactly the dash distance.
+## Front-loaded travel whose total is exactly the dash distance.
 func _dash_motion(f: FighterState, dash: DashData) -> void:
 	var t := f.action_tick
 	var frames := maxi(1, dash.travel_frames)
@@ -1505,20 +1514,36 @@ func _dash_motion(f: FighterState, dash: DashData) -> void:
 		f.vel.z = 0
 		return
 	var dist := dash_distance(f)
-	var v := Fx.dir(f.move_dir, dist * t / frames - dist * (t - 1) / frames)
+	var v := Fx.dir(f.move_dir, _dash_travelled(dash, dist, t) - _dash_travelled(dash, dist, t - 1))
 	f.vel.x = v.x
 	f.vel.z = v.z
 
 
-func _spend_dash_charge(f: FighterState, dash: DashData) -> void:
+## Distance covered after `t` dash frames: burst_percent by burst_frames, all by travel_frames.
+func _dash_travelled(dash: DashData, dist: int, t: int) -> int:
+	var frames := maxi(1, dash.travel_frames)
+	if t <= 0:
+		return 0
+	if t >= frames:
+		return dist
+	var burst := dash.burst_frames
+	if burst <= 0 or burst >= frames:
+		return dist * t / frames
+	var burst_dist := dist * clampi(dash.burst_percent, 0, 100) / 100
+	if t <= burst:
+		return burst_dist * t / burst
+	return burst_dist + (dist - burst_dist) * (t - burst) / (frames - burst)
+
+
+func _spend_dash_charge(f: FighterState) -> void:
 	f.dash_charges -= 1
 	if f.dash_recharge == 0:
-		f.dash_recharge = dash.recharge_frames
+		f.dash_recharge = dash_recharge_frames(f)
 
 
 func _quick_rise(f: FighterState, dash: DashData) -> void:
 	f.buffer = 0
-	_spend_dash_charge(f, dash)
+	_spend_dash_charge(f)
 	_set_action(f, Action.GETUP, dash.rise_frames)
 	f.action_variant = 2
 	f.invuln = dash.rise_invuln
@@ -2344,6 +2369,8 @@ func _base_hitstop(c: Contact) -> int:
 	var weight := c.hit.weight
 	if c.move != null and c.move.perfect_weight != HitData.Weight.AUTO and _perfect_of(c):
 		weight = c.move.perfect_weight
+	if weight == HitData.Weight.MASSIVE and _kind_of(c) == MoveData.Kind.SUPER:
+		return rules.hitstop_super_final
 	if weight != HitData.Weight.AUTO and weight - 1 < rules.weight_hitstop.size():
 		return rules.weight_hitstop[weight - 1]
 	match _kind_of(c):
@@ -2928,7 +2955,7 @@ func _post_tick(f: FighterState) -> void:
 		if f.dash_recharge == 0:
 			f.dash_charges += 1
 			if f.dash_charges < dash_max_charges(f):
-				f.dash_recharge = fighter_data[f.slot].dash.recharge_frames
+				f.dash_recharge = dash_recharge_frames(f)
 	for i in f.cooldowns.size():
 		if f.cooldowns[i] > 0:
 			f.cooldowns[i] -= 1

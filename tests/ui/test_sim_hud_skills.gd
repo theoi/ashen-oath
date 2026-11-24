@@ -20,10 +20,10 @@ func test_dash_charges_and_recharge_come_from_the_sim() -> void:
 	assert_eq(player.dash_charges, 2)
 	var f := sim.fighter(0)
 	f.dash_charges = 1
-	f.dash_recharge = 120
+	f.dash_recharge = 150
 	SimHud.fill(sim, hud)
 	assert_eq(player.dash_charges, 1)
-	assert_almost_eq(player.dash_recharge, 0.5, 0.001, "half of the 240-frame recharge is done")
+	assert_almost_eq(player.dash_recharge, 0.5, 0.001, "half of the 300-frame recharge is done")
 
 
 func test_tuned_dash_charges_set_the_pip_count() -> void:

@@ -19,8 +19,8 @@ enum Reaction {
 
 ## Impact class: default hitstop (CombatRules.weight_hitstop) and boss stagger
 ## (weight_stagger); presentation scales shake, rumble and numbers by it. AUTO = the old
-## per-kind hitstop.
-enum Weight { AUTO, BASIC, LIGHT, MEDIUM, HEAVY, MASSIVE }
+## per-kind hitstop. TICK (hold and multi-hit ticks) comes last so saved values keep their meaning.
+enum Weight { AUTO, BASIC, LIGHT, MEDIUM, HEAVY, MASSIVE, TICK }
 
 @export var damage: int = 40
 @export var weight: Weight = Weight.AUTO

@@ -178,7 +178,7 @@ func test_hard_lock_strafes_facing_the_target() -> void:
 
 func test_input_buffer_lasts_buffer_frames() -> void:
 	var n := CombatRules.new().buffer_frames
-	assert_eq(n, 10)
+	assert_eq(n, 12)
 	F.step(sim, F.D)
 	F.hold(sim, 23 - n)
 	F.step(sim, F.J)
