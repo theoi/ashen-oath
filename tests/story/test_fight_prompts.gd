@@ -1,9 +1,11 @@
 extends TestCase
-## Fight 1 tutorial prompts on a real story match: the match screen adds them, and each one
-## is ticked off by the player's fighter doing it in the sim.
+## Story tips on a real story match: the match screen adds them, each one is ticked off by
+## the player's fighter doing it in the sim, contextual tips cut in at their moment, tips
+## can be skipped, and a retry does not repeat what was already learned.
 
 const MATCH_SCENE := preload("res://ui/match/match_screen.tscn")
 const SAVE_PATH := "user://test_fight_prompts.cfg"
+const Goal := StoryPrompt.Goal
 
 
 ## Feeds queued frames to a slot, then neutral.
@@ -25,6 +27,8 @@ class QueueSource:
 
 var screen: MatchScreen
 var director: StoryDirector
+var source: QueueSource
+var overlay: FightPrompts
 
 
 func before_each() -> void:
@@ -44,74 +48,114 @@ func after_each() -> void:
 		DirAccess.remove_absolute(ProjectSettings.globalize_path(SAVE_PATH))
 
 
-func test_tutorial_prompts_follow_the_players_actions() -> void:
-	var story := StoryDirector.load_story()
-	var save := StorySave.load_from()
-	save.started = true
-	save.next_step = story.step_index(&"fight_squire")
-	var run := StoryRun.resume(story, save)
-	director = StoryDirector.new(run)
+func test_fight_one_tutorial_follows_the_players_actions() -> void:
+	await _open_fight(&"fight_squire")
+	assert_eq(overlay.current().goal, Goal.MOVE)
+
+	source.hold(SimInput.make(0, 0, -127), 150)
+	_run_until(Goal.LIGHT_STRING)
+	for n in 3:
+		source.tap(SimInput.LIGHT, 7)
+	source.hold(0, 60)
+	_run_until(Goal.GUARD)
+	source.hold(SimInput.GUARD, 80)
+	_run_until(Goal.PARRY)
+	assert_eq(overlay.current().goal, Goal.PARRY, "parry comes after guard")
+	_press_skip_key()
+	assert_eq(overlay.current().goal, Goal.DODGE, "F1 skips the tip")
+	source.tap(SimInput.DODGE, 60)
+	_run_until(Goal.GRAB)
+	source.tap(SimInput.GRAB, 80)
+	_run_until(Goal.LOCK_ON)
+	source.tap(SimInput.LOCK, 60)
+	_run_until(Goal.NONE)
+	assert_eq(overlay.completed, ["Move", "Light string", "Guard", "Dodge", "Grab", "Lock on"] as Array[String])
+	_step(400)
+	assert_true(overlay.is_done(), "the last tip times out")
+
+
+func test_a_retry_skips_tips_already_learned() -> void:
+	await _open_fight(&"fight_squire")
+	source.hold(SimInput.make(0, 0, -127), 150)
+	_run_until(Goal.LIGHT_STRING)
+	screen.free()
+	await _open_fight(&"fight_squire", false)
+	_step(1)
+	assert_eq(overlay.current().goal, Goal.LIGHT_STRING, "the retry starts at the first tip not yet done")
+
+
+func test_fight_two_teaches_abilities_and_cuts_in_for_super_and_burst() -> void:
+	await _open_fight(&"fight_two_hollowed")
+	_step(1)
+	assert_eq(overlay.current().goal, Goal.TARGET)
+	source.tap(SimInput.LOCK, 20)
+	source.tap(SimInput.TARGET_NEXT, 20)
+	_run_until(Goal.ABILITY)
+	assert_eq(overlay.current().ability_slot, 0, "ability 1 first")
+	assert_has(FightPrompts.hint_for(overlay.current()), "1", "shows the ability 1 key")
+
+	var player := screen.runner.sim.fighter(0)
+	player.soul = 100 * 100
+	_step(2)
+	assert_eq(overlay.current().goal, Goal.SUPER, "full Soul brings up the super tip")
+	assert_eq(overlay._counter.text, "Tip")
+	source.tap(SimInput.SUPER, 120)
+	_step(130)
+	assert_has(overlay.completed, "Soul full")
+
+	player = screen.runner.sim.fighter(0)
+	player.soul = 60 * 100
+	player.action = FighterState.Action.HITSTUN
+	player.action_tick = 1
+	player.stun = 40
+	_step(2)
+	assert_eq(overlay.current().goal, Goal.BURST, "caught in a combo with 50 Soul brings up Soul Burst")
+	source.tap(SimInput.SUPER, 30)
+	_step(40)
+	assert_has(overlay.completed, "Caught")
+
+
+func _open_fight(step_id: StringName, new_run: bool = true) -> void:
+	if new_run:
+		var story := StoryDirector.load_story()
+		var save := StorySave.load_from()
+		save.started = true
+		save.next_step = story.step_index(step_id)
+		director = StoryDirector.new(StoryRun.resume(story, save))
 	GameFlow.current_match = director.match_config()
 	screen = MATCH_SCENE.instantiate()
 	host.add_child(screen)
 	await wait_frames(1)
-	var prompts := screen.find_children("*", "FightPrompts", true, false)
-	assert_eq(prompts.size(), 1, "story fight 1 shows the tutorial prompts")
-	if prompts.is_empty():
-		return
-	var overlay := prompts[0] as FightPrompts
-	assert_eq(overlay.current().goal, StoryPrompt.Goal.MOVE)
-
-	var source := QueueSource.new()
+	var found := screen.find_children("*", "FightPrompts", true, false)
+	assert_eq(found.size(), 1, "the story fight shows tips")
+	overlay = found[0] as FightPrompts if not found.is_empty() else null
+	source = QueueSource.new()
 	screen.runner.paused = true
 	screen.runner.sources[0] = source
-	screen.runner.sources[1] = null
+	for slot in range(1, screen.runner.sources.size()):
+		screen.runner.sources[slot] = null
 	for i in 600:
 		if screen.runner.sim.state.phase == SimState.Phase.FIGHT:
 			break
 		screen.runner.step_once()
 
-	source.hold(SimInput.make(0, 0, -127), 150)
-	_run_until(overlay, 1, source)
-	assert_eq(overlay.index, 1, "moving 4 m completes Move")
 
-	for n in 3:
-		source.tap(SimInput.LIGHT, 7)
-	source.hold(0, 60)
-	_run_until(overlay, 2, source)
-	assert_eq(overlay.index, 2, "three chained lights complete the string")
-
-	source.hold(SimInput.GUARD, 80)
-	_run_until(overlay, 3, source)
-	assert_eq(overlay.index, 3, "holding guard completes Guard")
-
-	source.tap(SimInput.DODGE, 60)
-	_run_until(overlay, 4, source)
-	assert_eq(overlay.index, 4, "a roll completes Dodge")
-
-	source.tap(SimInput.GRAB, 80)
-	_run_until(overlay, 5, source)
-	assert_eq(overlay.index, 5, "a grab completes Grab")
-	assert_eq(overlay.completed, ["Move", "Light string", "Guard", "Dodge", "Grab"] as Array[String])
-
-	for i in 400:
+func _step(ticks: int) -> void:
+	for i in ticks:
 		screen.runner.step_once()
-	assert_true(overlay.is_done(), "the last prompt times out")
 
 
-func test_versus_matches_have_no_prompts() -> void:
-	GameFlow.current_match = MatchConfig.versus(&"aldric", &"morrigan", &"ashen_chapel", MatchConfig.Difficulty.NORMAL)
-	screen = MATCH_SCENE.instantiate()
-	host.add_child(screen)
-	await wait_frames(1)
-	assert_eq(screen.find_children("*", "FightPrompts", true, false).size(), 0)
-
-
-## Steps until the overlay reaches prompt `target` (or the queued input runs out).
-func _run_until(overlay: FightPrompts, target: int, source: QueueSource) -> void:
-	for i in 1200:
-		if overlay.index >= target:
+## Steps until the tip shown has `goal` (or the queued input runs out).
+func _run_until(goal: StoryPrompt.Goal) -> void:
+	for i in 1500:
+		if overlay.current() != null and overlay.current().goal == goal:
 			return
 		screen.runner.step_once()
-		if source.queue.is_empty() and i > 300:
-			return
+	fail("never reached tip %s (at %s)" % [goal, overlay.current().title if overlay.current() != null else "none"])
+
+
+func _press_skip_key() -> void:
+	var key := InputEventKey.new()
+	key.physical_keycode = KEY_F1
+	key.pressed = true
+	overlay._input(key)

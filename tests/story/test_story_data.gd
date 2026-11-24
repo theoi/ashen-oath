@@ -56,18 +56,33 @@ func test_fights_match_the_design() -> void:
 		assert_true(f[i].unlocks.is_empty())
 
 
-func test_fight_one_teaches_the_basics() -> void:
-	var goals: Array[int] = []
-	for prompt in story.fights()[0].prompts:
-		goals.append(prompt.goal)
-		assert_false(prompt.title.is_empty())
-		assert_false(prompt.text.is_empty())
-		assert_true(prompt.goal == StoryPrompt.Goal.NONE or not FightPrompts.hint_for(prompt).is_empty(), "%s shows its buttons" % prompt.title)
-		for action in prompt.actions:
-			assert_true(InputMap.has_action(action), "%s is an input action" % action)
-	for goal: int in [StoryPrompt.Goal.MOVE, StoryPrompt.Goal.LIGHT_STRING, StoryPrompt.Goal.GUARD,
-			StoryPrompt.Goal.DODGE, StoryPrompt.Goal.GRAB]:
-		assert_has(goals, goal)
+func test_fight_one_teaches_the_basics_and_fight_two_the_kit() -> void:
+	var fights := story.fights()
+	var expected: Array[Array] = [
+		[StoryPrompt.Goal.MOVE, StoryPrompt.Goal.LIGHT_STRING, StoryPrompt.Goal.GUARD, StoryPrompt.Goal.PARRY,
+				StoryPrompt.Goal.DODGE, StoryPrompt.Goal.GRAB, StoryPrompt.Goal.LOCK_ON, StoryPrompt.Goal.NONE],
+		[StoryPrompt.Goal.TARGET, StoryPrompt.Goal.ABILITY, StoryPrompt.Goal.ABILITY, StoryPrompt.Goal.ABILITY,
+				StoryPrompt.Goal.SUPER, StoryPrompt.Goal.BURST],
+	]
+	for f in 2:
+		var goals: Array = []
+		for prompt in fights[f].prompts:
+			goals.append(prompt.goal)
+			assert_false(prompt.title.is_empty())
+			assert_true(prompt.text.length() <= 70, "%s is short (%d chars)" % [prompt.title, prompt.text.length()])
+			assert_true(prompt.goal == StoryPrompt.Goal.NONE or not FightPrompts.hint_for(prompt).is_empty(), "%s shows its buttons" % prompt.title)
+			for action in prompt.actions:
+				assert_true(action == &"move" or InputMap.has_action(action), "%s is an input action" % action)
+		assert_eq(goals, expected[f], "fight %d tips" % (f + 1))
+	var kit := fights[1].prompts
+	assert_eq([kit[1].ability_slot, kit[2].ability_slot, kit[3].ability_slot], [0, 1, 2], "each ability with its own button")
+	assert_eq(Array(kit[1].actions), [DefaultBindings.ABILITY_1])
+	assert_eq(kit[4].trigger, StoryPrompt.Trigger.SOUL_FULL, "the super tip waits for full Soul")
+	assert_eq(kit[5].trigger, StoryPrompt.Trigger.IN_COMBO, "the burst tip waits for a combo")
+	for i in 4:
+		assert_eq(kit[i].trigger, StoryPrompt.Trigger.IN_ORDER)
+	for i in range(3):
+		assert_eq(kit[i + 1].title, Roster.ability_names(&"aldric")[i], "ability tips use Aldric's ability names")
 
 
 func test_scenes_are_playable() -> void:

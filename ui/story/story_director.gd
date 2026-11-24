@@ -111,7 +111,7 @@ func _on_match_started(screen: MatchScreen) -> void:
 	var fight := run.current_fight()
 	if fight != null and not fight.prompts.is_empty():
 		var overlay := FightPrompts.new()
-		overlay.setup(fight.prompts, screen.runner, 0)
+		overlay.setup(fight.prompts, screen.runner, 0, run.prompt_state(fight))
 		screen.add_overlay(overlay)
 
 
