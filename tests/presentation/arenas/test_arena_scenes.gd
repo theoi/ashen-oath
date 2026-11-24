@@ -3,17 +3,21 @@ extends TestCase
 ## and its dressing stays within the Compatibility-renderer budget for the web build.
 
 const ARENAS: PackedStringArray = [
-	"res://presentation/arenas/ashen_chapel/ashen_chapel.tscn",
-	"res://presentation/arenas/ashen_chapel/ashen_chapel_night.tscn",
+	"res://content/arenas/ashen_chapel.tres",
+	"res://content/arenas/ashen_chapel_night.tres",
+	"res://content/arenas/drowned_crypt.tres",
+	"res://content/arenas/drowned_crypt_depths.tres",
 ]
-## Each light adds a draw pass per object it touches in the Compatibility renderer.
-const MAX_OMNI_LIGHTS := 14
+## Each light adds a draw pass per object it touches in the Compatibility renderer. Vent
+## lights only switch on while a vent glows or burns.
+const MAX_OMNI_LIGHTS := 16
 const MAX_PARTICLES := 700
 
 
 func test_arenas_build_within_budget() -> void:
 	for path in ARENAS:
-		var scene: PackedScene = load(path)
+		var data: ArenaData = load(path)
+		var scene: PackedScene = load(data.scene)
 		var arena: ArenaView = scene.instantiate()
 		add_child_autofree(arena)
 		await wait_frames(2)

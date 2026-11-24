@@ -6,10 +6,14 @@ extends ArenaView
 ## `burning` dresses the night variant (fight 3): the fallen roof timbers smoulder, more
 ## embers rise and fire light replaces some of the moonlight.
 
-## Half extents (x, z) of the fightable floor. Collision lives in the arena's ArenaData.
+## Half extents (x, z) of the fightable floor. Collision lives in content/arenas/ashen_chapel*.tres
+## (corners chamfered; the north-west one is cut deeper around the fallen roof).
 const HALF := Vector2(12.0, 10.0)
 const WALL_THICKNESS := 1.0
 const WALL_HEIGHT := 4.0
+## wall_pillar pilasters stick out this far; those pieces sit further out so their faces
+## line up with the collision wall.
+const PILASTER_DEPTH := 0.25
 ## Nave pillars (x, z). The two western ones broke when the roof came down.
 const PILLARS: Array[Vector2] = [Vector2(-5.0, -4.5), Vector2(-5.0, 4.5), Vector2(5.0, -4.5), Vector2(5.0, 4.5)]
 const BROKEN_PILLARS: Array[int] = [0, 1]
@@ -60,7 +64,7 @@ func _build_long_walls() -> void:
 				dungeon("wall_archedwindow_open", Vector3(x, 0.0, z), yaw)
 				_build_niche(x, side)
 			elif i % 2 == 0:
-				dungeon("wall_pillar", Vector3(x, 0.0, z), yaw)
+				dungeon("wall_pillar", Vector3(x, 0.0, z + side * PILASTER_DEPTH), yaw)
 			else:
 				dungeon("wall_cracked" if (i + int(side)) % 3 == 0 else "wall", Vector3(x, 0.0, z), yaw)
 		for x: float in [-3.0, 3.0]:
@@ -68,7 +72,7 @@ func _build_long_walls() -> void:
 		_wall_torch(Vector3(-10.0, 2.1, side * HALF.y), yaw)
 		_wall_torch(Vector3(10.0, 2.1, side * HALF.y), yaw)
 		for x: float in [-8.0, -4.0, 0.0, 4.0, 8.0]:
-			_candle_row(Vector3(x, 0.0, side * (HALF.y - 0.3)), int(x) + int(side * 3.0))
+			_candle_row(Vector3(x, 0.0, side * (HALF.y - 0.15)), int(x) + int(side * 3.0))
 
 
 ## A shallow room behind a window opening: a coffin on a stone shelf, candles on the sill.
@@ -96,7 +100,8 @@ func _build_end_walls() -> void:
 		var yaw := 90.0 if side < 0.0 else -90.0
 		for z: float in [-8.0, -4.0, 4.0, 8.0]:
 			var model := "wall_pillar" if absf(z) > 6.0 else "wall"
-			dungeon(model, Vector3(x, 0.0, z), yaw)
+			var inset := PILASTER_DEPTH if model == "wall_pillar" else 0.0
+			dungeon(model, Vector3(x + side * inset, 0.0, z), yaw)
 		_wall_torch(Vector3(side * HALF.x, 2.1, -4.0), yaw)
 		_wall_torch(Vector3(side * HALF.x, 2.1, 4.0), yaw)
 
@@ -118,10 +123,11 @@ func _build_corners() -> void:
 		var t := base + Vector3(0.0, 0.0, -c.y * 0.55)
 		halloween("candle_melted", t, 30.0)
 		flame(t + Vector3(-0.09, 0.62, -0.02), 0.11)
-	var rubble := Vector3(-HALF.x + 1.4, 0.0, -HALF.y + 1.2)
-	dungeon("rubble_large", rubble, 35.0, Vector3(0.42, 0.5, 0.42))
-	block(Vector3(0.45, 0.5, 6.5), Vector3(-HALF.x + 2.6, 1.6, -HALF.y + 2.0), Vector3(28.0, 50.0, 0.0), CHAR_COLOR)
-	dungeon("pillar", Vector3(-HALF.x + 3.1, 0.15, -HALF.y + 0.75), 20.0, Vector3(0.7, 0.32, 0.7)).rotation_degrees = Vector3(0.0, 20.0, 82.0)
+	# Fallen roof in the north-west corner, kept behind the corner wall of the floor polygon
+	# (x + z < -18) so fighters never stand inside it.
+	dungeon("rubble_large", Vector3(-10.6, 0.0, -8.8), 35.0, Vector3(0.42, 0.5, 0.42))
+	beam(Vector3(-11.7, 4.5, -7.0), Vector3(-9.2, 0.15, -9.7), 0.45)
+	dungeon("pillar", Vector3(-9.4, 0.15, -9.3), 20.0, Vector3(0.7, 0.32, 0.7)).rotation_degrees = Vector3(0.0, 20.0, 82.0)
 
 
 ## Clerestory: arched windows along the long walls, broken where the roof collapsed.
@@ -214,8 +220,8 @@ func _build_atmosphere() -> void:
 	ash(Vector3(-3.0, 7.0, -1.0), Vector3(9.0, 1.0, 8.0), look.ash_amount)
 	embers(Vector3(-HALF.x + 2.0, 0.6, -HALF.y + 2.0), Vector3(1.5, 0.4, 1.5), look.ember_amount, look.ember_color)
 	if burning:
-		fire_light(Vector3(-HALF.x + 2.2, 1.2, -HALF.y + 2.2), 1.6, 9.0)
-		for p: Vector3 in [Vector3(-HALF.x + 1.4, 1.1, -HALF.y + 1.4), Vector3(-HALF.x + 2.5, 1.7, -HALF.y + 2.0), Vector3(-HALF.x + 3.4, 0.6, -HALF.y + 2.8), Vector3(-HALF.x + 1.0, 1.4, -HALF.y + 2.5)]:
+		fire_light(Vector3(-10.0, 1.4, -8.6), 1.6, 9.0)
+		for p: Vector3 in [Vector3(-10.8, 1.1, -8.6), Vector3(-10.0, 1.6, -8.8), Vector3(-9.6, 0.5, -9.3), Vector3(-11.2, 1.4, -7.6)]:
 			flame(p, 0.55)
 		embers(Vector3(0.0, 0.2, 0.0), Vector3(HALF.x, 0.2, HALF.y), look.ember_amount * 2, look.ember_color, 0.025)
 		fire_light(Vector3(PILLARS[0].x + 0.6, 2.2, 0.0), 1.2, 9.0)
@@ -223,6 +229,14 @@ func _build_atmosphere() -> void:
 			var p := PILLARS[pillar]
 			flame(Vector3(p.x + 0.4, 1.7 + 0.5 * float(pillar), p.y - 0.2), 0.35)
 			embers(Vector3(p.x, 1.9, p.y), Vector3(0.5, 0.2, 0.5), look.ember_amount >> 1, look.ember_color)
+
+
+## A charred beam (box) from `from` to `to`.
+func beam(from: Vector3, to: Vector3, thickness: float) -> MeshInstance3D:
+	var axis := to - from
+	var instance := block(Vector3(thickness, thickness, axis.length()), (from + to) * 0.5, Vector3.ZERO, CHAR_COLOR)
+	instance.look_at_from_position(instance.position, to, Vector3.UP if absf(axis.normalized().y) < 0.95 else Vector3.RIGHT)
+	return instance
 
 
 func _banner(at_wall: Vector3, yaw: float, model: String) -> void:

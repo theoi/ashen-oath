@@ -1,0 +1,8 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://presentation/arenas/drowned_crypt/drowned_crypt.gd" id="1_crypt"]
+[ext_resource type="Resource" path="res://presentation/arenas/drowned_crypt/drowned_crypt_look.tres" id="2_look"]
+
+[node name="DrownedCrypt" type="Node3D"]
+script = ExtResource("1_crypt")
+look = ExtResource("2_look")

@@ -1,0 +1,43 @@
+[gd_resource type="Resource" script_class="ArenaData" format=3]
+
+[ext_resource type="Script" path="res://content/types/arena_data.gd" id="1_arena"]
+[ext_resource type="Script" path="res://content/types/arena_obstacle.gd" id="2_obstacle"]
+
+[sub_resource type="Resource" id="Resource_obstacle_0"]
+script = ExtResource("2_obstacle")
+a = Vector2(-5, -4.5)
+b = Vector2(-5, -4.5)
+radius = 0.85
+height = 1.7
+
+[sub_resource type="Resource" id="Resource_obstacle_1"]
+script = ExtResource("2_obstacle")
+a = Vector2(-5, 4.5)
+b = Vector2(-5, 4.5)
+radius = 0.85
+height = 2.2
+
+[sub_resource type="Resource" id="Resource_obstacle_2"]
+script = ExtResource("2_obstacle")
+a = Vector2(5, -4.5)
+b = Vector2(5, -4.5)
+radius = 0.8
+height = 8
+
+[sub_resource type="Resource" id="Resource_obstacle_3"]
+script = ExtResource("2_obstacle")
+a = Vector2(5, 4.5)
+b = Vector2(5, 4.5)
+radius = 0.8
+height = 8
+
+[resource]
+script = ExtResource("1_arena")
+id = &"ashen_chapel"
+display_name = "Ashen Chapel"
+floor_polygon = PackedVector2Array(-8, -10, 10.5, -10, 12, -8.5, 12, 8.5, 10.5, 10, -10.5, 10, -12, 8.5, -12, -6)
+wall_height = 8.0
+obstacles = Array[ExtResource("2_obstacle")]([SubResource("Resource_obstacle_0"), SubResource("Resource_obstacle_1"), SubResource("Resource_obstacle_2"), SubResource("Resource_obstacle_3")])
+spawn_points = PackedVector2Array(-4, 0, 4, 0, 7, -3, -7, 3)
+scene = "res://presentation/arenas/ashen_chapel/ashen_chapel.tscn"
+camera_bounds = Rect2(-11, -9, 22, 18)
