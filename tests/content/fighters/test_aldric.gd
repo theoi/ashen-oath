@@ -193,3 +193,49 @@ func test_dash_has_two_charges() -> void:
 	_duel(8.0)
 	var ticks := F.play(sim, [SimInput.DASH] + F.held(0, 19) + [SimInput.DASH] + F.held(0, 19) + [SimInput.DASH], [], 42)
 	assert_eq(F.count_of(ticks, T.DASH), 2)
+
+## While Aldric holds (or mashes) BASIC at a foe that never acts: the most damage the foe
+## takes without a free frame, and the fewest free frames between the shield thrust (b3)
+## landing and the next hit.
+func _basic_pressure(foe_z: float, mash: bool, victim: String) -> Vector2i:
+	var cfg := F.config(2, load(ALDRIC))
+	cfg.slots[1].fighter = load(victim)
+	sim = F.fighting_sim(cfg)
+	F.place(sim, 0, 0.0, foe_z - 1.3, 0)
+	F.place(sim, 1, 0.0, foe_z, Fx.HALF_TURN)
+	me = sim.fighter(0)
+	foe = sim.fighter(1)
+	var worst := 0
+	var combo := 0
+	var after_b3 := -1
+	var shortest := 999
+	var hp := foe.hp
+	for t in 400:
+		var events := F.step(sim, (B if t % 4 < 2 else 0) if mash else B)
+		if foe.ko:
+			break
+		for e: SimEvent in events:
+			if e.type == T.HIT and e.source == 0:
+				if after_b3 >= 0:
+					shortest = mini(shortest, after_b3)
+				after_b3 = 0 if e.id == &"aldric_b3" else -1
+		var stunned := foe.action in [Action.HITSTUN, Action.AIR_HITSTUN, Action.COUNTER_STUN, Action.KNOCKDOWN]
+		combo += hp - foe.hp
+		hp = foe.hp
+		worst = maxi(worst, combo)
+		if not stunned:
+			combo = 0
+			if after_b3 >= 0:
+				after_b3 += 1
+	return Vector2i(worst, shortest)
+
+
+func test_held_or_mashed_basics_are_not_an_infinite() -> void:
+	var one_chain := 25 + 25 + 40
+	for victim: String in [HOLLOWED, ALDRIC]:
+		for foe_z: float in [0.0, 9.4]:
+			for mash: bool in [false, true]:
+				var result := _basic_pressure(foe_z, mash, victim)
+				var label := "%s at z %.1f, %s" % [victim.get_file().get_basename(), foe_z, "mashed" if mash else "held"]
+				assert_true(result.x <= one_chain, "%s: at most one chain without a free frame (%d)" % [label, result.x])
+				assert_true(result.y >= 8, "%s: free for 8+ frames after the shield thrust (%d)" % [label, result.y])
