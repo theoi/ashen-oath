@@ -15,8 +15,9 @@ const MAX_SLOTS := 4
 const STICK_DEADZONE := 24
 ## Buttons that are buffered, in priority order when pressed on the same tick.
 const BUFFER_PRIORITY: Array[int] = [
-	SimInput.SUPER, SimInput.ABILITY_1, SimInput.ABILITY_2, SimInput.ABILITY_3, SimInput.GRAB,
-	SimInput.HEAVY, SimInput.LIGHT, SimInput.DODGE, SimInput.JUMP,
+	SimInput.SUPER, SimInput.SKILL_1, SimInput.SKILL_2, SimInput.SKILL_3, SimInput.SKILL_4,
+	SimInput.SKILL_5, SimInput.SKILL_6, SimInput.GRAB, SimInput.HEAVY, SimInput.LIGHT,
+	SimInput.DODGE, SimInput.JUMP,
 ]
 const Action := FighterState.Action
 const Phase := SimState.Phase
@@ -75,16 +76,19 @@ func _init(sim_config: SimConfig) -> void:
 
 # --- Public API -------------------------------------------------------------------------
 
-## Advances one tick. `inputs[slot]` is that slot's SimInput frame (missing = neutral).
+## Advances one tick. `inputs[slot]` is that slot's SimInput frame (missing = neutral):
+## a PackedInt64Array, or a PackedInt32Array for frames without aim.
 ## Returns the events of this tick (also valid until the next step).
-func step(inputs: PackedInt32Array) -> Array[SimEvent]:
+func step(inputs: Variant) -> Array[SimEvent]:
 	_events = []
 	state.tick += 1
 	state.phase_tick += 1
 	_advance_phase()
 	var accept := state.phase == Phase.FIGHT
+	var count: int = inputs.size()
 	for f in state.fighters:
-		_read_input(f, inputs[f.slot] if f.slot < inputs.size() else 0, accept)
+		var frame: int = inputs[f.slot] if f.slot < count else 0
+		_read_input(f, SimInput.normalized(frame), accept)
 	if state.freeze > 0:
 		state.freeze -= 1
 		return _events
@@ -381,6 +385,9 @@ func _read_input(f: FighterState, frame: int, accept: bool) -> void:
 	f.buttons = held
 	f.stick_x = SimInput.stick_x(frame) if accept else 0
 	f.stick_z = SimInput.stick_z(frame) if accept else 0
+	f.aim_x = SimInput.aim_x(frame) if accept else 0
+	f.aim_z = SimInput.aim_z(frame) if accept else 0
+	f.aim_point = accept and SimInput.aim_is_point(frame)
 	if not accept:
 		f.buffer = 0
 		return
@@ -480,6 +487,74 @@ func attack_target(f: FighterState) -> FighterState:
 	if Fx.dist2_xz(f.pos, nearest.pos) <= range2:
 		return nearest
 	return null
+
+
+## The world point (y = 0) `f` aims at, at most `reach` units away (0 = aim_assist_range):
+## 1. hard lock: the locked target;
+## 2. a cursor point (SimInput.AIM_POINT): that point;
+## 3. a stick direction: the nearest enemy within aim_assist_degrees of it and within reach,
+##    else along it (`ground`: reach × deflection, at least aim_min_ground_range; else reach);
+## 4. no aim: the soft-lock target (attack_target), else along facing.
+## Points beyond reach are pulled in to reach.
+func aim_point(f: FighterState, reach: int = 0, ground: bool = false) -> Vector3i:
+	var origin := Vector3i(f.pos.x, 0, f.pos.z)
+	if reach <= 0:
+		reach = Fx.m(rules.aim_assist_range)
+	var min_ground := mini(reach, Fx.m(rules.aim_min_ground_range))
+	if f.hard_lock and f.target >= 0:
+		return _clamp_point(origin, state.fighters[f.target].pos, reach)
+	if f.aim_point:
+		return _clamp_point(origin, origin + Vector3i(f.aim_x * SimInput.AIM_UNIT, 0, f.aim_z * SimInput.AIM_UNIT), reach)
+	if f.aim_x != 0 or f.aim_z != 0:
+		var angle := Fx.angle_of(f.aim_x, f.aim_z)
+		var assisted := _assist_target(f, angle, mini(reach, Fx.m(rules.aim_assist_range)))
+		if assisted != null:
+			return _clamp_point(origin, assisted.pos, reach)
+		var dist := reach
+		if ground:
+			var deflection := mini(Fx.isqrt(f.aim_x * f.aim_x + f.aim_z * f.aim_z), SimInput.AIM_MAX)
+			dist = maxi(min_ground, reach * deflection / SimInput.AIM_MAX)
+		return origin + Fx.dir(angle, dist)
+	var target := attack_target(f)
+	if target != null:
+		return _clamp_point(origin, target.pos, reach)
+	return origin + Fx.dir(f.facing, min_ground if ground else reach)
+
+
+## Facing angle toward aim_point(f) (current facing when the point is under the fighter).
+func aim_angle(f: FighterState) -> int:
+	var point := aim_point(f)
+	if point.x == f.pos.x and point.z == f.pos.z:
+		return f.facing
+	return Fx.angle_of(point.x - f.pos.x, point.z - f.pos.z)
+
+
+func _clamp_point(origin: Vector3i, point: Vector3i, reach: int) -> Vector3i:
+	var flat := Vector3i(point.x, 0, point.z)
+	if Fx.dist_xz(origin, flat) <= reach:
+		return flat
+	return origin + Fx.with_length_xz(flat - origin, reach)
+
+
+func _assist_target(f: FighterState, angle: int, reach: int) -> FighterState:
+	var cone := Fx.deg(rules.aim_assist_degrees)
+	var in_cone: Array[FighterState] = []
+	for enemy in enemies_of(f):
+		if Fx.dist2_xz(f.pos, enemy.pos) > reach * reach:
+			continue
+		if absi(Fx.angle_diff(angle, _angle_to(f, enemy))) <= cone:
+			in_cone.append(enemy)
+	return _nearest(f, in_cone) if not in_cone.is_empty() else null
+
+
+## The nearest enemy within `dist` units in front of `f` (within 60° of facing), or null.
+func _enemy_ahead(f: FighterState, dist: int) -> FighterState:
+	var ahead: Array[FighterState] = []
+	for enemy in enemies_of(f):
+		if Fx.dist2_xz(f.pos, enemy.pos) <= dist * dist \
+				and absi(Fx.angle_diff(f.facing, _angle_to(f, enemy))) <= Fx.TURN / 6:
+			ahead.append(enemy)
+	return _nearest(f, ahead) if not ahead.is_empty() else null
 
 
 func _stick_active(f: FighterState) -> bool:
@@ -601,14 +676,14 @@ func _try_action(f: FighterState, airborne: bool) -> bool:
 		return false
 	var data := fighter_data[f.slot]
 	var bit := f.buffer
+	var skill := SimInput.SKILLS.find(bit)
+	if skill >= 0:
+		if skill < data.abilities.size() and f.cooldowns[skill] == 0:
+			return _try_move(f, data.find_move(data.abilities[skill]), bit)
+		return false
 	match bit:
 		SimInput.SUPER:
 			return _try_move(f, data.find_move(data.super_move), bit)
-		SimInput.ABILITY_1, SimInput.ABILITY_2, SimInput.ABILITY_3:
-			var ability := SimInput.ABILITIES.find(bit)
-			if ability < data.abilities.size() and f.cooldowns[ability] == 0:
-				return _try_move(f, data.find_move(data.abilities[ability]), bit)
-			return false
 		SimInput.GRAB:
 			return not airborne and _try_move(f, data.find_move(data.grab), bit)
 		SimInput.HEAVY:
@@ -686,7 +761,9 @@ func start_move(f: FighterState, move_index: int, bit: int = 0) -> void:
 	if move.soul_cost > 0:
 		f.soul -= move.soul_cost * 100
 	var target := attack_target(f)
-	if target != null:
+	if move.is_aimed():
+		_aim_move(f, move)
+	elif target != null:
 		f.facing = _angle_to(f, target)
 	elif _stick_active(f):
 		f.facing = _stick_angle(f)
@@ -699,6 +776,16 @@ func start_move(f: FighterState, move_index: int, bit: int = 0) -> void:
 	if hook != null:
 		hook.on_move_start(self, f, move)
 	_move_frame_effects(f, move)
+
+
+## Snaps an aimed move toward the aim and stores its aim point.
+func _aim_move(f: FighterState, move: MoveData) -> void:
+	if move.aims_at_point():
+		f.move_point = aim_point(f, Fx.m(move.max_range), true)
+	else:
+		f.move_point = aim_point(f)
+	if f.move_point.x != f.pos.x or f.move_point.z != f.pos.z:
+		f.facing = Fx.angle_of(f.move_point.x - f.pos.x, f.move_point.z - f.pos.z)
 
 
 func _attack(f: FighterState) -> void:
@@ -739,10 +826,8 @@ func _try_chain_or_cancel(f: FighterState, move: MoveData) -> bool:
 	var allowed := _cancel_mask(f, move)
 	if allowed == 0:
 		return false
-	var want := 0
+	var want := CancelData.INTO_ABILITY if SimInput.SKILLS.has(f.buffer) else 0
 	match f.buffer:
-		SimInput.ABILITY_1, SimInput.ABILITY_2, SimInput.ABILITY_3:
-			want = CancelData.INTO_ABILITY
 		SimInput.SUPER:
 			want = CancelData.INTO_SUPER
 		SimInput.JUMP:
@@ -799,26 +884,51 @@ func _move_motion(f: FighterState, move: MoveData) -> void:
 	var frame := f.move_frame
 	var target := _target_of(f)
 	var tracking := _tracking_of(move)
-	if target != null and frame < move.startup and tracking > 0:
-		f.facing = Fx.turn_toward(f.facing, _angle_to(f, target), tracking)
+	var aimed := move.is_aimed()
+	var follows_aim := aimed and not move.aims_at_point()
+	if frame < move.startup and tracking > 0:
+		if follows_aim:
+			f.facing = Fx.turn_toward(f.facing, aim_angle(f), tracking)
+		elif not aimed and target != null:
+			f.facing = Fx.turn_toward(f.facing, _angle_to(f, target), tracking)
 	var moved := false
+	var travel_done := false
 	for motion in move.motions:
+		if frame > motion.end_frame and motion.aim_travel != MotionData.AimTravel.NONE:
+			travel_done = true
 		if frame < motion.start_frame or frame > motion.end_frame:
 			continue
-		if motion.homing and target != null and tracking > 0:
-			f.facing = Fx.turn_toward(f.facing, _angle_to(f, target), tracking)
+		if motion.homing and tracking > 0:
+			if follows_aim:
+				f.facing = Fx.turn_toward(f.facing, aim_angle(f), tracking)
+			elif not aimed and target != null:
+				f.facing = Fx.turn_toward(f.facing, _angle_to(f, target), tracking)
 		var forward := Fx.mps(motion.forward_speed)
-		if motion.stop_at_distance > 0.0 and target != null \
-				and Fx.dist_xz(f.pos, target.pos) <= Fx.m(motion.stop_at_distance):
-			forward = 0
+		if motion.stop_at_distance > 0.0:
+			var stop := Fx.m(motion.stop_at_distance)
+			if aimed:
+				if _enemy_ahead(f, stop) != null:
+					forward = 0
+			elif target != null and Fx.dist_xz(f.pos, target.pos) <= stop:
+				forward = 0
 		var v := Fx.rotate(Vector3i(Fx.mps(motion.side_speed), 0, forward), f.facing)
+		if motion.aim_travel != MotionData.AimTravel.NONE:
+			var to_point := Vector3i(f.move_point.x - f.pos.x, 0, f.move_point.z - f.pos.z)
+			var remaining := Fx.length_xz(to_point)
+			var speed := mini(forward, remaining)
+			if motion.aim_travel == MotionData.AimTravel.ARRIVE:
+				speed = remaining / maxi(1, motion.end_frame - frame + 1)
+			v = Fx.with_length_xz(to_point, speed)
 		f.vel.x = v.x
 		f.vel.z = v.z
 		if frame == motion.start_frame and motion.up_speed > 0.0:
 			f.vel.y = Fx.mps(motion.up_speed)
 			f.grounded = false
 		moved = true
-	if not moved and f.grounded:
+	if not moved and travel_done:
+		f.vel.x = 0
+		f.vel.z = 0
+	elif not moved and f.grounded:
 		_brake(f)
 
 
@@ -841,6 +951,13 @@ func _teleport(f: FighterState, tp: TeleportData) -> void:
 			f.pos += Fx.dir(angle, Fx.m(tp.distance))
 		TeleportData.Mode.FORWARD:
 			f.pos += Fx.dir(f.facing, Fx.m(tp.distance))
+		TeleportData.Mode.AIM_POINT:
+			var move := current_move(f)
+			var reach := Fx.m(tp.max_range)
+			var origin := Vector3i(f.pos.x, 0, f.pos.z)
+			var point := _clamp_point(origin, f.move_point, reach) if move != null and move.aims_at_point() \
+					else aim_point(f, reach, true)
+			f.pos = Vector3i(point.x, f.pos.y, point.z)
 		TeleportData.Mode.BEHIND_TARGET:
 			var target := _target_of(f)
 			if target == null or Fx.dist_xz(f.pos, target.pos) > Fx.m(tp.max_range):
@@ -859,8 +976,13 @@ func _spawn_move_effect(f: FighterState, move: MoveData, effect_index: int) -> v
 	if ed.anchor == EffectData.Anchor.TARGET:
 		var target := _target_of(f)
 		var max_range := Fx.m(ed.max_range)
+		var origin := Vector3i(f.pos.x, 0, f.pos.z)
 		var spot: Vector3i
-		if target != null:
+		if move.aims_at_point():
+			spot = _clamp_point(origin, f.move_point, max_range)
+		elif move.is_aimed():
+			spot = aim_point(f, max_range, true)
+		elif target != null:
 			spot = Vector3i(target.pos.x, 0, target.pos.z)
 			if Fx.dist_xz(f.pos, spot) > max_range:
 				spot = Vector3i(f.pos.x, 0, f.pos.z) + Fx.with_length_xz(spot - Vector3i(f.pos.x, 0, f.pos.z), max_range)

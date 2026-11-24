@@ -39,7 +39,7 @@ func _physics_process(_delta: float) -> void:
 
 ## Gathers inputs, steps the sim once and emits its events.
 func step_once() -> void:
-	var inputs := PackedInt32Array()
+	var inputs := PackedInt64Array()
 	inputs.resize(sim.slot_count())
 	for slot in sim.slot_count():
 		var source: InputSource = sources[slot] if slot < sources.size() else null

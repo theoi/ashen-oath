@@ -69,6 +69,8 @@ var move_frame: int = 0
 var move_button: int = 0
 ## 0 = no contact yet, 1 = blocked/armored/parried, 2 = hit.
 var move_contact: int = 0
+## World point (y = 0) an aimed move targets (MoveData.aim other than AUTO), set on frame 1.
+var move_point: Vector3i = Vector3i.ZERO
 ## Per hitbox group (0-7): bitmask of slots already hit by this move.
 var move_hit_masks: PackedInt32Array = PackedInt32Array([0, 0, 0, 0, 0, 0, 0, 0])
 ## Frames the move has been held at its charge frame.
@@ -106,6 +108,10 @@ var buttons: int = 0
 var pressed: int = 0
 var stick_x: int = 0
 var stick_z: int = 0
+## Aim from the input frame (SimInput.aim_x/aim_z; aim_point set for cursor points).
+var aim_x: int = 0
+var aim_z: int = 0
+var aim_point: bool = false
 ## Buffered button (one SimInput bit) and its age in frames.
 var buffer: int = 0
 var buffer_age: int = 0

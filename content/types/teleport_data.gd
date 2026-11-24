@@ -9,6 +9,8 @@ enum Mode {
 	FORWARD,
 	## `distance` meters behind the target, facing it. Fails (no move) beyond `max_range`.
 	BEHIND_TARGET,
+	## Onto the move's aim point (clamped to `max_range`).
+	AIM_POINT,
 }
 
 @export var frame: int = 1

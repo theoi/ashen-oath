@@ -3,13 +3,15 @@ extends InputSource
 ## Frames from a per-tick list (index = sim tick before the step), neutral past the end.
 ## Handy for tests, demos and tutorials.
 
-var frames: PackedInt32Array = PackedInt32Array()
+var frames: PackedInt64Array = PackedInt64Array()
 ## Repeat from the start instead of going neutral at the end.
 var loop: bool = false
 
 
-func _init(source_frames: PackedInt32Array = PackedInt32Array(), looping: bool = false) -> void:
-	frames = source_frames
+## `source_frames`: a PackedInt64Array, PackedInt32Array or Array of int frames.
+func _init(source_frames: Variant = PackedInt64Array(), looping: bool = false) -> void:
+	for frame: int in source_frames:
+		frames.append(SimInput.normalized(frame))
 	loop = looping
 
 

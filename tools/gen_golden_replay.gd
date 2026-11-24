@@ -26,7 +26,7 @@ func _init() -> void:
 	var bots: Array[DebugBot] = [DebugBot.new(5), DebugBot.new(6), DebugBot.new(7)]
 	var hits := 0
 	for _t in TICKS:
-		var inputs := PackedInt32Array()
+		var inputs := PackedInt64Array()
 		for slot in 3:
 			inputs.append(bots[slot].next_frame(sim, slot))
 		for e in sim.step(inputs):
