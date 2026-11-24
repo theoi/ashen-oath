@@ -71,6 +71,12 @@ enum Weight { AUTO, BASIC, LIGHT, MEDIUM, HEAVY, MASSIVE, TICK }
 ## Throws normally lose to fighters in attack startup/active frames. Set for command grabs
 ## that only jumps and dodges beat.
 @export var throw_beats_attacks: bool = false
+## Roots a grounded victim for this many frames: no running, walking, dashing, rolling or
+## jumping (skills still work). Launches and knockdowns clear it; armor ignores it.
+@export var root_frames: int = 0
+## Applied to the victim on hit and on armored hits (debuffs such as Chill use a negative
+## speed_bonus_percent). One buff per BuffData.id: a second hit refreshes it.
+@export var victim_buff: BuffData
 ## Can be parried (projectiles and melee). Throws are never parried.
 @export var parryable: bool = true
 ## Presentation cue name for sparks/sound (events carry it).

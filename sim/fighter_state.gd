@@ -179,6 +179,9 @@ var grab_tech_left: int = 0
 var carried_ticks: int = 0
 var carried_by: int = -1
 
+## Frames left rooted (HitData.root_frames).
+var rooted: int = 0
+
 var ko: bool = false
 ## Storage for the fighter's FighterTrait script (stored charges and similar).
 var vars: PackedInt32Array = PackedInt32Array([0, 0, 0, 0, 0, 0, 0, 0])

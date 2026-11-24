@@ -46,6 +46,14 @@ func on_hit_dealt(_sim: Sim, _attacker: FighterState, _victim: FighterState, _mo
 	pass
 
 
+## Called after a hit or an armored hit (`armored`) dealt `damage` to this fighter, before
+## a KO is applied. `attacker` is null for hazards. Traits may start moves (sim.start_move)
+## or apply buffs here (shoves, Second Wind).
+func on_hit_taken(_sim: Sim, _victim: FighterState, _attacker: FighterState, _move: MoveData,
+		_hit: HitData, _damage: int, _armored: bool) -> void:
+	pass
+
+
 ## Called after this fighter parries `attacker` (attacker is -1 for effects without owner).
 func on_parry(_sim: Sim, _fighter: FighterState, _attacker: int) -> void:
 	pass

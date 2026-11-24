@@ -58,6 +58,8 @@ enum Type {
 	CHAIN_READY,
 	## A charge level was reached (amount = level; FLAG_PERFECT when the perfect zone opens).
 	CHARGE_LEVEL,
+	## The target was rooted (amount = frames).
+	ROOT,
 }
 
 const FLAG_COUNTER := 1
