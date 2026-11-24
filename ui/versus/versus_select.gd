@@ -50,7 +50,12 @@ func _ready() -> void:
 	_fight.name = "Fight"
 	_fight.custom_minimum_size.x = 200.0
 	buttons.add_child(_fight)
-	buttons.add_child(make_button("Back", go_back))
+	var back := make_button("Back", go_back)
+	buttons.add_child(back)
+	# Back sits nearer the selectors' center than Fight, so geometric focus would skip Fight.
+	_difficulty.focus_neighbor_bottom = _difficulty.get_path_to(_fight)
+	_fight.focus_neighbor_top = _fight.get_path_to(_difficulty)
+	back.focus_neighbor_top = back.get_path_to(_difficulty)
 	_notice = make_label("", &"SubtleLabel")
 	_notice.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_notice.add_theme_color_override("font_color", Palette.EMBER_BRIGHT)

@@ -79,7 +79,34 @@ func test_unlocking_while_open_updates_the_screen() -> void:
 	assert_false(versus._opponent.is_selected_locked())
 
 
+func test_down_from_the_top_reaches_fight() -> void:
+	await _open()
+	assert_true(host.get_viewport().gui_get_focus_owner() == versus._fighter, "starts on the fighter selector")
+	for i in 4:
+		_press(&"ui_down")
+		await wait_frames(1)
+	assert_eq(_focused_name(), "Fight", "fighter, opponent, arena, difficulty, Fight")
+	_press(&"ui_up")
+	await wait_frames(1)
+	assert_true(host.get_viewport().gui_get_focus_owner() == versus._difficulty, "up returns to difficulty")
+
+
+func _focused_name() -> String:
+	var owner := host.get_viewport().gui_get_focus_owner()
+	return "" if owner == null else String(owner.name)
+
+
+func _press(action: StringName) -> void:
+	for pressed: bool in [true, false]:
+		var event := InputEventAction.new()
+		event.action = action
+		event.pressed = pressed
+		Input.parse_input_event(event)
+		Input.flush_buffered_events()
+
+
 func _open() -> void:
 	versus = VERSUS.instantiate()
 	host.add_child(versus)
+	versus.focus_default()
 	await wait_frames(1)
