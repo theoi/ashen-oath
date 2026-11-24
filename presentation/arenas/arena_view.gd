@@ -539,9 +539,10 @@ func _build_environment() -> void:
 		spot.light_color = look.pool_light_color
 		spot.light_energy = look.pool_light_energy
 		spot.spot_range = look.pool_light_height + 4.0
-		spot.spot_angle = look.pool_light_angle
-		# Low exponent: brightness falls off gradually from the centre, no hard cone edge.
-		spot.spot_angle_attenuation = 0.4
+		# Wide cone with a steep angular falloff: bright centre fading to nothing well before
+		# the cone edge, so the pool has no visible rim on the floor.
+		spot.spot_angle = minf(look.pool_light_angle * 1.6, 80.0)
+		spot.spot_angle_attenuation = 3.0
 		spot.spot_attenuation = 0.4
 		spot.shadow_enabled = false
 		# Mostly diffuse: a full-strength specular glares off the crypt water toward the camera.
