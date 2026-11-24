@@ -73,6 +73,8 @@ func test_full_act_runs_every_scene_and_fight_then_opens_chapter_select() -> voi
 		assert_eq(config.menu_stack, [&"mode_select", &"story"] as Array[StringName])
 		assert_true(config.on_finished.is_valid() and config.on_started.is_valid())
 	assert_eq(matches[0].difficulty, MatchConfig.Difficulty.EASY, "fight 1 AI is capped at Easy")
+	assert_eq(matches[0].ai_cap, MatchConfig.Difficulty.EASY)
+	assert_eq(matches[4].ai_profiles, {1: &"oath_shade"} as Dictionary[int, StringName], "the Shade plays its own aggressive profile")
 	assert_eq(matches[0].rounds_to_win, 1)
 	assert_eq(matches[0].round_seconds, -1, "no timer while learning")
 	assert_eq(matches[1].fighters, [&"aldric", &"hollowed", &"hollowed"] as Array[StringName])

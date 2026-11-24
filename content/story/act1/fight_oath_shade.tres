@@ -8,6 +8,7 @@ script = ExtResource("2_eqy25")
 opponents = Array[StringName]([&"oath_shade"])
 opponent_name = "The Oath-Shade"
 arena = &"drowned_crypt_depths"
+opponent_ai_profiles = Array[StringName]([&"oath_shade"])
 opponent_soul = Array[int]([50])
 seed = 505
 id = &"fight_oath_shade"

@@ -24,6 +24,8 @@ func test_act_order_is_scene_first_and_last_with_five_fights() -> void:
 		assert_false(s.title.is_empty(), "%s has a chapter title" % s.id)
 		unique[s.id] = true
 	assert_eq(unique.size(), story.steps.size(), "step ids are unique")
+	for s in story.steps:
+		assert_eq(s.resource_path, "res://content/story/act1/%s.tres" % s.id, "%s lives in its own file" % s.id)
 
 
 func test_fights_match_the_design() -> void:
@@ -45,6 +47,9 @@ func test_fights_match_the_design() -> void:
 		assert_eq(f[i].ai_cap, e[3], "fight %d AI cap" % (i + 1))
 		assert_eq(Array(f[i].opponent_soul), e[4], "fight %d starting Soul" % (i + 1))
 		assert_false(f[i].opponent_name.is_empty())
+	assert_eq(Array(f[4].opponent_ai_profiles), [&"oath_shade"], "the Shade plays the aggressive profile")
+	assert_not_null(AiProfile.by_id(&"oath_shade"))
+	assert_eq(AiProfile.by_id(&"oath_shade").resource_path, AiProfile.PROFILE_DIR + "oath_shade.tres")
 	assert_eq(Array(f[2].unlocks), [&"morrigan"], "Morrigan unlocks after fight 3")
 	assert_eq(Array(f[3].unlocks), [&"gorrath"], "Gorrath unlocks after fight 4")
 	for i: int in [0, 1, 4]:

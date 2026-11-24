@@ -17,6 +17,9 @@ extends StoryStep
 @export var ai_cap: int = -1
 ## Max HP percent per opponent (missing = 100).
 @export var opponent_hp_percent: Array[int] = []
+## CPU profile id per opponent overriding the fighter's own (content/ai/profiles; empty or
+## missing = the fighter's profile). The Oath-Shade plays &"oath_shade".
+@export var opponent_ai_profiles: Array[StringName] = []
 ## Starting Soul per opponent (missing = 0).
 @export var opponent_soul: Array[int] = []
 ## Sim seed for the fight.
