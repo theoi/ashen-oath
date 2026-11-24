@@ -85,26 +85,26 @@ text = "Kneel. It is easier than what comes next."
 
 [sub_resource type="Resource" id="Resource_jgvvv"]
 script = ExtResource("5_fu4yd")
-position = Vector3(-1, 1.6, 4.4)
-target = Vector3(-1.2, 0.9, 0.3)
-fov = 42.0
+position = Vector3(-3.1999998, 1.9, 4.94)
+target = Vector3(-1.1, 0.9, 0.39999998)
+fov = 44.0
 
 [sub_resource type="Resource" id="Resource_35rjb"]
 script = ExtResource("5_fu4yd")
-position = Vector3(-2.6, 1.9, 4.2)
-target = Vector3(0.6, 1.3, 0.6)
+position = Vector3(4.0299997, 1.9, 5.2799997)
+target = Vector3(1.6999999, 0.9, 0.29999998)
 fov = 44.0
 
 [sub_resource type="Resource" id="Resource_cysai"]
 script = ExtResource("5_fu4yd")
-position = Vector3(-1.6, 1.8, 3)
-target = Vector3(3.2, 1.5, -0.4)
-fov = 36.0
+position = Vector3(-1.01, 1.75, 0.51)
+target = Vector3(3.1999998, 1.15, -0.39999998)
+fov = 40.0
 
 [sub_resource type="Resource" id="Resource_qvc4n"]
 script = ExtResource("5_fu4yd")
-position = Vector3(1, 1.6, 2.4)
-target = Vector3(0.2, 1.4, 1)
+position = Vector3(-0.45999998, 1.75, -2.9299998)
+target = Vector3(0.19999999, 1.15, 1)
 fov = 40.0
 
 [resource]
