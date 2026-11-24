@@ -36,7 +36,7 @@ func next_frame(sim: Sim, slot: int) -> int:
 	if dist > 6.0 and _rng.randf() < 0.02:
 		_queue([SimInput.ABILITY_3])
 		return _plan.pop_front()
-	if dist > 2.0:
+	if dist > 1.4:
 		return SimInput.from_vector(0, toward)
 	match _rng.randi() % 12:
 		0, 1:
