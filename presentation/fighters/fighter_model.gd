@@ -68,6 +68,8 @@ const HIP_HEIGHT := 0.75
 @export var spark_color: Color = Color(1.0, 0.6, 0.25)
 ## Signature colour of abilities and super effects.
 @export var accent_color: Color = Color(1.0, 0.45, 0.12)
+## Burns away into ash and embers when knocked out (Hollowed).
+@export var ash_on_death: bool = false
 
 @export_group("Animation")
 @export var idle_clip: StringName = &"Idle"
@@ -81,6 +83,7 @@ var body_material: ShaderMaterial
 var weapon_material: ShaderMaterial
 var trail_node: Node3D
 
+var _eye_materials: Array[StandardMaterial3D] = []
 var _anim_a: AnimationNodeAnimation
 var _anim_b: AnimationNodeAnimation
 var _built := false
@@ -132,6 +135,16 @@ func set_flash(color: Color, amount: float) -> void:
 		if material != null:
 			material.set_shader_parameter(&"flash_color", color)
 			material.set_shader_parameter(&"flash_amount", amount)
+
+
+## Ash dissolve amount (0 = whole, 1 = gone) on every material of the fighter.
+func set_dissolve(amount: float) -> void:
+	if body_material != null:
+		body_material.set_shader_parameter(&"dissolve", amount)
+	for material in _eye_materials:
+		material.albedo_color.a = 1.0 - amount
+		material.emission_energy_multiplier = 3.0 * (1.0 - amount)
+	visible = amount < 0.999
 
 
 ## World positions of the weapon trail segment (base, tip).
@@ -279,6 +292,8 @@ func _has_atlas(mesh_instance: MeshInstance3D) -> bool:
 
 func _eye_material() -> StandardMaterial3D:
 	var material := StandardMaterial3D.new()
+	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	_eye_materials.append(material)
 	material.albedo_color = eye_color
 	material.emission_enabled = true
 	material.emission = eye_color

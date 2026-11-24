@@ -25,9 +25,20 @@ var _ring_ages: PackedFloat32Array = PackedFloat32Array()
 var _ring_sizes: PackedFloat32Array = PackedFloat32Array()
 var _ring_next := 0
 var _effects: Dictionary[int, Node3D] = {}
+const SLOW_MOTION_TICKS := 24
+const DESATURATE_SHADER := preload("res://presentation/fight/shaders/screen_desaturate.gdshader")
+
+## Floating damage numbers and floor decals (telegraphs, counter rings, target circles).
+var numbers: DamageNumbers
+var decals: GroundDecals
+
 var _overlay: ColorRect
 var _overlay_flash := 0.0
 var _overlay_color := Color.WHITE
+var _grey: ColorRect
+var _bars: Array[ColorRect] = []
+var _letterbox_left := 0.0
+var _letterbox := 0.0
 
 func setup(match_runner: MatchRunner, fighter_views: Array[FighterView], fight_camera: FightCamera) -> void:
 	runner = match_runner
@@ -55,6 +66,31 @@ func setup(match_runner: MatchRunner, fighter_views: Array[FighterView], fight_c
 	_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_overlay.color = Color(0, 0, 0, 0)
 	layer.add_child(_overlay)
+	_grey = ColorRect.new()
+	_grey.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_grey.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var grey_material := ShaderMaterial.new()
+	grey_material.shader = DESATURATE_SHADER
+	_grey.material = grey_material
+	_grey.visible = false
+	layer.add_child(_grey)
+	layer.move_child(_grey, 0)
+	for top: bool in [true, false]:
+		var bar := ColorRect.new()
+		bar.color = Color(0.0, 0.0, 0.0, 1.0)
+		bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		bar.set_anchors_preset(Control.PRESET_TOP_WIDE if top else Control.PRESET_BOTTOM_WIDE)
+		layer.add_child(bar)
+		_bars.append(bar)
+	numbers = DamageNumbers.new()
+	numbers.name = "DamageNumbers"
+	add_child(numbers)
+	decals = GroundDecals.new()
+	decals.name = "GroundDecals"
+	add_child(decals)
+	var local := camera.focus_slot if camera != null else 0
+	numbers.local_slot = local
+	decals.setup(runner, local)
 	runner.event_emitted.connect(_on_event)
 
 
@@ -64,6 +100,7 @@ func _process(delta: float) -> void:
 	_update_sprites(delta)
 	_update_effects()
 	_update_overlay(delta)
+	_update_letterbox(delta)
 
 
 # --- Events ------------------------------------------------------------------------------
@@ -98,7 +135,8 @@ func _on_event(e: SimEvent) -> void:
 			var at := _contact_point(e)
 			flash_at(at, Color(1.0, 0.55, 0.2), 1.0, 0.1)
 			burst(at, Color(1.0, 0.6, 0.25), 12, 3.0, _away(e))
-			_shake(0.15)
+			_shake(WEIGHT_SHAKE[weight_of(e)] * 0.6)
+			numbers.show_hit(at, e.amount, weight_of(e), false, _local(e.target), true, "")
 			Sound.play(&"armor")
 		SimEvent.Type.LAUNCH:
 			Sound.play(&"launch")
@@ -128,6 +166,7 @@ func _on_event(e: SimEvent) -> void:
 			Sound.play(&"dodge", -4.0)
 		SimEvent.Type.PERFECT_DODGE:
 			_overlay_pulse(Color(0.55, 0.7, 1.0), 0.2)
+			runner.slow_motion(0.5, 12)
 			Sound.play(&"perfect_dodge")
 		SimEvent.Type.AIR_TECH, SimEvent.Type.TECH_ROLL:
 			Sound.play(&"dodge")
@@ -150,6 +189,9 @@ func _on_event(e: SimEvent) -> void:
 			_play(e.cue, &"")
 		SimEvent.Type.KO:
 			var at := _body_point(e.target)
+			var dead := _view(e.target)
+			if dead != null and dead.model.ash_on_death:
+				dead.dissolve_to_ash()
 			flash_at(at, Color(1.0, 0.9, 0.8), 1.8, 0.3)
 			_shake(0.9)
 			_overlay_pulse(Color(1.0, 1.0, 1.0), 0.3)
@@ -180,7 +222,8 @@ func _on_event(e: SimEvent) -> void:
 
 func _on_hit(e: SimEvent) -> void:
 	var at := _contact_point(e)
-	var strength := clampf(float(e.hitstop - 3) / 11.0, 0.0, 1.0)
+	var weight := weight_of(e)
+	var strength := float(weight - 1) / 4.0
 	var counter := (e.flags & SimEvent.FLAG_COUNTER) != 0
 	var super_hit := (e.flags & SimEvent.FLAG_SUPER) != 0
 	var color := _spark_color(e.source)
@@ -190,7 +233,15 @@ func _on_hit(e: SimEvent) -> void:
 		ring_at(at, Color(1.0, 0.3, 0.2), 1.6)
 		_overlay_pulse(Color(1.0, 0.35, 0.25), 0.1)
 		Sound.play(&"hit_counter")
-	_shake(0.12 + 0.4 * strength + (0.2 if counter else 0.0) + (0.25 if super_hit else 0.0))
+	_shake(WEIGHT_SHAKE[weight] + (0.15 if counter else 0.0))
+	if weight >= MASSIVE:
+		_punch(0.3)
+		ring_at(_ground_point(e.target), color, 3.0)
+		if super_hit:
+			runner.slow_motion(Feel.slow_motion(), SLOW_MOTION_TICKS)
+	if _local(e.source) or _local(e.target):
+		_rumble(weight)
+	numbers.show_hit(at, e.amount, weight, counter, _local(e.target), false, "%d>%d:%s" % [e.source, e.target, e.id])
 	if not _play(e.cue, &""):
 		Sound.play(&"hit_heavy" if strength > 0.35 else &"hit_light")
 	if strength > 0.35:
@@ -215,19 +266,62 @@ func _on_move_start(e: SimEvent) -> void:
 			Sound.play(&"swing_light", -6.0)
 
 
+## Awakening camera moment (design-lost-ark §1.6): the world dims and desaturates, letterbox
+## bars slide in, the camera swoops low and close on the caster for the freeze, then hands
+## back to gameplay framing over ~20 f.
 func _on_super_flash(e: SimEvent) -> void:
+	var seconds := float(e.amount) / 60.0
 	_overlay_color = Color(0.0, 0.0, 0.02)
 	_overlay_flash = 0.55
+	_letterbox_left = seconds + 0.35
 	Sound.play(&"super_flash")
 	var at := _body_point(e.source)
-	flash_at(at, _accent(e.source), 1.4, float(e.amount) / 60.0)
+	flash_at(at, _accent(e.source), 1.4, seconds)
+	ring_at(_ground_point(e.source), _accent(e.source), 3.5)
+	if _local(e.source):
+		_rumble(MASSIVE, 0.6)
 	if camera != null and e.source >= 0:
 		var f := runner.sim.fighter(e.source)
 		var face := Fx.angle_to_rad(f.facing)
 		var ahead := Vector3(sin(face), 0.0, cos(face))
 		var side := Vector3(ahead.z, 0.0, -ahead.x)
 		var base := runner.fighter_position(e.source)
-		camera.cinematic(base + ahead * 2.6 + side * 1.2 + Vector3.UP * 1.3, base + Vector3.UP * 1.2, 0.9)
+		camera.cinematic(base + ahead * 2.4 + side * 1.0 + Vector3.UP * 0.7, base + Vector3.UP * 1.1, seconds + 0.33)
+
+
+# --- Impact by weight (design-lost-ark §1.12) -----------------------------------------------
+
+## Camera shake, rumble (weak, strong, seconds) and spark scale per weight class
+## (index: 1 BASIC .. 5 MASSIVE; 0 unused).
+const WEIGHT_SHAKE: Array[float] = [0.0, 0.05, 0.15, 0.3, 0.55, 0.8]
+const WEIGHT_RUMBLE: Array[Vector3] = [Vector3.ZERO, Vector3(0.3, 0.0, 0.04), Vector3(0.45, 0.0, 0.07),
+		Vector3(0.45, 0.45, 0.12), Vector3(0.3, 0.8, 0.18), Vector3(0.5, 1.0, 0.3)]
+const MASSIVE := 5
+
+
+## Weight class 1..5 of a HIT/ARMOR event: SimEvent.weight (HitData.Weight) when the hit
+## has one, else derived from the hitstop it applied (old kits).
+static func weight_of(e: SimEvent) -> int:
+	if e.weight > 0:
+		return clampi(e.weight, 1, 5)
+	if e.hitstop <= 3:
+		return 1
+	if e.hitstop <= 5:
+		return 2
+	if e.hitstop <= 7:
+		return 3
+	if e.hitstop <= 10:
+		return 4
+	return 5
+
+
+func _rumble(weight: int, scale: float = 1.0) -> void:
+	var r := WEIGHT_RUMBLE[clampi(weight, 1, 5)] * Vector3(scale, scale, 1.0)
+	var k := Feel.rumble_scale()
+	if k <= 0.0:
+		return
+	for device in Input.get_connected_joypads():
+		Input.start_joy_vibration(device, clampf(r.x * k, 0.0, 1.0), clampf(r.y * k, 0.0, 1.0), r.z)
 
 
 # --- Helpers -----------------------------------------------------------------------------
@@ -246,6 +340,30 @@ func _play(id: StringName, fallback: StringName) -> bool:
 func _shake(amount: float) -> void:
 	if camera != null:
 		camera.add_trauma(amount)
+
+
+func _punch(amount: float) -> void:
+	if camera != null:
+		camera.punch(amount)
+
+
+## True for the fighter the local player controls (the camera's focus).
+func _local(slot: int) -> bool:
+	return slot >= 0 and camera != null and slot == camera.focus_slot
+
+
+func _update_letterbox(delta: float) -> void:
+	_letterbox_left = maxf(0.0, _letterbox_left - delta)
+	_letterbox = move_toward(_letterbox, 1.0 if _letterbox_left > 0.0 else 0.0, delta * 4.0)
+	var height := get_viewport().get_visible_rect().size.y * 0.11 * _letterbox
+	for i in _bars.size():
+		_bars[i].custom_minimum_size.y = height
+		_bars[i].size.y = height
+		_bars[i].position.y = 0.0 if i == 0 else get_viewport().get_visible_rect().size.y - height
+		_bars[i].visible = _letterbox > 0.001
+	_grey.visible = _letterbox > 0.001
+	if _grey.visible:
+		(_grey.material as ShaderMaterial).set_shader_parameter(&"amount", 0.75 * _letterbox)
 
 
 func _overlay_pulse(color: Color, amount: float) -> void:

@@ -54,6 +54,8 @@ func show_match(match_runner: MatchRunner, focus_slot: int = 0, arena_scene: Str
 	var bounds := config.arena.camera_bounds if config.arena != null else Rect2(-11.0, -9.0, 22.0, 18.0)
 	camera.setup(runner, focus_slot, bounds)
 	camera.make_current()
+	if config.arena != null:
+		ArenaCutaway.apply(arena, camera.yaw, config.arena.floor_polygon)
 	for source in sources:
 		if source is DeviceInputSource:
 			(source as DeviceInputSource).camera = camera

@@ -39,6 +39,10 @@ uniform float glow_pulse = 0.0;
 // Hit / armour / parry flash (presentation only).
 uniform vec3 flash_color : source_color = vec3(1.0);
 uniform float flash_amount : hint_range(0.0, 1.0) = 0.0;
+// Ash dissolve on death (0 = whole, 1 = gone): the body burns away from the head down
+// with an ember edge.
+uniform float dissolve : hint_range(0.0, 1.0) = 0.0;
+uniform vec3 dissolve_edge : source_color = vec3(1.0, 0.45, 0.12);
 // Shade look: darkens the body to smoky black with ember fresnel (Oath-Shade).
 uniform float shade_amount : hint_range(0.0, 1.0) = 0.0;
 uniform vec3 shade_edge : source_color = vec3(1.0, 0.35, 0.08);
@@ -147,6 +151,17 @@ void fragment() {
 	emission += rim_color * rim * rim_strength * 0.55;
 	// The flash reads as a rim-weighted glow so the model keeps its shape.
 	emission += flash_color * flash_amount * (0.35 + 1.6 * fres);
+	if (dissolve > 0.0) {
+		// Burns from the top: higher rest positions go first, noise breaks the line.
+		float n = fbm(rest_pos * 6.0) * 0.6 + (1.0 - clamp(rest_pos.y / 2.2, 0.0, 1.0)) * 0.4;
+		float cut = dissolve * 1.15;
+		if (n < cut) {
+			discard;
+		}
+		float edge = 1.0 - smoothstep(0.0, 0.07, n - cut);
+		col = mix(col, vec3(0.03), smoothstep(0.0, 0.5, dissolve));
+		emission += dissolve_edge * edge * 4.0;
+	}
 	ALBEDO = mix(col, flash_color, flash_amount * 0.25);
 	EMISSION = emission;
 	ROUGHNESS = rough;

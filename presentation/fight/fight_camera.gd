@@ -1,72 +1,71 @@
 class_name FightCamera
 extends Camera3D
-## Third-person fight camera: sits behind the focus fighter, frames its target, orbits
-## with the mouse / right stick and turns to face the target under hard lock. Presentation
-## only: DeviceInputSource reads this camera's yaw to make movement camera-relative.
+## The fight camera (design-lost-ark §3): high, wide and stable. A fixed yaw per arena
+## (ArenaData.camera_yaw when the arena has it), ~52° pitch, 15–20 m out, 40° FOV, a
+## critically damped follow of the player with a small lead toward the aim, and a distance
+## that pulls back only when framing needs it (with hysteresis so it does not breathe).
+## Values come from Feel (FeelTuning when present) every frame.
 ##
-## Hooks: add_trauma() for shake, cinematic() for short super shots.
+## Hooks: add_trauma() for shake, punch() for a zoom punch, cinematic() for awakening and
+## other authored shots. Presentation only: DeviceInputSource reads this camera's basis to
+## make movement camera-relative.
 
-const MOUSE_SENSITIVITY := 0.0035
-const STICK_SPEED := 2.6
-const MIN_PITCH := -0.75
-const MAX_PITCH := 0.05
+const MAX_DISTANCE := 20.0
+const FAR_ENEMY := 16.0
+const WAVE_RADIUS := 12.0
+## Framing hysteresis: pull back when the frame is this full, return below the second.
+const PULL_BACK_AT := 0.85
+const RETURN_AT := 0.65
 
 var runner: MatchRunner
 var focus_slot: int = 0
 var bounds: Rect2 = Rect2(-11.0, -9.0, 22.0, 18.0)
-## Orbit angles (radians). Yaw 0 looks along +Z.
+## World yaw the camera looks along (radians; 0 looks along +Z). Fixed per arena.
 var yaw: float = 0.0
-var orbit_pitch: float = -0.3
-var base_distance: float = 4.6
-## Over-the-shoulder offset (meters to the camera's right) so the focus fighter does not
-## hide the target.
-var shoulder: float = 1.25
-## Spectator framing (attract mode, clips): a three-quarter side view of both fighters
-## instead of over the focus fighter's shoulder.
-var spectator: bool = false
-## Reads mouse/stick orbit input (off for clips and attract mode).
+## Kept for callers (attract mode, clips); the camera never takes orbit input.
 var player_control: bool = true
+var spectator: bool = false
 
-var _trauma: float = 0.0
-var _time: float = 0.0
+var _trauma := 0.0
+var _punch := 0.0
+var _time := 0.0
 var _focus := Vector3.ZERO
-var _distance: float = 5.6
-var _shot_left: float = 0.0
-var _shot_from := Transform3D.IDENTITY
+var _focus_vel := Vector3.ZERO
+var _distance := 15.0
+var _distance_vel := 0.0
+var _want_distance := 15.0
+var _shot_left := 0.0
+var _shot_total := 0.0
 var _shot_position := Vector3.ZERO
 var _shot_look := Vector3.ZERO
 var _initialized := false
-var _arena: ArenaData
-## Smoothed fraction of the wanted distance left free by walls and pillars.
-var _clear := 1.0
-## Yaw swung away from straight-behind so a cornered fighter is framed along the wall
-## instead of from inside it (radians, relative to the target-facing yaw).
-var _wall_bias := 0.0
-## Chest points of the focus fighter and its target this frame (line-of-sight checks).
-var _me_chest := Vector3.ZERO
-var _them_chest := Vector3.ZERO
 
 
 func setup(match_runner: MatchRunner, slot: int, camera_bounds: Rect2) -> void:
 	runner = match_runner
 	focus_slot = slot
-	bounds = camera_bounds.grow(-0.4)
-	_arena = runner.sim.config.arena
-	fov = 58.0
-	near = 0.1
-	var f := runner.sim.fighter(slot)
-	yaw = Fx.angle_to_rad(f.facing)
+	bounds = camera_bounds
+	var arena := runner.sim.config.arena
+	yaw = deg_to_rad(float(arena.get(&"camera_yaw"))) if arena != null and &"camera_yaw" in arena else 0.0
+	near = 0.3
+	far = 200.0
 	_initialized = false
 
 
-## Adds screen shake (0..1, accumulates, decays over ~0.6 s).
+## Adds screen shake (0..1, accumulates, decays over ~0.6 s). Scaled by Feel.shake_scale.
 func add_trauma(amount: float) -> void:
 	_trauma = clampf(_trauma + amount, 0.0, 1.0)
 
 
-## Short cinematic shot: moves to `at` looking at `look` for `seconds` (super cameras).
+## A quick zoom toward the focus (metres of the FOV-equivalent push, decays in ~0.2 s).
+func punch(amount: float) -> void:
+	_punch = maxf(_punch, amount)
+
+
+## Short authored shot: moves to `at` looking at `look` for `seconds`, blending in and out.
 func cinematic(at: Vector3, look: Vector3, seconds: float) -> void:
 	_shot_left = seconds
+	_shot_total = seconds
 	_shot_position = at
 	_shot_look = look
 
@@ -75,214 +74,143 @@ func is_cinematic() -> bool:
 	return _shot_left > 0.0
 
 
-func _unhandled_input(event: InputEvent) -> void:
-	if not player_control:
-		return
-	if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
-		var motion: InputEventMouseMotion = event
-		yaw -= motion.relative.x * MOUSE_SENSITIVITY
-		orbit_pitch = clampf(orbit_pitch - motion.relative.y * MOUSE_SENSITIVITY, MIN_PITCH, MAX_PITCH)
+## The world point the camera is centred on (after smoothing).
+func focus_point() -> Vector3:
+	return _focus
 
 
 func _process(delta: float) -> void:
 	if runner == null or runner.sim == null:
 		return
 	_time += delta
-	var sim := runner.sim
-	var f := sim.fighter(focus_slot)
-	var me := runner.fighter_position(focus_slot)
-	var target_slot := f.target
-	var has_target := target_slot >= 0 and not sim.fighter(target_slot).ko
-	var them := runner.fighter_position(target_slot) if has_target else me
-	if player_control:
-		var stick := Input.get_axis(&"camera_left", &"camera_right")
-		yaw -= stick * STICK_SPEED * delta
-		var vertical := Input.get_axis(&"camera_up", &"camera_down")
-		orbit_pitch = clampf(orbit_pitch - vertical * STICK_SPEED * 0.5 * delta, MIN_PITCH, MAX_PITCH)
-	var to := Vector3(them.x - me.x, 0.0, them.z - me.z)
-	var separation := to.length()
-	_me_chest = me + Vector3.UP * 1.0
-	_them_chest = them + Vector3.UP * 1.0
-	var focus := me + Vector3.UP * 1.15
-	if has_target and separation < 14.0:
-		focus = focus.lerp(them + Vector3.UP * 1.0, 0.5 if spectator else 0.42)
-	var want_distance := clampf(base_distance + separation * (0.55 if spectator else 0.3), base_distance, 9.5)
-	var offset := 0.0 if spectator else shoulder
+	var pitch := Feel.camera_pitch()
+	fov = Feel.camera_fov() - 6.0 * _punch
+	var target := _target_focus()
+	var want := _framing_distance(target, pitch)
 	if not _initialized:
-		_focus = focus
-		_distance = want_distance
+		_focus = target
+		_distance = want
+		_want_distance = want
 		_initialized = true
-	_focus = _focus.lerp(focus, 1.0 - exp(-9.0 * delta))
-	_distance = lerpf(_distance, want_distance, 1.0 - exp(-3.0 * delta))
-	if has_target and separation > 0.5:
-		var desired := atan2(to.x, to.z) + (deg_to_rad(62.0) if spectator else 0.0)
-		_update_wall_bias(desired, offset, delta)
-		var aim := desired + _wall_bias
-		var off := absf(angle_difference(yaw, aim))
-		var rate := 6.0 if f.hard_lock else (1.4 if off > deg_to_rad(40.0) else 0.0)
-		if spectator:
-			rate = 1.2 if off > deg_to_rad(25.0) else 0.4
-		if _wall_bias != 0.0:
-			rate = maxf(rate, 3.0)
-		yaw = lerp_angle(yaw, aim, 1.0 - exp(-rate * delta))
-	var forward := _forward(yaw)
-	var right := Vector3(-cos(yaw), 0.0, sin(yaw))
-	var wanted := _focus - forward * _distance + right * offset
-	var clear := _free_fraction(_focus, wanted)
-	_clear = clear if clear < _clear else lerpf(_clear, clear, 1.0 - exp(-4.0 * delta))
-	# Pull in only part of the way and rise over the obstacle instead, so the camera never
-	# ends up inside a fighter.
-	var eye := _focus.lerp(wanted, lerpf(0.55, 1.0, _clear))
-	eye.y = maxf(eye.y + (1.0 - _clear) * 2.2, 0.6)
-	var xf := Transform3D(Basis.IDENTITY, eye).looking_at(_focus + right * offset * 0.5, Vector3.UP)
+	_focus = _smooth_v(_focus, target, delta, Feel.camera_smoothing())
+	_distance = _smooth_f(_distance, _want_distance, delta, 0.6)
+	var forward := Vector3(sin(yaw) * cos(pitch), -sin(pitch), cos(yaw) * cos(pitch))
+	var eye := _focus - forward * _distance
+	var xf := Transform3D(Basis.looking_at(forward, Vector3.UP), eye)
 	if _shot_left > 0.0:
 		_shot_left -= delta
 		var shot := Transform3D(Basis.IDENTITY, _shot_position).looking_at(_shot_look, Vector3.UP)
-		var w := clampf(minf(_shot_left, 0.25) / 0.25, 0.0, 1.0)
+		# Swoop in over the first 0.25 s, hold, and hand back over the last ~0.33 s (20 f).
+		var into := clampf((_shot_total - _shot_left) / 0.25, 0.0, 1.0)
+		var out := clampf(_shot_left / 0.33, 0.0, 1.0)
+		var w := minf(into, out)
+		w = w * w * (3.0 - 2.0 * w)
 		xf = xf.interpolate_with(shot, w)
 	global_transform = xf
 	_apply_shake(delta)
+	_punch = move_toward(_punch, 0.0, delta * 5.0)
 
 
-func _forward(at_yaw: float) -> Vector3:
-	return Vector3(sin(at_yaw) * cos(orbit_pitch), sin(orbit_pitch), cos(at_yaw) * cos(orbit_pitch))
-
-
-## How good a camera yaw is: the free fraction toward its spot, capped low when a pillar
-## would hide either fighter from there.
-func _clear_at(at_yaw: float, offset: float) -> float:
-	var right := Vector3(-cos(at_yaw), 0.0, sin(at_yaw))
-	var wanted := _focus - _forward(at_yaw) * _distance + right * offset
-	var clear := _free_fraction(_focus, wanted)
-	var eye := _focus.lerp(wanted, lerpf(0.55, 1.0, clear))
-	if _hugs_pillar(eye) or not (_sees(eye, _me_chest) and _sees(eye, _them_chest)):
-		return minf(clear, 0.5)
-	return clear
-
-
-## True when `eye` is so close to a pillar that it would fill the screen.
-func _hugs_pillar(eye: Vector3) -> bool:
-	if _arena == null:
-		return false
-	var e := Vector2(eye.x, eye.z)
-	for o in _arena.obstacles:
-		if eye.y < o.height and _segment_distance(e, o.a, o.b) < o.radius + 1.0:
-			return true
-	return false
-
-
-## False when a pillar taller than the sight line stands between `eye` and `point`.
-func _sees(eye: Vector3, point: Vector3) -> bool:
-	if _arena == null:
-		return true
-	var e := Vector2(eye.x, eye.z)
-	var p := Vector2(point.x, point.z)
-	var low := minf(eye.y, point.y)
-	for o in _arena.obstacles:
-		if o.height < low:
+## Player × 0.6 + enemies × 0.4 (enemies within reach), plus a lead toward the aim or the
+## move direction, clamped to the camera bounds.
+func _target_focus() -> Vector3:
+	var sim := runner.sim
+	var me := runner.fighter_position(focus_slot)
+	var f := sim.fighter(focus_slot)
+	var enemies := Vector3.ZERO
+	var count := 0
+	var reach := FAR_ENEMY if sim.slot_count() <= 2 else WAVE_RADIUS
+	for slot in sim.slot_count():
+		var other := sim.fighter(slot)
+		if slot == focus_slot or other.team == f.team or other.ko:
 			continue
-		if _segments_distance(e, p, o.a, o.b) < o.radius + 0.3:
-			return false
-	return true
+		var p := runner.fighter_position(slot)
+		if Vector2(p.x - me.x, p.z - me.z).length() > reach:
+			continue
+		enemies += p
+		count += 1
+	var focus := me
+	if count > 0:
+		focus = me * 0.6 + (enemies / float(count)) * 0.4
+	focus += _lead(f) * Feel.camera_lead()
+	focus.y = 0.9
+	focus.x = clampf(focus.x, bounds.position.x, bounds.end.x)
+	focus.z = clampf(focus.z, bounds.position.y, bounds.end.y)
+	return focus
 
 
-static func _segments_distance(p1: Vector2, p2: Vector2, q1: Vector2, q2: Vector2) -> float:
-	if Geometry2D.segment_intersects_segment(p1, p2, q1, q2) != null:
-		return 0.0
-	return minf(minf(_segment_distance(p1, q1, q2), _segment_distance(p2, q1, q2)),
-			minf(_segment_distance(q1, p1, p2), _segment_distance(q2, p1, p2)))
+## Unit lead direction: toward the cursor aim point, else the stick, else none.
+func _lead(f: FighterState) -> Vector3:
+	var aim := Vector3(float(f.get(&"aim_x")) if &"aim_x" in f else 0.0, 0.0, float(f.get(&"aim_z")) if &"aim_z" in f else 0.0)
+	if aim.length_squared() > 0.0:
+		return aim.normalized()
+	var stick := Vector3(f.stick_x, 0.0, f.stick_z)
+	return stick.normalized() if stick.length_squared() > 0.0 else Vector3.ZERO
 
 
-## Swings the camera around a fighter backed against a wall or pillar until it has room
-## behind it, and eases back to straight-behind once that is clear again.
-func _update_wall_bias(desired: float, offset: float, delta: float) -> void:
-	const ENOUGH := 0.9
-	const MAX_BIAS := 1.75
-	const STEP := 0.22
-	if _clear_at(desired + _wall_bias, offset) < ENOUGH:
-		var best := _wall_bias
-		var best_clear := -1.0
-		for k in range(1, 9):
-			for side: float in [1.0, -1.0]:
-				var bias := clampf(_wall_bias + side * STEP * k, -MAX_BIAS, MAX_BIAS)
-				var c := _clear_at(desired + bias, offset)
-				if c > best_clear + 0.02:
-					best = bias
-					best_clear = c
-			if best_clear >= ENOUGH:
-				break
-		_wall_bias = best
-	elif _wall_bias != 0.0:
-		var eased := move_toward(_wall_bias, 0.0, delta * 0.6)
-		if _clear_at(desired + eased, offset) >= 0.98:
-			_wall_bias = eased
-
-
-## How far (0..1) the camera can go from `from` toward `to` before it would enter a wall or
-## pillar (with a margin), so it pulls in instead of clipping through scenery.
-func _free_fraction(from: Vector3, to: Vector3) -> float:
-	const STEPS := 24
-	const WALL_MARGIN := 0.7
-	const PILLAR_MARGIN := 0.9
-	# A pillar the focus point is inside (fighters on both sides of it) is left to the
-	# line-of-sight check; counting it would block every direction alike.
-	var start := Vector2(from.x, from.z)
-	var pillars: Array[ArenaObstacle] = []
-	if _arena != null:
-		for o in _arena.obstacles:
-			if _segment_distance(start, o.a, o.b) >= o.radius + 0.1:
-				pillars.append(o)
-	for i in range(1, STEPS + 1):
-		var t := float(i) / STEPS
-		var p := from.lerp(to, t)
-		var p2 := Vector2(p.x, p.z)
-		var blocked := not bounds.has_point(p2)
-		if _arena != null and not blocked:
-			blocked = _outside_floor(p2, WALL_MARGIN)
-			for o in pillars:
-				if blocked:
-					break
-				if p.y < o.height + 0.5 and _segment_distance(p2, o.a, o.b) < o.radius + PILLAR_MARGIN:
-					blocked = true
-		if blocked:
-			return float(i - 1) / STEPS
-	return 1.0
-
-
-func _outside_floor(p: Vector2, margin: float) -> bool:
-	var poly := _arena.floor_polygon
-	var n := poly.size()
-	if n < 3:
-		return false
-	var area := 0.0
-	for i in n:
-		area += poly[i].cross(poly[(i + 1) % n])
-	var winding := signf(area)
-	for i in n:
-		var a := poly[i]
-		var b := poly[(i + 1) % n]
-		var edge := b - a
-		var inside := edge.cross(p - a) * winding
-		if inside < margin * edge.length():
-			return true
-	return false
-
-
-static func _segment_distance(p: Vector2, a: Vector2, b: Vector2) -> float:
-	var ab := b - a
-	var t := 0.0 if ab.length_squared() < 0.0001 else clampf((p - a).dot(ab) / ab.length_squared(), 0.0, 1.0)
-	return p.distance_to(a + ab * t)
+## Distance that keeps the player and enemies (within reach) inside the middle of the
+## frame, with hysteresis; returns the current wanted distance.
+func _framing_distance(focus: Vector3, pitch: float) -> float:
+	var sim := runner.sim
+	var base := Feel.camera_distance()
+	var half_v := tan(deg_to_rad(Feel.camera_fov()) * 0.5)
+	var aspect := get_viewport().get_visible_rect().size.aspect() if is_inside_tree() else 16.0 / 9.0
+	var right := Vector3(cos(yaw), 0.0, -sin(yaw))
+	var ahead := Vector3(sin(yaw), 0.0, cos(yaw))
+	var me := runner.fighter_position(focus_slot)
+	var f := sim.fighter(focus_slot)
+	var need := 0.0
+	var reach := FAR_ENEMY if sim.slot_count() <= 2 else WAVE_RADIUS
+	for slot in sim.slot_count():
+		var other := sim.fighter(slot)
+		if other.ko or (slot != focus_slot and other.team == f.team):
+			continue
+		var p := runner.fighter_position(slot)
+		if slot != focus_slot and Vector2(p.x - me.x, p.z - me.z).length() > reach:
+			continue
+		var d := p - focus
+		var sx := absf(d.dot(right))
+		var sz := absf(d.dot(ahead))
+		# Relative to the safe frame: the middle 80% of the screen.
+		need = maxf(need, maxf(sx / (0.8 * aspect * half_v), sz * sin(pitch) / (0.8 * half_v)))
+	var fill := need / maxf(1.0, _want_distance)
+	if fill > PULL_BACK_AT:
+		_want_distance = clampf(need / (PULL_BACK_AT - 0.05), base, MAX_DISTANCE)
+	elif fill < RETURN_AT:
+		_want_distance = clampf(maxf(base, need / RETURN_AT), base, MAX_DISTANCE)
+	_want_distance = clampf(_want_distance, base, maxf(base, MAX_DISTANCE))
+	return _want_distance
 
 
 func _apply_shake(delta: float) -> void:
 	if _trauma <= 0.0:
-		return
-	var s := _trauma * _trauma
-	var t := _time * 38.0
-	h_offset = s * 0.12 * (sin(t * 1.3) + sin(t * 2.9) * 0.5)
-	v_offset = s * 0.10 * (cos(t * 1.7) + sin(t * 3.3) * 0.5)
-	rotate_object_local(Vector3.FORWARD, s * 0.03 * sin(t * 2.1))
-	_trauma = maxf(0.0, _trauma - delta * 1.8)
-	if _trauma <= 0.0:
 		h_offset = 0.0
 		v_offset = 0.0
+		return
+	var s := _trauma * _trauma * Feel.shake_scale()
+	var t := _time * 38.0
+	h_offset = s * 0.35 * (sin(t * 1.3) + sin(t * 2.9) * 0.5)
+	v_offset = s * 0.3 * (cos(t * 1.7) + sin(t * 3.3) * 0.5)
+	rotate_object_local(Vector3.FORWARD, s * 0.02 * sin(t * 2.1))
+	_trauma = maxf(0.0, _trauma - delta * 1.8)
+
+
+## Critically damped smoothing toward `target` with time constant `smoothing` seconds.
+func _smooth_v(current: Vector3, target: Vector3, delta: float, smoothing: float) -> Vector3:
+	var omega := 2.0 / maxf(0.01, smoothing)
+	var x := omega * delta
+	var e := 1.0 / (1.0 + x + 0.48 * x * x + 0.235 * x * x * x)
+	var change := current - target
+	var temp := (_focus_vel + omega * change) * delta
+	_focus_vel = (_focus_vel - omega * temp) * e
+	return target + (change + temp) * e
+
+
+func _smooth_f(current: float, target: float, delta: float, smoothing: float) -> float:
+	var omega := 2.0 / maxf(0.01, smoothing)
+	var x := omega * delta
+	var e := 1.0 / (1.0 + x + 0.48 * x * x + 0.235 * x * x * x)
+	var change := current - target
+	var temp := (_distance_vel + omega * change) * delta
+	_distance_vel = (_distance_vel - omega * temp) * e
+	return target + (change + temp) * e

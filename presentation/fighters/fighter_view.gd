@@ -35,6 +35,13 @@ var _shake := 0.0
 var _shake_dir := Vector3.RIGHT
 var _hit_variant := 0
 var _time := 0.0
+## Ash dissolve: seconds since KO (-1 = not dissolving).
+var _ash := -1.0
+var _ash_embers: CPUParticles3D
+
+## Ash timing (design-lost-ark §1.12): 6 f freeze, then 40 f of dissolve.
+const ASH_HOLD := 0.1
+const ASH_TIME := 0.667
 
 
 ## Builds the view for `slot` of the runner's match.
@@ -103,6 +110,19 @@ func on_event(e: SimEvent) -> void:
 				_shake = 1.0
 		SimEvent.Type.ROUND_START:
 			_trail.clear()
+			_ash = -1.0
+			model.set_dissolve(0.0)
+			if _ash_embers != null:
+				_ash_embers.emitting = false
+
+
+## Burns the model away into ash with rising embers (Hollowed deaths).
+func dissolve_to_ash() -> void:
+	_ash = 0.0
+	if _ash_embers == null:
+		_ash_embers = _make_ash_embers()
+		add_child(_ash_embers)
+	_ash_embers.emitting = false
 
 
 func flash(color: Color, amount: float) -> void:
@@ -147,7 +167,11 @@ func _update(delta: float) -> void:
 	_apply_shake(delta, f)
 	if not frozen:
 		_flash = move_toward(_flash, 0.0, delta * 6.0)
+	# Blue pulse while the fighter's move can be ⚡Countered (design-lost-ark §1.9).
+	if sim.in_counter_window(f):
+		flash(Color(0.3, 0.6, 1.0), 0.45 + 0.25 * absf(sin(_time * 14.0)))
 	model.set_flash(_flash_color, _flash)
+	_update_ash(delta)
 	_trail.feed(model.trail_segment(), _pose.trail and not frozen, 0.0 if frozen else delta)
 	model.update_extras(sim, f, delta)
 
@@ -184,3 +208,46 @@ func _apply_shake(delta: float, f: FighterState) -> void:
 	if _pose.shake > 0.0:
 		offset += Vector3(sin(_time * 71.0), 0.0, cos(_time * 83.0)) * 0.015 * _pose.shake
 	_body.position = Vector3(offset.x, -FighterModel.HIP_HEIGHT + offset.y, offset.z)
+
+func _update_ash(delta: float) -> void:
+	if _ash < 0.0:
+		return
+	_ash += delta
+	var t := clampf((_ash - ASH_HOLD) / ASH_TIME, 0.0, 1.0)
+	model.set_dissolve(t)
+	if _ash_embers != null:
+		_ash_embers.emitting = t > 0.0 and t < 0.95
+		_ash_embers.global_position = global_position + Vector3.UP * lerpf(1.4, 0.3, t)
+
+
+func _make_ash_embers() -> CPUParticles3D:
+	var material := StandardMaterial3D.new()
+	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	material.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
+	material.vertex_color_use_as_albedo = true
+	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	material.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+	material.albedo_texture = FightFx._glow()
+	var quad := QuadMesh.new()
+	quad.size = Vector2(0.07, 0.07)
+	quad.material = material
+	var p := CPUParticles3D.new()
+	p.mesh = quad
+	p.amount = 60
+	p.lifetime = 1.4
+	p.local_coords = false
+	p.top_level = true
+	p.emission_shape = CPUParticles3D.EMISSION_SHAPE_BOX
+	p.emission_box_extents = Vector3(0.35, 0.3, 0.35)
+	p.direction = Vector3.UP
+	p.spread = 30.0
+	p.gravity = Vector3(0.0, 1.5, 0.0)
+	p.initial_velocity_min = 0.3
+	p.initial_velocity_max = 1.2
+	var ramp := Gradient.new()
+	ramp.set_color(0, Color(3.0, 1.2, 0.3, 1.0))
+	ramp.set_color(1, Color(0.3, 0.28, 0.26, 0.0))
+	p.color_ramp = ramp
+	p.emitting = false
+	p.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	return p
