@@ -19,6 +19,9 @@ const BY_TYPE: Dictionary[StringName, StringName] = {
 	MatchEvents.SUPER: &"super_flash",
 	MatchEvents.SOUL_BURST: &"soul_burst",
 	MatchEvents.WALL_SPLAT: &"wall_splat",
+	MatchEvents.WAVE: &"wave_start",
+	MatchEvents.STAGGER_BREAK: &"stagger_break",
+	MatchEvents.CHANNEL_BREAK: &"channel_break",
 }
 
 

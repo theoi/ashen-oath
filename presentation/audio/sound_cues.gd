@@ -44,6 +44,14 @@ const TABLE: Dictionary[StringName, Array] = {
 	&"soul_burst": [[_IMPACT + "impactSoft_heavy_000.ogg"], SFX, 2.0, 0.55, 0.0],
 	&"grave_vent": [[_IMPACT + "impactSoft_heavy_000.ogg"], SFX, 1.0, 0.38, 0.05],
 	&"wall_splat": [[_IMPACT + "impactWood_heavy_000.ogg"], SFX, 0.0, 0.7, 0.05],
+	# Story waves and bosses.
+	&"wave_start": [[_IMPACT + "impactBell_heavy_002.ogg"], SFX, -1.0, 0.4, 0.0],
+	&"mob_death": [[_IMPACT + "impactSoft_heavy_001.ogg", _IMPACT + "impactSoft_heavy_002.ogg"], SFX, -5.0, 0.6, 0.08],
+	&"spawn_rise": [[_IMPACT + "impactMining_000.ogg", _IMPACT + "impactMining_001.ogg"], SFX, -7.0, 0.42, 0.08],
+	&"root": [[_RPG + "metalLatch.ogg", _RPG + "metalClick.ogg"], SFX, -3.0, 0.5, 0.05],
+	&"stagger_break": [[_IMPACT + "impactGlass_heavy_001.ogg"], SFX, 0.0, 0.5, 0.0],
+	&"channel_start": [[_SCIFI + "forceField_000.ogg"], SFX, -2.0, 0.4, 0.0],
+	&"channel_break": [[_SCIFI + "lowFrequency_explosion_001.ogg"], SFX, 2.0, 0.55, 0.0],
 
 	# Fight presentation (FightFx routes sim events here; HitData/MoveData/EffectData cues
 	# name rows).

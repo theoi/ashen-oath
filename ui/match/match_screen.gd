@@ -7,7 +7,9 @@ extends Node
 ## node keep running. Leaving goes back to MatchConfig.menu_stack.
 
 const RESULTS_DELAY := 2.2
-const ROUND_FLOW_SOUNDS: Array[StringName] = [MatchEvents.ROUND_INTRO, MatchEvents.FIGHT, MatchEvents.TIME_UP]
+## Events the match screen voices; FightFx voices the rest (channel breaks included).
+const ROUND_FLOW_SOUNDS: Array[StringName] = [MatchEvents.ROUND_INTRO, MatchEvents.FIGHT, MatchEvents.TIME_UP,
+		MatchEvents.WAVE, MatchEvents.STAGGER_BREAK]
 
 var config: MatchConfig
 var runner: MatchRunner
@@ -133,7 +135,7 @@ func _on_stepped(events: Array[SimEvent]) -> void:
 			continue
 		hud.on_event(event)
 		# FightView's FightFx voices combat events (hits, blocks, abilities...) with
-		# per-move cues; the match screen voices only the round flow.
+		# per-move cues; the match screen voices only the round and wave flow.
 		if event["type"] in ROUND_FLOW_SOUNDS:
 			MatchSounds.play_for(event)
 		if event["type"] == MatchEvents.MATCH_WON:

@@ -19,6 +19,15 @@ func test_match_events_map_to_existing_cues() -> void:
 	assert_eq(MatchSounds.cue_for({"type": MatchEvents.HIT}), &"hit_light")
 	assert_eq(MatchSounds.cue_for({"type": MatchEvents.BLOCK, "cue": &"parry"}), &"parry", "an event's own cue wins")
 	assert_eq(MatchSounds.cue_for({"type": MatchEvents.BLOCK, "cue": &"no_such_cue"}), &"block", "unknown own cue falls back")
+	assert_eq(MatchSounds.cue_for({"type": MatchEvents.WAVE, "wave": 2, "waves": 3}), &"wave_start")
+	assert_eq(MatchSounds.cue_for({"type": MatchEvents.STAGGER_BREAK, "slot": 1}), &"stagger_break")
+	assert_eq(MatchSounds.cue_for({"type": MatchEvents.CHANNEL_BREAK, "slot": 1}), &"channel_break")
+
+
+func test_story_and_boss_cues_exist() -> void:
+	# FightFx plays these by name and falls back to generic cues when they are missing.
+	for id: StringName in [&"spawn_rise", &"root", &"channel_start", &"channel_break", &"mob_death", &"stagger_break", &"wave_start"]:
+		assert_true(Sound.has_cue(id), "cue %s" % id)
 
 
 func test_sim_events_reach_the_cue_player() -> void:

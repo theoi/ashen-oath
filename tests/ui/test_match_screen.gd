@@ -42,6 +42,64 @@ func test_one_vs_two_hud_follows_the_sim() -> void:
 	assert_almost_eq(hud.plate_for(0).health_shown(), 1.0, 0.001)
 
 
+func test_story_waves_pass_through_to_the_sim_with_cpu_wave_slots() -> void:
+	var config := MatchConfig.versus(&"aldric", &"hollowed", &"ashen_chapel", MatchConfig.Difficulty.NORMAL)
+	config.fighters = [&"aldric"]
+	config.teams = [0]
+	config.round_seconds = -1
+	config.rounds_to_win = 1
+	var grunts := WaveEntry.new()
+	grunts.fighter = MatchSetup.fighter_data(&"hollowed")
+	grunts.count = 2
+	var first := WaveData.new()
+	first.entries = [grunts]
+	first.advance_alive = 0
+	var second := WaveData.new()
+	second.entries = [grunts]
+	config.waves = [first, second]
+	config.wave_slots = 3
+	assert_eq(config.duplicate_config().waves.size(), 2, "waves survive a rematch copy")
+	await _open(config)
+	var sim := screen.runner.sim
+	assert_eq(sim.slot_count(), 4, "one config slot and three wave slots")
+	assert_eq(screen.runner.sources.size(), 4)
+	for slot in range(1, 4):
+		assert_true(screen.runner.sources[slot] is AiInputSource, "wave slot %d is a CPU" % slot)
+
+	_step_until_fight()
+	screen.runner.paused = true
+	for i in 120:
+		screen.runner.step_once()
+	await wait_frames(1)
+	assert_eq(screen.hud.wave_text(), "Wave 1 / 2")
+	assert_has(screen.hud.announced, "Wave 1")
+	assert_not_null(screen.hud.mob_for(1))
+	assert_true(screen.hud.mob_for(1).visible, "a spawned grunt is shown")
+	assert_false(screen.hud.mob_for(3).visible, "the free slot is hidden")
+
+	var ko := SimEvent.new()
+	ko.type = SimEvent.Type.KO
+	ko.source = 0
+	ko.target = 1
+	screen.view.fx._on_event(ko)
+	assert_eq(Sound.last_cue, &"mob_death", "a grunt's KO plays the lighter cue, not the KO bell")
+	ko.target = 0
+	screen.view.fx._on_event(ko)
+	assert_eq(Sound.last_cue, &"ko", "the player's KO keeps the bell")
+
+	sim._ko(sim.fighter(1))
+	sim._ko(sim.fighter(2))
+	var cues: Array[StringName] = []
+	for i in 240:
+		screen.runner.step_once()
+		cues.append(Sound.last_cue)
+	await wait_frames(1)
+	assert_eq(screen.hud.wave_text(), "Wave 2 / 2")
+	assert_has(screen.hud.announced, "Wave 2")
+	assert_false(screen.hud.announced.has("KO"), "grunt KOs are not announced")
+	assert_has(cues, &"wave_start")
+
+
 func test_pause_stops_the_sim_and_resume_continues() -> void:
 	await _open(MatchConfig.versus(&"aldric", &"morrigan", &"ashen_chapel", MatchConfig.Difficulty.NORMAL))
 	await wait_physics_frames(3)
