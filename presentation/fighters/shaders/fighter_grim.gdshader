@@ -39,6 +39,9 @@ uniform float glow_pulse = 0.0;
 // Hit / armour / parry flash (presentation only).
 uniform vec3 flash_color : source_color = vec3(1.0);
 uniform float flash_amount : hint_range(0.0, 1.0) = 0.0;
+// Status tint from debuffs (chill, ash), presentation only.
+uniform vec3 status_color : source_color = vec3(0.6, 0.85, 1.0);
+uniform float status_amount : hint_range(0.0, 1.0) = 0.0;
 // Ash dissolve on death (0 = whole, 1 = gone): the body burns away from the head down
 // with an ember edge.
 uniform float dissolve : hint_range(0.0, 1.0) = 0.0;
@@ -163,6 +166,8 @@ void fragment() {
 		col = mix(col, vec3(0.03), smoothstep(0.0, 0.5, dissolve));
 		emission += dissolve_edge * edge * 4.0;
 	}
+	col = mix(col, status_color * 0.8, status_amount * 0.3);
+	emission += status_color * rim * status_amount * 0.5;
 	ALBEDO = mix(col, flash_color, flash_amount * 0.25);
 	EMISSION = emission;
 	ROUGHNESS = rough;

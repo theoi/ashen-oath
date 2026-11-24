@@ -134,7 +134,7 @@ func _target_focus() -> Vector3:
 	var reach := FAR_ENEMY if sim.slot_count() <= 2 else WAVE_RADIUS
 	for slot in sim.slot_count():
 		var other := sim.fighter(slot)
-		if slot == focus_slot or other.team == f.team or other.ko:
+		if slot == focus_slot or other.team == f.team or other.ko or not other.active:
 			continue
 		var p := runner.fighter_position(slot)
 		if Vector2(p.x - me.x, p.z - me.z).length() > reach:
@@ -145,10 +145,23 @@ func _target_focus() -> Vector3:
 	if count > 0:
 		focus = me * 0.6 + (enemies / float(count)) * 0.4
 	focus += _lead(f) * Feel.camera_lead()
+	# The player stays within the middle 60% of the frame however the enemies spread.
+	var offset := Vector3(focus.x - me.x, 0.0, focus.z - me.z)
+	var limit := player_offset_limit(_want_distance, Feel.camera_pitch())
+	if offset.length() > limit:
+		focus = Vector3(me.x, focus.y, me.z) + offset.normalized() * limit
 	focus.y = 0.9
 	focus.x = clampf(focus.x, bounds.position.x, bounds.end.x)
 	focus.z = clampf(focus.z, bounds.position.y, bounds.end.y)
 	return focus
+
+
+## Farthest the focus may sit from the player (m on the floor) so the player stays within
+## the middle 60% of the frame at `distance` and `pitch`.
+func player_offset_limit(distance: float, pitch: float) -> float:
+	var half_v := tan(deg_to_rad(Feel.camera_fov()) * 0.5)
+	# Floor depth covered by half the frame height, roughly, at this pitch.
+	return 0.6 * distance * half_v / maxf(0.2, sin(pitch))
 
 
 ## Unit lead direction: toward the cursor aim point, else the stick, else none.
@@ -176,7 +189,7 @@ func _framing_distance(focus: Vector3, pitch: float) -> float:
 	var reach := FAR_ENEMY if sim.slot_count() <= 2 else WAVE_RADIUS
 	for slot in sim.slot_count():
 		var other := sim.fighter(slot)
-		if other.ko or (slot != focus_slot and other.team == f.team):
+		if other.ko or not other.active or (slot != focus_slot and other.team == f.team):
 			continue
 		var p := runner.fighter_position(slot)
 		if slot != focus_slot and Vector2(p.x - me.x, p.z - me.z).length() > reach:

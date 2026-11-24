@@ -137,6 +137,13 @@ func set_flash(color: Color, amount: float) -> void:
 			material.set_shader_parameter(&"flash_amount", amount)
 
 
+## Debuff tint (chill, ash) on the body: colour and 0..1 amount.
+func set_status(color: Color, amount: float) -> void:
+	if body_material != null:
+		body_material.set_shader_parameter(&"status_color", color)
+		body_material.set_shader_parameter(&"status_amount", amount)
+
+
 ## Ash dissolve amount (0 = whole, 1 = gone) on every material of the fighter.
 func set_dissolve(amount: float) -> void:
 	if body_material != null:
