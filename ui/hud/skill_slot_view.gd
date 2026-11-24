@@ -16,7 +16,6 @@ var _box: Control
 var _charge_bar: Control
 var _initials: Label
 var _count: Label
-var _counter_mark: Label
 var _name: Label
 var _prompt: InputPrompt
 var _was_ready := true
@@ -43,11 +42,6 @@ func _init(action: StringName = &"") -> void:
 	_count = _label(&"HudNumberLabel", 26)
 	_count.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_box.add_child(_count)
-	_counter_mark = _label(&"StrongLabel", 15)
-	_counter_mark.text = "⚡"
-	_counter_mark.position = Vector2(3.0, 0.0)
-	_counter_mark.add_theme_color_override("font_color", Color(0.55, 0.8, 1.0))
-	_box.add_child(_counter_mark)
 	_prompt = InputPrompt.new(action, 22.0, true)
 	_prompt.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT, Control.PRESET_MODE_MINSIZE, 2)
 	_prompt.grow_horizontal = Control.GROW_DIRECTION_BEGIN
@@ -72,7 +66,6 @@ func apply(value: HudState.Skill) -> void:
 	var left := 0.0 if following else skill.cooldown_left
 	_count.text = "" if left <= 0.0 else ("%.1f" % left if left < 1.0 else "%d" % ceili(left))
 	_initials.modulate.a = 1.0 if left <= 0.0 else 0.15
-	_counter_mark.visible = skill.counter
 	var is_ready := skill.ready()
 	if is_ready and not _was_ready:
 		_flash = 1.0
@@ -126,9 +119,22 @@ func _draw_box() -> void:
 	_box.draw_rect(rect, border, false, 2.0 if lit else 1.0)
 	if skill.follow_left > 0.0:
 		_draw_perimeter(rect.grow(-1.5), skill.follow_left / maxf(skill.follow_total, 0.001), Palette.SOUL_FULL, 3.0)
+	if skill.counter:
+		_draw_bolt(Vector2(4.0, 3.0))
 	if _flash > 0.0:
 		_box.draw_rect(rect, Color(1.0, 0.85, 0.6, 0.5 * _flash))
 		_box.draw_rect(rect.grow(2.0 * _flash), Color(1.0, 0.8, 0.5, _flash), false, 2.0)
+
+
+## The counter mark, drawn because the UI fonts have no ⚡ glyph.
+func _draw_bolt(at: Vector2) -> void:
+	var points := PackedVector2Array([Vector2(8.0, 0.0), Vector2(1.0, 9.0), Vector2(5.5, 9.0),
+			Vector2(3.5, 16.0), Vector2(11.0, 6.5), Vector2(6.5, 6.5), Vector2(9.5, 0.0)])
+	for i in points.size():
+		points[i] += at
+	_box.draw_colored_polygon(points, Color(0.55, 0.8, 1.0))
+	points.append(points[0])
+	_box.draw_polyline(points, Color(0.0, 0.0, 0.0, 0.8), 1.0)
 
 
 ## Dark pie over the part of the cooldown still to run, clockwise from 12 o'clock.
