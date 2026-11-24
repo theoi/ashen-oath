@@ -66,6 +66,7 @@ var _gauge_break := -1.0
 var _gauge_fill := 1.0
 var _status := 0.0
 var _status_color := CHILL
+var _sheen := 0.0
 
 
 ## Builds the view for `slot` of the runner's match.
@@ -180,6 +181,8 @@ func _reset_status() -> void:
 	_root_fade = 0.0
 	_status = 0.0
 	model.set_status(_status_color, 0.0)
+	_sheen = 0.0
+	model.set_sheen(0.0)
 
 
 ## Burns the model away into ash with rising embers (Hollowed deaths).
@@ -308,12 +311,17 @@ func _update_statuses(f: FighterState, delta: float) -> void:
 		_root_ring.global_position = Vector3(p.x, 0.04, p.z)
 		(_root_ring.material_override as ShaderMaterial).set_shader_parameter(&"fade", _root_fade)
 	var want := 0.0
+	var armored := false
 	for buff in f.buffs:
+		if buff.armor != 0 or buff.damage_taken_percent < 0:
+			armored = true
 		if buff.source == Sim.VICTIM_BUFF:
 			_status_color = CHILL if buff.speed_bonus_percent < 0 else ASH_TINT
 			want = 0.75 if buff.speed_bonus_percent < 0 else 0.5
 	_status = move_toward(_status, want if not f.ko else 0.0, delta * 4.0)
 	model.set_status(_status_color, _status * (0.85 + 0.15 * sin(_time * 5.0)))
+	_sheen = move_toward(_sheen, 0.8 if armored and not f.ko else 0.0, delta * 4.0)
+	model.set_sheen(_sheen)
 	var material := _gauge.material_override as ShaderMaterial
 	if _gauge_break >= 0.0:
 		_gauge_break += delta

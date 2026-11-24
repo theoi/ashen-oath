@@ -31,6 +31,8 @@ const DESATURATE_SHADER := preload("res://presentation/fight/shaders/screen_desa
 ## Floating damage numbers and floor decals (telegraphs, counter rings, target circles).
 var numbers: DamageNumbers
 var decals: GroundDecals
+## Echo afterimages (delayed re-casts).
+var echoes: EchoViews
 
 var _overlay: ColorRect
 var _overlay_flash := 0.0
@@ -88,6 +90,10 @@ func setup(match_runner: MatchRunner, fighter_views: Array[FighterView], fight_c
 	decals = GroundDecals.new()
 	decals.name = "GroundDecals"
 	add_child(decals)
+	echoes = EchoViews.new()
+	echoes.name = "EchoViews"
+	add_child(echoes)
+	echoes.setup(runner)
 	var local := camera.focus_slot if camera != null else 0
 	numbers.local_slot = local
 	decals.setup(runner, local)
@@ -226,15 +232,32 @@ func _on_event(e: SimEvent) -> void:
 			_play(&"channel_start", &"super_flash")
 		SimEvent.Type.CHANNEL_BREAK:
 			_on_channel_break(e)
+		SimEvent.Type.ECHO:
+			# The afterimage peels off the caster in a puff of smoke and embers.
+			var at := Fx.to_vec3(e.position)
+			burst(at + Vector3.UP * 0.9, Color(0.25, 0.2, 0.22), 20, 1.5, Vector3.UP)
+			burst(at + Vector3.UP * 0.9, Color(1.0, 0.4, 0.12), 10, 1.2, Vector3.UP)
+			_play(&"echo", &"")
+		SimEvent.Type.ECHO_CAST:
+			var at := Fx.to_vec3(e.position) + Vector3.UP * 1.0
+			flash_at(at, Color(1.0, 0.45, 0.15), 1.2, 0.15)
+			burst(at, Color(1.0, 0.4, 0.12), 16, 2.5, Vector3.ZERO)
+			_play(&"echo_cast", &"")
 		SimEvent.Type.KO:
 			var at := _body_point(e.target)
 			var dead := _view(e.target)
 			if dead != null and dead.model.ash_on_death:
 				dead.dissolve_to_ash()
-			flash_at(at, Color(1.0, 0.9, 0.8), 1.8, 0.3)
-			_shake(0.12, 20)
-			_overlay_pulse(Color(1.0, 1.0, 1.0), 0.3)
-			Sound.play(&"mob_death" if _is_wave_mob(e.target) else &"ko")
+			if _is_wave_mob(e.target):
+				# Mobs die in bursts: a small flash and a light shake, and the ash carries it.
+				flash_at(at, Color(1.0, 0.85, 0.7), 0.9, 0.15)
+				_shake(0.02, 6)
+				Sound.play(&"mob_death")
+			else:
+				flash_at(at, Color(1.0, 0.9, 0.8), 1.8, 0.3)
+				_shake(0.12, 20)
+				_overlay_pulse(Color(1.0, 1.0, 1.0), 0.3)
+				Sound.play(&"ko")
 		SimEvent.Type.EFFECT_SPAWN:
 			_spawn_effect(e)
 			_play(e.cue, &"")
@@ -641,6 +664,7 @@ func _spawn_effect(e: SimEvent) -> void:
 	if node.has_method(&"setup"):
 		node.call(&"setup", data, _accent(state.owner))
 	node.global_position = Fx.to_vec3(state.pos)
+	node.rotation.y = Fx.angle_to_rad(state.facing)
 	_effects[state.id] = node
 
 
@@ -648,15 +672,26 @@ func _update_effects() -> void:
 	if _effects.is_empty():
 		return
 	var alpha := 0.0 if runner.sim.state.freeze > 0 or runner.paused else runner.alpha()
-	for state in runner.sim.state.effects:
+	var sim := runner.sim
+	for state in sim.state.effects:
 		var node: Node3D = _effects.get(state.id)
 		if node == null:
 			continue
-		var data := runner.sim.effect_data(state)
+		var data := sim.effect_data(state)
 		var moving := state.age > data.delay
-		var pos := Fx.to_vec3(state.pos) + (Fx.to_vec3(state.vel) * alpha if moving else Vector3.ZERO)
+		var pos := Fx.to_vec3(state.pos)
+		if data.attach_to_owner and state.owner >= 0 and state.owner < sim.slot_count():
+			# Ride the owner's interpolated position so the effect stays glued to the body.
+			pos += runner.fighter_position(state.owner) - Fx.to_vec3(sim.fighter(state.owner).pos)
+		elif moving:
+			pos += Fx.to_vec3(state.vel) * alpha
 		node.global_position = pos
-		node.rotation.y = Fx.angle_to_rad(state.facing)
+		var facing := Fx.angle_to_rad(state.facing)
+		if data.aim_turn_rate > 0.0 or data.homing_turn_rate > 0.0:
+			# Turning effects swing smoothly between ticks.
+			node.rotation.y = lerp_angle(node.rotation.y, facing, 0.5)
+		else:
+			node.rotation.y = facing
 		if node.has_method(&"set_radius"):
 			node.call(&"set_radius", Fx.to_m(state.radius))
 

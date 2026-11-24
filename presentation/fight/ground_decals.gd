@@ -3,7 +3,7 @@ extends Node3D
 ## Floor decals for readability (design-lost-ark §1.9, §1.10):
 ## - red telegraphs on enemy attacks (areas and effects always; melee hitboxes and aimed
 ##   projectiles only when the wind-up is 12 f or more), filling from edge to centre as the
-##   hit approaches, from Sim.telegraphs();
+##   hit approaches, from Sim.telegraphs(); pending echoes in a paler, pulsing red;
 ## - the blue counter ring under a fighter whose move is in its counter window;
 ## - target circles for the local player's ground-targeted skills: the range ring and the
 ##   impact circle flash on cast and stay up while a charge/hold skill is held.
@@ -12,6 +12,8 @@ extends Node3D
 const SHADER := preload("res://presentation/fight/shaders/ground_decal.gdshader")
 const POOL := 24
 const RED := Color(1.0, 0.14, 0.08, 0.8)
+## Echo warnings: a paler, purplish red that pulses like smoke.
+const ECHO_RED := Color(0.85, 0.22, 0.4, 0.55)
 const BLUE := Color(0.3, 0.6, 1.0, 0.9)
 const AIM := Color(1.0, 0.75, 0.35, 0.75)
 const SLOW_WIND_UP := 12
@@ -64,8 +66,9 @@ func _draw_telegraphs() -> void:
 	for t in sim.telegraphs():
 		if t.team == team:
 			continue
-		# Fast melee and fast projectiles stay undecorated so duels stay quick.
-		if (not t.effect or t.shape == SimTelegraph.Shape.LINE) and t.wind_up < SLOW_WIND_UP:
+		# Fast melee and fast projectiles stay undecorated so duels stay quick; echoes always
+		# warn, since the caster is no longer there to read.
+		if not t.echo and (not t.effect or t.shape == SimTelegraph.Shape.LINE) and t.wind_up < SLOW_WIND_UP:
 			continue
 		var fill := 1.0
 		if t.frames_to_active > 0:
@@ -77,7 +80,10 @@ func _draw_telegraphs() -> void:
 			to = from
 		elif t.shape == SimTelegraph.Shape.LINE:
 			radius = maxf(radius, 0.15)
-		_place(from, to, radius, RED, fill, false, 0.0)
+		if t.echo:
+			_place(from, to, radius, ECHO_RED, fill, false, 0.6)
+		else:
+			_place(from, to, radius, RED, fill, false, 0.0)
 
 
 func _draw_counter_rings() -> void:

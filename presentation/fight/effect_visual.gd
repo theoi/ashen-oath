@@ -3,7 +3,7 @@ extends Node3D
 ## projectiles, a floor rune that erupts for delayed effects, a ground ring for shockwaves
 ## and a rising column for pillars. Colour comes from the owner's FighterModel accent.
 
-enum Kind { BOLT, RUNE, RING, PILLAR }
+enum Kind { BOLT, RUNE, RING, PILLAR, BEAM }
 
 const COLUMN_SHADER := preload("res://presentation/fight/shaders/fire_column.gdshader")
 
@@ -25,7 +25,9 @@ func setup(data: EffectData, accent: Color) -> void:
 	_data = data
 	color = accent
 	_radius = data.radius
-	if data.speed > 0.0:
+	if data.length > 0.0:
+		kind = Kind.BEAM
+	elif data.speed > 0.0 and not data.attach_to_owner:
 		kind = Kind.BOLT
 	elif data.grow_speed > 0.0:
 		kind = Kind.RING
@@ -78,6 +80,29 @@ func setup(data: EffectData, accent: Color) -> void:
 			_particles.initial_velocity_max = 7.0
 			_particles.emission_shape = CPUParticles3D.EMISSION_SHAPE_SPHERE
 			_particles.emission_sphere_radius = data.radius
+		Kind.BEAM:
+			# A horizontal column from the effect along its facing (+Z), `length` long.
+			var beam := CylinderMesh.new()
+			beam.top_radius = data.radius
+			beam.bottom_radius = data.radius
+			beam.height = data.length
+			beam.cap_top = false
+			beam.cap_bottom = false
+			_core.mesh = beam
+			_core.rotation.x = PI / 2.0
+			# The effect sits at the beam's start (its offset height included).
+			_core.position = Vector3(0.0, 0.0, data.length * 0.5)
+			_column = ShaderMaterial.new()
+			_column.shader = COLUMN_SHADER
+			_column.set_shader_parameter(&"color", Color(color, 0.9))
+			_core.material_override = _column
+			_particles = _trail_particles(48, 0.4)
+			_particles.local_coords = true
+			_particles.emission_shape = CPUParticles3D.EMISSION_SHAPE_BOX
+			_particles.emission_box_extents = Vector3(data.radius, data.radius, data.length * 0.5)
+			_particles.position = _core.position
+			_particles.initial_velocity_min = 0.5
+			_particles.initial_velocity_max = 2.0
 	add_child(_core)
 	_active = data.delay <= 0
 
@@ -126,6 +151,12 @@ func _process(delta: float) -> void:
 			if not _active:
 				_core.rotation.y += delta * 1.5
 				_material.albedo_color = _hot(0.35 + 0.3 * absf(sin(_age * 10.0)))
+		Kind.BEAM:
+			# Shoots out over 4 f, then flickers.
+			var reach := clampf(_age / 0.07, 0.0, 1.0)
+			var length := (_core.mesh as CylinderMesh).height
+			_core.scale = Vector3(1.0 + 0.08 * sin(_age * 40.0), reach, 1.0 + 0.08 * cos(_age * 33.0))
+			_core.position.z = length * 0.5 * reach
 		Kind.PILLAR:
 			var rise := clampf(_age / 0.12, 0.0, 1.0)
 			_core.scale = Vector3(1.0 + 0.06 * sin(_age * 30.0), rise, 1.0 + 0.06 * cos(_age * 27.0))
