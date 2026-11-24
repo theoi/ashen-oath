@@ -39,6 +39,7 @@ class Writer {
     if (typeof v === 'number') return num(v);
     if (typeof v === 'string') {
       if (key === 'scene' || key === 'portrait') return JSON.stringify(v);
+      if (key === 'trait_script') return `ExtResource("${this.extId('Script', v)}")`;
       if (v.startsWith('res://')) return `ExtResource("${this.extId(v.endsWith('.gd') ? 'Script' : 'Resource', v)}")`;
       return STRING_NAMES.has(key) ? `&"${v}"` : JSON.stringify(v);
     }

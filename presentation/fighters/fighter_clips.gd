@@ -58,25 +58,24 @@ const IN_PLACE: Array[StringName] = [
 	&"Running_C", &"Lie_StandUp", &"Sit_Floor_StandUp", &"Skeletons_Awaken_Standing",
 ]
 
-static var _library: AnimationLibrary
-
-
 ## The shared library (loaded once, loop modes and in-place fixes applied).
 static func library() -> AnimationLibrary:
-	if _library != null:
-		return _library
+	return TreeCache.get_or_make(&"fighter_clips_library", _load_library)
+
+
+static func _load_library() -> AnimationLibrary:
 	var scene: PackedScene = load(SOURCE)
 	var instance := scene.instantiate()
 	var player: AnimationPlayer = instance.find_child("AnimationPlayer", true, false)
-	_library = player.get_animation_library(&"")
+	var lib := player.get_animation_library(&"")
 	instance.free()
 	for clip in LOOPED:
-		if _library.has_animation(clip):
-			_library.get_animation(clip).loop_mode = Animation.LOOP_LINEAR
+		if lib.has_animation(clip):
+			lib.get_animation(clip).loop_mode = Animation.LOOP_LINEAR
 	for clip in IN_PLACE:
-		if _library.has_animation(clip):
-			_pin_hips(_library.get_animation(clip))
-	return _library
+		if lib.has_animation(clip):
+			_pin_hips(lib.get_animation(clip))
+	return lib
 
 
 static func length(clip: StringName) -> float:

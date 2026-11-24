@@ -1,0 +1,42 @@
+[gd_resource type="Resource" script_class="FighterData" format=3]
+
+[ext_resource type="Script" path="res://content/types/fighter_data.gd" id="1_fighter_data"]
+[ext_resource type="Script" path="res://content/fighters/morrigan/lantern_of_souls.gd" id="2_lantern_of_s"]
+[ext_resource type="Script" path="res://content/types/move_data.gd" id="3_move_datagd"]
+[ext_resource type="Resource" path="res://content/fighters/morrigan/moves/morrigan_l1.tres" id="4_morrigan_l1t"]
+[ext_resource type="Resource" path="res://content/fighters/morrigan/moves/morrigan_l2.tres" id="5_morrigan_l2t"]
+[ext_resource type="Resource" path="res://content/fighters/morrigan/moves/morrigan_h1.tres" id="6_morrigan_h1t"]
+[ext_resource type="Resource" path="res://content/fighters/morrigan/moves/morrigan_run_l.tres" id="7_morrigan_run"]
+[ext_resource type="Resource" path="res://content/fighters/morrigan/moves/morrigan_air_l1.tres" id="8_morrigan_air"]
+[ext_resource type="Resource" path="res://content/fighters/morrigan/moves/morrigan_air_l2.tres" id="9_morrigan_air"]
+[ext_resource type="Resource" path="res://content/fighters/morrigan/moves/morrigan_air_h.tres" id="10_morrigan_air"]
+[ext_resource type="Resource" path="res://content/fighters/morrigan/moves/morrigan_grab.tres" id="11_morrigan_gra"]
+[ext_resource type="Resource" path="res://content/fighters/morrigan/moves/morrigan_throw.tres" id="12_morrigan_thr"]
+[ext_resource type="Resource" path="res://content/fighters/morrigan/moves/morrigan_getup.tres" id="13_morrigan_get"]
+[ext_resource type="Resource" path="res://content/fighters/morrigan/moves/soul_lance.tres" id="14_soul_lancetr"]
+[ext_resource type="Resource" path="res://content/fighters/morrigan/moves/grave_grasp.tres" id="15_grave_graspt"]
+[ext_resource type="Resource" path="res://content/fighters/morrigan/moves/wraithstep.tres" id="16_wraithsteptr"]
+[ext_resource type="Resource" path="res://content/fighters/morrigan/moves/requiem_of_the_drowned.tres" id="17_requiem_of_t"]
+
+[resource]
+script = ExtResource("1_fighter_data")
+id = &"morrigan"
+display_name = "Morrigan"
+max_hp = 900
+radius = 0.42
+height = 1.9
+weight = 1.1
+run_speed = 5.6
+parry_window = 6
+light = &"morrigan_l1"
+heavy = &"morrigan_h1"
+run_light = &"morrigan_run_l"
+air_light = &"morrigan_air_l1"
+air_heavy = &"morrigan_air_h"
+grab = &"morrigan_grab"
+getup_attack = &"morrigan_getup"
+abilities = Array[StringName]([&"soul_lance", &"grave_grasp", &"wraithstep"])
+super_move = &"requiem_of_the_drowned"
+trait_script = ExtResource("2_lantern_of_s")
+scene = "res://presentation/fighters/morrigan/morrigan.tscn"
+moves = Array[ExtResource("3_move_datagd")]([ExtResource("4_morrigan_l1t"), ExtResource("5_morrigan_l2t"), ExtResource("6_morrigan_h1t"), ExtResource("7_morrigan_run"), ExtResource("8_morrigan_air"), ExtResource("9_morrigan_air"), ExtResource("10_morrigan_air"), ExtResource("11_morrigan_gra"), ExtResource("12_morrigan_thr"), ExtResource("13_morrigan_get"), ExtResource("14_soul_lancetr"), ExtResource("15_grave_graspt"), ExtResource("16_wraithsteptr"), ExtResource("17_requiem_of_t")])

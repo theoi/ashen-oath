@@ -29,10 +29,6 @@ var _overlay: ColorRect
 var _overlay_flash := 0.0
 var _overlay_color := Color.WHITE
 
-static var _glow_texture: GradientTexture2D
-static var _ring_texture: GradientTexture2D
-
-
 func setup(match_runner: MatchRunner, fighter_views: Array[FighterView], fight_camera: FightCamera) -> void:
 	runner = match_runner
 	views = fighter_views
@@ -485,33 +481,36 @@ func _make_sprite(texture: Texture2D, billboard: bool) -> MeshInstance3D:
 
 
 static func _glow() -> GradientTexture2D:
-	if _glow_texture == null:
-		var g := Gradient.new()
-		g.set_color(0, Color(1, 1, 1, 1))
-		g.add_point(0.25, Color(1, 1, 1, 0.55))
-		g.set_color(g.get_point_count() - 1, Color(1, 1, 1, 0))
-		_glow_texture = GradientTexture2D.new()
-		_glow_texture.gradient = g
-		_glow_texture.fill = GradientTexture2D.FILL_RADIAL
-		_glow_texture.fill_from = Vector2(0.5, 0.5)
-		_glow_texture.fill_to = Vector2(0.5, 0.0)
-		_glow_texture.width = 64
-		_glow_texture.height = 64
-	return _glow_texture
+	return TreeCache.get_or_make(&"fight_fx_glow", _make_glow)
 
 
 static func _ring() -> GradientTexture2D:
-	if _ring_texture == null:
-		var g := Gradient.new()
-		g.set_color(0, Color(1, 1, 1, 0))
-		g.add_point(0.72, Color(1, 1, 1, 0.0))
-		g.add_point(0.86, Color(1, 1, 1, 1.0))
-		g.set_color(g.get_point_count() - 1, Color(1, 1, 1, 0))
-		_ring_texture = GradientTexture2D.new()
-		_ring_texture.gradient = g
-		_ring_texture.fill = GradientTexture2D.FILL_RADIAL
-		_ring_texture.fill_from = Vector2(0.5, 0.5)
-		_ring_texture.fill_to = Vector2(0.5, 0.0)
-		_ring_texture.width = 128
-		_ring_texture.height = 128
-	return _ring_texture
+	return TreeCache.get_or_make(&"fight_fx_ring", _make_ring)
+
+
+static func _make_glow() -> GradientTexture2D:
+	var g := Gradient.new()
+	g.set_color(0, Color(1, 1, 1, 1))
+	g.add_point(0.25, Color(1, 1, 1, 0.55))
+	g.set_color(g.get_point_count() - 1, Color(1, 1, 1, 0))
+	return _radial(g, 64)
+
+
+static func _make_ring() -> GradientTexture2D:
+	var g := Gradient.new()
+	g.set_color(0, Color(1, 1, 1, 0))
+	g.add_point(0.72, Color(1, 1, 1, 0.0))
+	g.add_point(0.86, Color(1, 1, 1, 1.0))
+	g.set_color(g.get_point_count() - 1, Color(1, 1, 1, 0))
+	return _radial(g, 128)
+
+
+static func _radial(g: Gradient, size: int) -> GradientTexture2D:
+	var t := GradientTexture2D.new()
+	t.gradient = g
+	t.fill = GradientTexture2D.FILL_RADIAL
+	t.fill_from = Vector2(0.5, 0.5)
+	t.fill_to = Vector2(0.5, 0.0)
+	t.width = size
+	t.height = size
+	return t

@@ -66,4 +66,22 @@ const TABLE: Dictionary[StringName, Array] = {
 	&"pyre_plant": [[_IMPACT + "impactPlate_heavy_000.ogg"], SFX, 0.0, 0.5, 0.0],
 	&"pyre_pillar": [[_SCIFI + "lowFrequency_explosion_001.ogg"], SFX, 0.0, 0.8, 0.0],
 	&"pyre_wave": [[_SCIFI + "thrusterFire_000.ogg", _SCIFI + "thrusterFire_001.ogg"], SFX, 0.0, 0.6, 0.03],
+	# Morrigan
+	&"hit_staff": [[_IMPACT + "impactWood_heavy_000.ogg", _IMPACT + "impactPunch_heavy_000.ogg", _IMPACT + "impactPunch_heavy_001.ogg"], SFX, -3.0, 0.9, 0.06],
+	&"hit_soul": [[_SCIFI + "forceField_000.ogg", _SCIFI + "forceField_001.ogg", _SCIFI + "forceField_002.ogg"], SFX, -2.0, 0.7, 0.06],
+	&"soul_lance_cast": [[_SCIFI + "laserLarge_000.ogg"], SFX, -4.0, 0.55, 0.04],
+	&"soul_lance": [[_SCIFI + "laserLarge_001.ogg"], SFX, -4.0, 0.7, 0.05],
+	&"soul_shard": [[_SCIFI + "laserLarge_000.ogg", _SCIFI + "laserLarge_001.ogg"], SFX, -8.0, 1.1, 0.08],
+	&"grave_grasp_cast": [[_RPG + "cloth3.ogg"], SFX, -3.0, 0.6, 0.05],
+	&"grave_grasp": [[_SCIFI + "slime_000.ogg"], SFX, -2.0, 0.5, 0.05],
+	&"wraithstep": [[_SCIFI + "forceField_002.ogg"], SFX, -4.0, 1.3, 0.06],
+	&"requiem_rise": [[_IMPACT + "impactBell_heavy_001.ogg"], SFX, 0.0, 0.5, 0.0],
+	&"requiem_hands": [[_SCIFI + "lowFrequency_explosion_000.ogg"], SFX, 1.0, 0.6, 0.0],
+	# Gorrath
+	&"chain_throw": [[_RPG + "drawKnife1.ogg", _RPG + "drawKnife2.ogg"], SFX, -2.0, 0.6, 0.05],
+	&"hit_chain": [[_IMPACT + "impactMetal_medium_000.ogg", _IMPACT + "impactMetal_medium_001.ogg", _IMPACT + "impactMetal_medium_002.ogg"], SFX, -1.0, 0.7, 0.05],
+	&"earthsplitter": [[_IMPACT + "impactMining_000.ogg", _IMPACT + "impactMining_001.ogg"], SFX, 0.0, 0.55, 0.04],
+	&"earthsplitter_wave": [[_SCIFI + "lowFrequency_explosion_000.ogg"], SFX, -1.0, 0.9, 0.05],
+	&"bull_rush": [[_IMPACT + "footstep_concrete_000.ogg"], SFX, -1.0, 0.5, 0.05],
+	&"execution_chain": [[_RPG + "metalLatch.ogg", _RPG + "metalClick.ogg"], SFX, 0.0, 0.5, 0.0],
 }

@@ -1,0 +1,26 @@
+[gd_resource type="Resource" script_class="MoveData" format=3]
+
+[ext_resource type="Script" path="res://content/types/move_data.gd" id="1_move_datagd"]
+[ext_resource type="Script" path="res://content/types/teleport_data.gd" id="2_teleport_dat"]
+
+[sub_resource type="Resource" id="Teleport_1"]
+script = ExtResource("2_teleport_dat")
+frame = 3
+mode = 0
+distance = 5
+
+[resource]
+script = ExtResource("1_move_datagd")
+id = &"wraithstep"
+kind = 6
+startup = 4
+active = 1
+recovery = 10
+cooldown = 300
+air_ok = true
+gravity_percent = 0
+invuln_start = 1
+invuln_end = 12
+animation = &"Dodge_Forward"
+cue = &"wraithstep"
+teleport = SubResource("Teleport_1")

@@ -1,0 +1,50 @@
+[gd_resource type="Resource" script_class="MoveData" format=3]
+
+[ext_resource type="Script" path="res://content/types/move_data.gd" id="1_move_datagd"]
+[ext_resource type="Script" path="res://content/types/motion_data.gd" id="2_motion_datag"]
+[ext_resource type="Script" path="res://content/types/hitbox_data.gd" id="3_hitbox_datag"]
+[ext_resource type="Script" path="res://content/types/hit_data.gd" id="4_hit_datagd"]
+
+[sub_resource type="Resource" id="Motion_1"]
+script = ExtResource("2_motion_datag")
+start_frame = 4
+end_frame = 35
+forward_speed = 15
+homing = true
+
+[sub_resource type="Resource" id="Hit_3"]
+script = ExtResource("4_hit_datagd")
+damage = 80
+hitstun = 30
+blockstun = 14
+knockback = 2.5
+block_pushback = 1.2
+carry_frames = 22
+wall_splat = true
+wall_splat_bonus = 40
+cue = &"hit_heavy"
+
+[sub_resource type="Resource" id="Hitbox_2"]
+script = ExtResource("3_hitbox_datag")
+offset = Vector3(0, 1.1, 0.8)
+radius = 0.75
+destroys_projectiles = false
+hit = SubResource("Hit_3")
+
+[resource]
+script = ExtResource("1_move_datagd")
+id = &"bull_rush"
+kind = 6
+startup = 10
+active = 26
+recovery = 26
+cooldown = 420
+animation = &"Block_Attack"
+cue = &"bull_rush"
+armor_start = 1
+armor_end = 35
+armor_hits = 2
+armor_damage_percent = 100
+tracking = 3
+motions = Array[ExtResource("2_motion_datag")]([SubResource("Motion_1")])
+hitboxes = Array[ExtResource("3_hitbox_datag")]([SubResource("Hitbox_2")])

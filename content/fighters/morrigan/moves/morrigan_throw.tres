@@ -1,0 +1,30 @@
+[gd_resource type="Resource" script_class="MoveData" format=3]
+
+[ext_resource type="Script" path="res://content/types/move_data.gd" id="1_move_datagd"]
+[ext_resource type="Script" path="res://content/types/hitbox_data.gd" id="2_hitbox_datag"]
+[ext_resource type="Script" path="res://content/types/hit_data.gd" id="3_hit_datagd"]
+
+[sub_resource type="Resource" id="Hit_2"]
+script = ExtResource("3_hit_datagd")
+damage = 85
+hitstun = 30
+reaction = 1
+knockback = 3.2
+wall_splat = true
+cue = &"hit_soul"
+
+[sub_resource type="Resource" id="Hitbox_1"]
+script = ExtResource("2_hitbox_datag")
+offset = Vector3(0, 1, 0.6)
+radius = 0.8
+hit = SubResource("Hit_2")
+
+[resource]
+script = ExtResource("1_move_datagd")
+id = &"morrigan_throw"
+kind = 5
+startup = 20
+active = 2
+recovery = 20
+animation = &"Spellcast_Shoot"
+hitboxes = Array[ExtResource("2_hitbox_datag")]([SubResource("Hitbox_1")])

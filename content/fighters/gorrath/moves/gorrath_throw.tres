@@ -1,0 +1,30 @@
+[gd_resource type="Resource" script_class="MoveData" format=3]
+
+[ext_resource type="Script" path="res://content/types/move_data.gd" id="1_move_datagd"]
+[ext_resource type="Script" path="res://content/types/hitbox_data.gd" id="2_hitbox_datag"]
+[ext_resource type="Script" path="res://content/types/hit_data.gd" id="3_hit_datagd"]
+
+[sub_resource type="Resource" id="Hit_2"]
+script = ExtResource("3_hit_datagd")
+damage = 120
+hitstun = 32
+reaction = 1
+knockback = 3.5
+wall_splat = true
+cue = &"hit_heavy"
+
+[sub_resource type="Resource" id="Hitbox_1"]
+script = ExtResource("2_hitbox_datag")
+offset = Vector3(0, 1, 0.6)
+radius = 0.9
+hit = SubResource("Hit_2")
+
+[resource]
+script = ExtResource("1_move_datagd")
+id = &"gorrath_throw"
+kind = 5
+startup = 22
+active = 2
+recovery = 22
+animation = &"Throw"
+hitboxes = Array[ExtResource("2_hitbox_datag")]([SubResource("Hitbox_1")])

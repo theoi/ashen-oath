@@ -1,0 +1,19 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://presentation/fighters/fighter_model.gd" id="1_script"]
+[ext_resource type="PackedScene" path="res://assets/kaykit-adventurers/Mage.glb" id="2_model"]
+
+[node name="Morrigan" type="Node3D"]
+script = ExtResource("1_script")
+model = ExtResource("2_model")
+model_scale = 0.76
+hide_meshes = PackedStringArray("Spellbook", "Spellbook_open", "1H_Wand")
+eye_color = Color(0.45, 1, 0.8, 1)
+tint = Color(0.72, 0.8, 0.86, 1)
+desaturate = 0.7
+brightness = 0.78
+rim_color = Color(0.4, 1, 0.8, 1)
+trail_tip = Vector3(0, 1.6, 0)
+trail_color = Color(0.4, 1, 0.78, 0.55)
+spark_color = Color(0.5, 1, 0.85, 1)
+accent_color = Color(0.3, 0.95, 0.75, 1)

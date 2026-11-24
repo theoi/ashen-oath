@@ -1,0 +1,67 @@
+[gd_resource type="Resource" script_class="MoveData" format=3]
+
+[ext_resource type="Script" path="res://content/types/move_data.gd" id="1_move_datagd"]
+[ext_resource type="Script" path="res://content/types/effect_data.gd" id="2_effect_datag"]
+[ext_resource type="Script" path="res://content/types/hit_data.gd" id="3_hit_datagd"]
+
+[sub_resource type="Resource" id="Hit_2"]
+script = ExtResource("3_hit_datagd")
+damage = 60
+hitstun = 20
+blockstun = 12
+knockback = 0.6
+cue = &"hit_soul"
+
+[sub_resource type="Resource" id="Effect_1"]
+script = ExtResource("2_effect_datag")
+id = &"soul_lance_bolt"
+spawn_frame = 16
+anchor = 0
+offset = Vector3(0, 1.2, 0.8)
+speed = 18
+travel = 20
+radius = 0.35
+lifetime = 80
+destroy_on_contact = true
+destroyable = true
+blocked_by_walls = true
+projectile = true
+cue = &"soul_lance"
+hit = SubResource("Hit_2")
+
+[sub_resource type="Resource" id="Hit_4"]
+script = ExtResource("3_hit_datagd")
+damage = 30
+hitstun = 20
+blockstun = 12
+knockback = 0.6
+cue = &"hit_soul"
+
+[sub_resource type="Resource" id="Effect_3"]
+script = ExtResource("2_effect_datag")
+id = &"soul_lance_shard"
+spawn_frame = 999
+anchor = 0
+offset = Vector3(0, 1.2, 0.8)
+speed = 20
+travel = 16
+radius = 0.3
+lifetime = 80
+destroy_on_contact = true
+destroyable = true
+blocked_by_walls = true
+projectile = true
+cue = &"soul_shard"
+hit = SubResource("Hit_4")
+
+[resource]
+script = ExtResource("1_move_datagd")
+id = &"soul_lance"
+kind = 6
+startup = 16
+active = 1
+recovery = 20
+cooldown = 150
+animation = &"Spellcast_Shoot"
+cue = &"soul_lance_cast"
+effects = Array[ExtResource("2_effect_datag")]([SubResource("Effect_1"), SubResource("Effect_3")])
