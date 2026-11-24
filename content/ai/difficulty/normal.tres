@@ -1,0 +1,11 @@
+[gd_resource type="Resource" script_class="AiDifficulty" format=3]
+
+[ext_resource type="Script" path="res://ai/ai_difficulty.gd" id="1_5guhx"]
+
+[resource]
+script = ExtResource("1_5guhx")
+reaction_jitter = 6
+attack_gap = 40
+aggression = 90
+strategy_period = 8
+hesitation_ticks = 24

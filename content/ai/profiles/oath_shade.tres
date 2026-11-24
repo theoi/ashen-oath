@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="AiProfile" format=3]
+
+[ext_resource type="Script" path="res://ai/ai_profile.gd" id="1_5rug8"]
+
+[resource]
+script = ExtResource("1_5rug8")
+id = &"oath_shade"
+preferred_min = 1.0
+preferred_max = 2.6
+approach = 150
+pressure = 150
+bait = 80
+defend = 60
+retreat = 30
+punish = 140
+aggression = 140
+jump_in = 12
+grab = 40
+ability_bias = PackedInt32Array(100, 100, 100)
+burst_bias = 1

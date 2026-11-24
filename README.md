@@ -48,6 +48,9 @@ tools/capture_clip.sh res://ui/app/menu_app.tscn /tmp/clip.mp4 180
 # Play story mode Act 1 end to end through the real game (args: tests/story/story_autoplay.gd)
 tools/story_playthrough.sh --fast=8 --skip-scenes
 
+# AI-vs-AI soak / difficulty harness (headless): win rates, round lengths, stuck states, errors
+tools/ai_soak.sh --matches=40 --levels=nightmare,easy --arena=ashen_chapel
+
 # Screenshot after N frames; --menu= opens a menu screen stack directly (ids in ui/app/game_flow.gd)
 tools/capture_screenshot.sh /tmp/settings.png 30 -- --menu=mode_select,settings
 ```
@@ -85,6 +88,7 @@ fail CI even without a dedicated test.
 |---|---|
 | `sim/` | The deterministic combat simulation: `state(t+1) = step(state(t), inputs(t))` at 60 Hz. Plain data and pure logic, no scene tree, nodes, engine physics or rendering, so it runs and tests headless. |
 | `content/` | Data-driven content as Godot `Resource`s: moves, fighters, arenas, story. Adding a fighter or arena should be mostly data plus art. |
+| `ai/` | The CPU opponent: an `InputSource` with strategy, tactics and reaction layers, difficulty and profile Resources, and a headless AI-vs-AI runner. See [ai/README.md](ai/README.md). |
 | `presentation/` | Everything that *reads* simulation state and events: models, animation, VFX, camera, audio, arena scenes. Never writes simulation state. |
 | `ui/` | Menus, HUD, settings, controls screen, input bindings, theme, story scene player. See [ui/README.md](ui/README.md). |
 | `assets/` | Third-party CC0 assets, one folder per pack with its license file. Credit each in `CREDITS.md`. |

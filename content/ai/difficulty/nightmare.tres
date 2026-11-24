@@ -1,0 +1,27 @@
+[gd_resource type="Resource" script_class="AiDifficulty" format=3]
+
+[ext_resource type="Script" path="res://ai/ai_difficulty.gd" id="1_s68re"]
+
+[resource]
+script = ExtResource("1_s68re")
+level = 3
+display_name = "Nightmare"
+reaction_delay = 8
+reaction_jitter = 2
+defend_chance = 90
+parry_percent = 40
+dodge_percent = 35
+anticipate_guard_percent = 80
+hold_guard_percent = 90
+tech_chance = 90
+punish_chance = 95
+combo_level = 3
+super_use = 3
+burst_chance = 90
+attack_gap = 22
+aggression = 110
+hesitation_percent = 0
+hesitation_ticks = 0
+whiff_percent = 0
+aim_noise_degrees = 0
+attack_tokens = 2

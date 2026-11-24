@@ -28,22 +28,39 @@ static func sim_config(config: MatchConfig) -> SimConfig:
 	return cfg
 
 
-## One input source per slot: the local device for human slots, the CPU for the rest.
+## One input source per slot: the local device for human slots, the CPU for the rest (every
+## slot in attract mode).
 static func input_sources(config: MatchConfig, camera: Camera3D) -> Array[InputSource]:
 	var sources: Array[InputSource] = []
+	# CPU fighters on one team share attack tokens (1v2: one attacker at a time).
+	var per_team: Dictionary[int, int] = {}
 	for slot in config.slot_count():
-		if config.attract:
-			sources.append(cpu_source(config, slot))
+		if config.attract or not config.is_human(slot):
+			per_team[config.teams[slot]] = per_team.get(config.teams[slot], 0) + 1
+	var team_tokens: Dictionary[int, AiAttackTokens] = {}
+	for team: int in per_team:
+		if per_team[team] >= 2:
+			team_tokens[team] = AiAttackTokens.new(cpu_difficulty(config).attack_tokens)
+	for slot in config.slot_count():
+		if config.attract or not config.is_human(slot):
+			sources.append(cpu_source(config, slot, team_tokens.get(config.teams[slot])))
 		else:
-			sources.append(DeviceInputSource.new(camera) if config.is_human(slot) else cpu_source(config, slot))
+			sources.append(DeviceInputSource.new(camera))
 	return sources
 
 
-## The CPU opponent for `slot`. Until the AI lands this is the fight sandbox's sparring
-## partner (scripted strings, abilities, guards), so matches can be played.
-static func cpu_source(config: MatchConfig, slot: int) -> InputSource:
-	return SparringInputSource.new(config.seed * 17 + slot)
+## The CPU opponent for `slot` at the match difficulty (capped by `ai_cap`), with the
+## fighter's AI profile unless `ai_profiles` overrides it. Pass the team's shared tokens
+## when several CPU fighters fight on one team.
+static func cpu_source(config: MatchConfig, slot: int, tokens: AiAttackTokens = null) -> InputSource:
+	var profile: AiProfile = null
+	if config.ai_profiles.has(slot):
+		profile = AiProfile.by_id(config.ai_profiles[slot])
+	return AiInputSource.new(cpu_difficulty(config), profile, tokens)
 
+
+static func cpu_difficulty(config: MatchConfig) -> AiDifficulty:
+	return AiDifficulty.preset(config.difficulty, config.ai_cap)
 
 static func fighter_data(id: StringName) -> FighterData:
 	var path: String = Roster.fighter(id).get("data", "")
