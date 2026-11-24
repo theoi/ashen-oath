@@ -23,3 +23,5 @@ var dead: bool = false
 var skill_slot: int = -1
 ## The owner's FighterState.move_cast when it spawned.
 var cast: int = 0
+## Damage percent (echo-spawned effects use the echo's).
+var damage_percent: int = 100

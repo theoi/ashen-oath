@@ -28,3 +28,5 @@ var frames_active_left: int = 0
 var wind_up: int = 0
 ## True for effects (projectiles, eruptions), false for move hitboxes.
 var effect: bool = false
+## True for hitboxes and effects of a move echo (MoveData.echo_frames).
+var echo: bool = false

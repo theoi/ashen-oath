@@ -73,6 +73,12 @@ enum Type {
 	SPAWN,
 	## Source slot was freed after its KO (hide its view).
 	DESPAWN,
+	## Source cast a move that will echo (id = move, amount = frames until the re-cast,
+	## position = cast position).
+	ECHO,
+	## An echo of source's move starts re-casting (id = move, position = echo position,
+	## amount = its facing). Read state.echoes for its frame.
+	ECHO_CAST,
 }
 
 const FLAG_COUNTER := 1

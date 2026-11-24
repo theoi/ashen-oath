@@ -33,6 +33,8 @@ var freeze: int = 0
 var freeze_owner: int = -1
 var fighters: Array[FighterState] = []
 var effects: Array[EffectState] = []
+## Pending and running move echoes (MoveData.echo_frames), in cast order.
+var echoes: Array[EchoState] = []
 var next_effect_id: int = 1
 ## Per arena hazard: bitmask of slots hit during its current activation.
 var hazard_hits: PackedInt32Array = PackedInt32Array()

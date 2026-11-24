@@ -183,6 +183,9 @@ var grab_tech_left: int = 0
 var carried_ticks: int = 0
 var carried_by: int = -1
 
+## Damage percent of this fighter's echoes (-1 = MoveData.echo_damage_percent); traits
+## set it (the Oath-Shade's phase 2: 100).
+var echo_percent: int = -1
 ## Where the last teleport started (EffectData.Anchor.TELEPORT_ORIGIN).
 var teleport_from: Vector3i = Vector3i.ZERO
 ## Frames left rooted (HitData.root_frames).
