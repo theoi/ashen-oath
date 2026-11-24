@@ -111,6 +111,18 @@ var cooldowns: PackedInt32Array = PackedInt32Array([0, 0, 0, 0, 0, 0])
 var cooldown_totals: PackedInt32Array = PackedInt32Array([0, 0, 0, 0, 0, 0])
 ## Skill slot (0-5) that started the current move, -1 for other moves.
 var move_slot: int = -1
+## Per skill slot: the move index the slot casts now (combo/chain part, -1 = its skill),
+## frames left in the slot's sequence (follow-up window, or waiting for the hit), the
+## cooldown waiting for the sequence to end, and the move index of the last part cast.
+var skill_next: PackedInt32Array = PackedInt32Array([-1, -1, -1, -1, -1, -1])
+var skill_window: PackedInt32Array = PackedInt32Array([0, 0, 0, 0, 0, 0])
+var skill_pending: PackedInt32Array = PackedInt32Array([0, 0, 0, 0, 0, 0])
+var skill_part: PackedInt32Array = PackedInt32Array([-1, -1, -1, -1, -1, -1])
+## Charge level reached on release (0 = below L1) and whether it was a perfect release.
+var charge_level: int = 0
+var charge_perfect: bool = false
+## Per slot: frames left on the mark (brand) that slot's fighter put on this one.
+var marks: PackedInt32Array = PackedInt32Array([0, 0, 0, 0])
 ## Skill-kit dash charges and frames until the next charge comes back (0 = full).
 var dash_charges: int = 0
 var dash_recharge: int = 0

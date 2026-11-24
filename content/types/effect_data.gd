@@ -33,6 +33,8 @@ enum Anchor {
 ## Maximum travel in meters (0 = limited by lifetime only).
 @export var travel: float = 0.0
 @export var hit: HitData
+## Spawns only after a perfect charge release.
+@export var requires_perfect: bool = false
 ## Hits per target; each target is hit at most this many times, `hit_interval` frames apart.
 @export var hits_per_target: int = 1
 @export var hit_interval: int = 10

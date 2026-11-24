@@ -15,6 +15,9 @@ extends Resource
 @export_group("Tuning overrides")
 ## Scales every hitstop (percent).
 @export var hitstop_percent: int = 100
+## Skill/animation speed: every move frame number is scaled by 100 / this at match start
+## (rounded, at least 1 frame), and move speeds by this. sim.fighter_data holds the copies.
+@export var move_speed_percent: int = 100
 ## Dash distance in meters for every skill-kit fighter (-1 = fighter data).
 @export var dash_distance: float = -1.0
 ## Dash charges for every skill-kit fighter (-1 = fighter data).

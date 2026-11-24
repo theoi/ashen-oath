@@ -24,6 +24,8 @@ extends Resource
 @export var stagger_soul: int = 20
 ## The stagger bar's maximum after each break, percent of the previous maximum.
 @export var stagger_growth_percent: int = 120
+## Freeze on both fighters when a stance absorbs a hit.
+@export var stance_hitstop: int = 4
 
 ## Frames after the last active frame in which lights/heavies can be cancelled into
 ## abilities on contact (and abilities into supers on hit).

@@ -32,6 +32,8 @@ var fighter_data: Array[FighterData] = []
 var traits: Array[FighterTrait] = []
 
 var _events: Array[SimEvent] = []
+## Mark detonations queued during fighter updates, applied with this tick's contacts.
+var _mark_contacts: Array[Contact] = []
 var _jump_speed: PackedInt32Array = PackedInt32Array()
 var _gravity: PackedInt32Array = PackedInt32Array()
 var _juggle_gravity: int = 0
@@ -49,9 +51,14 @@ func _init(sim_config: SimConfig) -> void:
 	state.rng = (config.seed ^ 0x2545F491) & 0xFFFFFFFF
 	if state.rng == 0:
 		state.rng = 1
+	var scaled: Dictionary[FighterData, FighterData] = {}
 	for i in config.slots.size():
 		var slot_config := config.slots[i]
 		var data := slot_config.fighter
+		if config.move_speed_percent > 0 and config.move_speed_percent != 100:
+			if not scaled.has(data):
+				scaled[data] = MoveSpeed.scaled_fighter(data, config.move_speed_percent)
+			data = scaled[data]
 		fighter_data.append(data)
 		var hook: FighterTrait = null
 		if data.trait_script != null:
@@ -238,6 +245,102 @@ static func dash_cancel_frame(move: MoveData) -> int:
 	return 1
 
 
+## Where every in-progress attack will hit: move hitboxes that are not over yet, effects
+## the current move will still spawn, and live effects (still in their delay or active).
+## Rebuilt on each call from the current state; presentation filters by team and wind-up.
+func telegraphs() -> Array[SimTelegraph]:
+	var out: Array[SimTelegraph] = []
+	for f in state.fighters:
+		if f.action != Action.ATTACK or f.ko:
+			continue
+		var move := current_move(f)
+		var frame := f.move_frame
+		var wind_up := move.startup + f.charge
+		for hb in move.hitboxes:
+			if hb.hit == null:
+				continue
+			var first := hb.start_frame if hb.start_frame >= 0 else move.startup
+			var last := hb.end_frame if hb.end_frame >= 0 else move.last_active_frame()
+			if frame > last:
+				continue
+			var base := _telegraph_base(f, move, first)
+			var t := _telegraph(f, move, wind_up, first - frame, last - maxi(frame, first) + 1)
+			t.from = base + Fx.rotate(Fx.v3(hb.offset), f.facing)
+			t.radius = Fx.m(hb.radius)
+			if hb.capsule:
+				t.shape = SimTelegraph.Shape.CAPSULE
+				t.to = base + Fx.rotate(Fx.v3(hb.offset_end), f.facing)
+			out.append(t)
+		for i in move.effects.size():
+			var ed := move.effects[i]
+			if ed.hit == null or ed.spawn_frame <= frame:
+				continue
+			var t := _telegraph(f, move, wind_up, ed.spawn_frame - frame + ed.delay, ed.lifetime)
+			t.effect = true
+			t.from = _effect_spawn_point(f, move, ed)
+			_effect_shape(t, ed, f.facing)
+			out.append(t)
+	for e in state.effects:
+		var ed := effect_data(e)
+		if e.dead or ed.hit == null:
+			continue
+		var owner := state.fighters[e.owner]
+		var t := _telegraph(owner, fighter_data[e.owner].moves[e.move_index], 0,
+				maxi(0, ed.delay - e.age + 1), ed.delay + ed.lifetime - maxi(e.age, ed.delay))
+		t.effect = true
+		t.from = e.pos
+		_effect_shape(t, ed, e.facing)
+		t.radius = e.radius
+		out.append(t)
+	return out
+
+
+func _telegraph(f: FighterState, move: MoveData, wind_up: int, to_active: int, active_left: int) -> SimTelegraph:
+	var t := SimTelegraph.new()
+	t.owner = f.slot
+	t.team = f.team
+	t.move_id = move.id
+	t.wind_up = wind_up
+	t.frames_to_active = maxi(0, to_active)
+	t.frames_active_left = maxi(0, active_left)
+	return t
+
+
+## Where the fighter will stand when a hitbox starting on `first` comes out: the aim point
+## for moves that travel there first (leaps, dash-to), else where it stands now.
+func _telegraph_base(f: FighterState, move: MoveData, first: int) -> Vector3i:
+	if move.aims_at_point():
+		for motion in move.motions:
+			if motion.aim_travel != MotionData.AimTravel.NONE and motion.start_frame <= first:
+				return Vector3i(f.move_point.x, f.pos.y, f.move_point.z)
+	return f.pos
+
+
+func _effect_spawn_point(f: FighterState, move: MoveData, ed: EffectData) -> Vector3i:
+	if ed.anchor != EffectData.Anchor.TARGET:
+		return f.pos + Fx.rotate(Fx.v3(ed.offset), f.facing)
+	var origin := Vector3i(f.pos.x, 0, f.pos.z)
+	var reach := Fx.m(ed.max_range)
+	if move.aims_at_point():
+		return _clamp_point(origin, f.move_point, reach)
+	if move.is_aimed():
+		return aim_point(f, reach, true)
+	var target := _target_of(f)
+	if target != null:
+		return _clamp_point(origin, target.pos, reach)
+	return origin + Fx.dir(f.facing, reach)
+
+
+func _effect_shape(t: SimTelegraph, ed: EffectData, angle: int) -> void:
+	t.radius = Fx.m(ed.radius)
+	if ed.speed <= 0.0:
+		t.shape = SimTelegraph.Shape.CIRCLE
+		return
+	t.shape = SimTelegraph.Shape.LINE
+	var reach := Fx.m(ed.travel) if ed.travel > 0.0 else Fx.mps(ed.speed) * ed.lifetime
+	t.to = t.from + Fx.dir(angle, reach)
+
+
 ## Hazard `index` phase this tick: 0 idle, 1 warning, 2 active.
 func hazard_phase(index: int) -> int:
 	if state.phase != Phase.FIGHT and state.phase != Phase.ROUND_END:
@@ -292,6 +395,8 @@ func spawn_effect(owner: FighterState, move_index: int, effect_index: int, pos: 
 	e.vel = Fx.dir(e.facing, Fx.mps(ed.speed))
 	e.radius = Fx.m(ed.radius)
 	e.age = 0
+	if owner.move_index == move_index:
+		e.skill_slot = owner.move_slot
 	state.effects.append(e)
 	_emit(EventType.EFFECT_SPAWN, owner.slot, -1, ed.id, pos, e.id).cue = ed.cue
 	return e
@@ -739,7 +844,11 @@ func _try_action(f: FighterState, airborne: bool) -> bool:
 	var bit := f.buffer
 	var skill := SimInput.SKILLS.find(bit)
 	if skill >= 0:
-		if skill < data.abilities.size() and f.cooldowns[skill] == 0:
+		if skill >= data.abilities.size():
+			return false
+		if f.skill_next[skill] >= 0:
+			return _try_move(f, f.skill_next[skill], bit)
+		if f.cooldowns[skill] == 0 and f.skill_window[skill] == 0:
 			return _try_move(f, data.find_move(data.abilities[skill]), bit)
 		return false
 	match bit:
@@ -820,12 +929,13 @@ func start_move(f: FighterState, move_index: int, bit: int = 0) -> void:
 	f.armor_left = move.armor_hits
 	f.landing_recovery = 0
 	f.buffer = 0
+	f.charge_level = 0
+	f.charge_perfect = false
 	f.move_slot = SimInput.SKILLS.find(bit) if bit != 0 else -1
 	if f.move_slot < 0 and move.kind == MoveData.Kind.ABILITY:
 		f.move_slot = data.abilities.find(move.id)
-	if f.move_slot >= 0 and move.cooldown > 0:
-		f.cooldowns[f.move_slot] = move.cooldown
-		f.cooldown_totals[f.move_slot] = move.cooldown
+	if f.move_slot >= 0:
+		_skill_cast(f, f.move_slot, move_index, move)
 	if move.soul_cost > 0:
 		f.soul -= move.soul_cost * 100
 	var target := attack_target(f)
@@ -846,6 +956,78 @@ func start_move(f: FighterState, move_index: int, bit: int = 0) -> void:
 	_move_frame_effects(f, move)
 
 
+## Cooldown and combo/chain bookkeeping when slot `s` casts `move`.
+func _skill_cast(f: FighterState, s: int, move_index: int, move: MoveData) -> void:
+	var follow := f.skill_next[s] == move_index
+	f.skill_next[s] = -1
+	f.skill_window[s] = 0
+	var sequence := move.follow_up != &"" or move.chain_move != &""
+	if not follow and not sequence:
+		if move.cooldown > 0:
+			_start_cooldown(f, s, move.cooldown)
+		return
+	if not follow:
+		f.skill_pending[s] = move.cooldown
+	if sequence:
+		f.skill_part[s] = move_index
+		f.skill_window[s] = _arming_frames(move)
+	else:
+		_end_skill_sequence(f, s)
+
+
+func _start_cooldown(f: FighterState, s: int, frames: int) -> void:
+	f.cooldowns[s] = frames
+	f.cooldown_totals[s] = frames
+
+
+## Frames a sequence part waits for its hit: the move plus its effects' lifetimes.
+static func _arming_frames(move: MoveData) -> int:
+	var last := move.total_frames()
+	for ed in move.effects:
+		last = maxi(last, ed.spawn_frame + ed.delay + ed.lifetime)
+	return last + 1
+
+
+func _end_skill_sequence(f: FighterState, s: int) -> void:
+	f.skill_next[s] = -1
+	f.skill_window[s] = 0
+	f.skill_part[s] = -1
+	if f.skill_pending[s] > 0:
+		_start_cooldown(f, s, f.skill_pending[s])
+	f.skill_pending[s] = 0
+
+
+## A sequence part connected: its slot now casts the follow-up / chain move.
+func _arm_follow_up(a: FighterState, s: int, move: MoveData) -> void:
+	if s < 0 or a.skill_next[s] >= 0 or a.skill_window[s] == 0:
+		return
+	var data := fighter_data[a.slot]
+	if a.skill_part[s] < 0 or data.moves[a.skill_part[s]] != move:
+		return
+	var next_id := move.follow_up if move.follow_up != &"" else move.chain_move
+	var next := data.find_move(next_id)
+	if next < 0:
+		return
+	a.skill_next[s] = next
+	a.skill_window[s] = move.follow_up_window if move.follow_up != &"" else move.chain_frames
+	_emit(EventType.CHAIN_READY, a.slot, -1, next_id, a.pos, s)
+
+
+## The move skill slot `s` casts now (combo/chain part or its skill), or null.
+func skill_move(f: FighterState, s: int) -> MoveData:
+	var data := fighter_data[f.slot]
+	if f.skill_next[s] >= 0:
+		return data.moves[f.skill_next[s]]
+	return data.move_by_id(data.abilities[s]) if s < data.abilities.size() else null
+
+
+## Whether skill slot `s` can be cast as far as cooldowns and sequences go.
+func skill_ready(f: FighterState, s: int) -> bool:
+	if s >= fighter_data[f.slot].abilities.size():
+		return false
+	return f.skill_next[s] >= 0 or (f.cooldowns[s] == 0 and f.skill_window[s] == 0)
+
+
 ## Snaps an aimed move toward the aim and stores its aim point.
 func _aim_move(f: FighterState, move: MoveData) -> void:
 	if move.aims_at_point():
@@ -863,12 +1045,21 @@ func _attack(f: FighterState) -> void:
 		if (f.buttons & f.move_button) and f.charge < move.charge_max:
 			f.charge += 1
 			advanced = false
+			_charge_events(f, move)
 		else:
 			f.charging = false
+			if _release_charge(f, move, (f.buttons & f.move_button) != 0):
+				return
 	if advanced:
 		f.move_frame += 1
-		if move.chargeable and f.move_frame == move.charge_frame and (f.buttons & f.move_button):
-			f.charging = true
+		if move.hold_end > 0 and f.move_frame > move.hold_start and f.move_frame <= move.hold_end \
+				and not (f.buttons & f.move_button):
+			f.move_frame = move.hold_end + 1
+		if move.chargeable and f.move_frame == move.charge_frame:
+			if f.buttons & f.move_button:
+				f.charging = true
+			elif not move.charge_levels.is_empty() and _release_charge(f, move, false):
+				return
 	if f.move_frame > move.total_frames():
 		if move.next_light != &"" and f.buttons & SimInput.BASIC and move.is_basic() \
 				and fighter_data[f.slot].is_skill_kit() \
@@ -882,6 +1073,39 @@ func _attack(f: FighterState) -> void:
 		_move_frame_effects(f, move)
 	else:
 		_move_motion(f, move)
+
+
+func _charge_events(f: FighterState, move: MoveData) -> void:
+	var level := move.charge_levels.find(f.charge) + 1
+	if level > 0:
+		_emit(EventType.CHARGE_LEVEL, f.slot, -1, move.id, f.pos, level)
+	if move.perfect_end > 0 and f.charge == move.perfect_start:
+		var reached := 0
+		for threshold in move.charge_levels:
+			if f.charge >= threshold:
+				reached += 1
+		_emit(EventType.CHARGE_LEVEL, f.slot, -1, move.id, f.pos, reached).flags = SimEvent.FLAG_PERFECT
+
+
+## Settles the charge level when the charge ends. Returns true if it started another move
+## (early release).
+func _release_charge(f: FighterState, move: MoveData, auto: bool) -> bool:
+	f.charge_level = 0
+	for threshold in move.charge_levels:
+		if f.charge >= threshold:
+			f.charge_level += 1
+	f.charge_perfect = not auto and move.perfect_end > 0 and f.charge >= move.perfect_start \
+			and f.charge <= move.perfect_end
+	if f.charge_level == 0 and not move.charge_levels.is_empty() and move.early_release_move != &"":
+		var early := fighter_data[f.slot].find_move(move.early_release_move)
+		if early >= 0:
+			var slot := f.move_slot
+			start_move(f, early, f.move_button)
+			f.move_slot = slot
+			return true
+	if move.aims_at_point():
+		_aim_move(f, move)
+	return false
 
 
 ## Chains (next_light / next_heavy from the end of active frames) and cancel windows.
@@ -922,7 +1146,7 @@ func _try_chain_or_cancel(f: FighterState, move: MoveData) -> bool:
 func _default_cancel_allows(f: FighterState, move: MoveData, bit: int) -> bool:
 	var skill := SimInput.SKILLS.find(bit)
 	if skill >= 0 or bit == SimInput.SUPER:
-		if skill >= 0 and skill == f.move_slot:
+		if skill >= 0 and skill == f.move_slot and f.skill_next[skill] < 0:
 			return false
 		var from := skill_cancel_frame(move)
 		return from > 0 and f.move_frame >= from
@@ -958,9 +1182,17 @@ func _move_frame_effects(f: FighterState, move: MoveData) -> void:
 		_emit(EventType.COUNTER_WINDOW, f.slot, -1, move.id, f.pos, move.counter_window_end - frame + 1)
 	if move.teleport != null and frame == move.teleport.frame:
 		_teleport(f, move.teleport)
+	for hb in move.hitboxes:
+		if hb.rehit_frames > 0:
+			var first := hb.start_frame if hb.start_frame >= 0 else move.startup
+			if frame > first and (frame - first) % hb.rehit_frames == 0:
+				f.move_hit_masks[clampi(hb.group, 0, 7)] = 0
 	for i in move.effects.size():
-		if move.effects[i].spawn_frame == frame:
+		var ed := move.effects[i]
+		if ed.spawn_frame == frame and (f.charge_perfect or not ed.requires_perfect):
 			_spawn_move_effect(f, move, i)
+	if move.mark_hit != null and frame == (move.mark_frame if move.mark_frame > 0 else move.startup):
+		_detonate_marks(f, move)
 	if move.buff != null and frame == move.buff_frame:
 		apply_buff(f, move.buff, f.move_index)
 
@@ -1009,6 +1241,11 @@ func _move_motion(f: FighterState, move: MoveData) -> void:
 		if frame == motion.start_frame and motion.up_speed > 0.0:
 			f.vel.y = Fx.mps(motion.up_speed)
 			f.grounded = false
+		moved = true
+	if move.hold_steer_percent > 0 and frame >= move.hold_start and frame <= move.hold_end:
+		var facing := f.facing
+		_run(f, move.hold_steer_percent)
+		f.facing = facing
 		moved = true
 	if not moved and travel_done:
 		f.vel.x = 0
@@ -1744,7 +1981,8 @@ class Contact:
 
 
 func _resolve_combat() -> void:
-	var contacts: Array[Contact] = []
+	var contacts: Array[Contact] = _mark_contacts
+	_mark_contacts = []
 	_collect_hitbox_contacts(contacts)
 	_destroy_effects_by_hitboxes()
 	_collect_effect_contacts(contacts)
@@ -1753,6 +1991,25 @@ func _resolve_combat() -> void:
 	for c in contacts:
 		_apply_contact(c)
 	_remove_dead_effects()
+
+
+## Queues MoveData.mark_hit on every enemy carrying `f`'s mark and clears those marks.
+func _detonate_marks(f: FighterState, move: MoveData) -> void:
+	for v in enemies_of(f):
+		if v.marks[f.slot] <= 0:
+			continue
+		v.marks[f.slot] = 0
+		if is_invulnerable(v) or v.action == Action.GRABBED:
+			continue
+		var c := Contact.new()
+		c.attacker = f
+		c.victim = v
+		c.move = move
+		c.hit = move.mark_hit
+		c.point = v.pos + Vector3i(0, _height[v.slot] / 2, 0)
+		c.source = v.pos
+		c.direction = _angle_to(f, v) if Fx.dist2_xz(f.pos, v.pos) > 0 else f.facing
+		_mark_contacts.append(c)
 
 
 func _collect_hitbox_contacts(contacts: Array[Contact]) -> void:
@@ -2004,6 +2261,11 @@ func _apply_contact(c: Contact) -> void:
 	var v := c.victim
 	if v.ko or (c.effect != null and c.effect.dead and effect_data(c.effect).destroy_on_contact):
 		return
+	if not c.held and is_invulnerable(v):
+		return
+	if not c.held and _try_stance(c):
+		_after_contact(c)
+		return
 	if c.hit.throw:
 		_connect_grab(c)
 		return
@@ -2039,14 +2301,37 @@ func _scaled_hitstop(frames: int) -> int:
 	return maxi(1, frames * config.hitstop_percent / 100)
 
 
+## Whether a contact comes from a move whose charge was released perfectly.
+func _perfect_of(c: Contact) -> bool:
+	var a := c.attacker
+	if a == null or c.move == null or c.move.perfect_end <= 0:
+		return false
+	return a.charge_perfect and a.move_index >= 0 and current_move(a) == c.move
+
+
+## Damage percent from charge levels for a levelled charge move's contact.
+func _charge_percent(c: Contact) -> int:
+	if _perfect_of(c):
+		return c.move.perfect_damage_percent
+	var a := c.attacker
+	if a == null or current_move(a) != c.move or a.charge_level <= 0:
+		return 100
+	var percents := c.move.charge_level_damage_percent
+	return percents[a.charge_level - 1] if a.charge_level - 1 < percents.size() else 100
+
+
 ## HitData.Weight of a contact, with AUTO resolved: BASIC for basic moves, LIGHT otherwise.
 func _weight_of(c: Contact) -> int:
+	if c.move != null and c.move.perfect_weight != HitData.Weight.AUTO and _perfect_of(c):
+		return c.move.perfect_weight
 	if c.hit.weight != HitData.Weight.AUTO:
 		return c.hit.weight
 	return HitData.Weight.BASIC if c.move != null and c.move.is_basic() else HitData.Weight.LIGHT
 
 
 func _stagger_of(c: Contact) -> int:
+	if c.move != null and c.move.perfect_stagger >= 0 and _perfect_of(c):
+		return c.move.perfect_stagger
 	if c.hit.stagger >= 0:
 		return c.hit.stagger
 	var index := _weight_of(c) - 1
@@ -2056,8 +2341,11 @@ func _stagger_of(c: Contact) -> int:
 func _base_hitstop(c: Contact) -> int:
 	if c.hit.hitstop >= 0:
 		return c.hit.hitstop
-	if c.hit.weight != HitData.Weight.AUTO and c.hit.weight - 1 < rules.weight_hitstop.size():
-		return rules.weight_hitstop[c.hit.weight - 1]
+	var weight := c.hit.weight
+	if c.move != null and c.move.perfect_weight != HitData.Weight.AUTO and _perfect_of(c):
+		weight = c.move.perfect_weight
+	if weight != HitData.Weight.AUTO and weight - 1 < rules.weight_hitstop.size():
+		return rules.weight_hitstop[weight - 1]
 	match _kind_of(c):
 		MoveData.Kind.LIGHT, MoveData.Kind.AIR_LIGHT, MoveData.Kind.GETUP_ATTACK:
 			return rules.hitstop_light
@@ -2205,6 +2493,41 @@ func _try_block(c: Contact) -> bool:
 	return true
 
 
+## A stance window absorbs the first hit from inside its arc and starts the counter move.
+func _try_stance(c: Contact) -> bool:
+	var v := c.victim
+	if v.action != Action.ATTACK:
+		return false
+	var move := current_move(v)
+	if not move.in_window(v.move_frame, move.stance_start, move.stance_end):
+		return false
+	if Fx.dist2_xz(v.pos, c.source) > 0:
+		var to := Fx.angle_of(c.source.x - v.pos.x, c.source.z - v.pos.z)
+		if absi(Fx.angle_diff(v.facing, to)) * 2 > Fx.deg(move.stance_arc):
+			return false
+	var a := c.attacker
+	var hitstop := _scaled_hitstop(rules.stance_hitstop)
+	var e := _emit(EventType.STANCE_TRIGGER, v.slot, a.slot if a != null else -1, move.id, c.point, 0)
+	e.hitstop = hitstop
+	if c.effect != null:
+		e.flags |= SimEvent.FLAG_PROJECTILE
+		_kill_effect(c.effect, true)
+	elif a != null:
+		a.hitstop = hitstop
+		a.move_contact = maxi(a.move_contact, 1)
+	_gain_soul(v, rules.counter_soul * 100)
+	var data := fighter_data[v.slot]
+	if data.parry_buff != null:
+		apply_buff(v, data.parry_buff, -1)
+	var counter := data.find_move(move.counter_move)
+	if counter >= 0:
+		var slot := v.move_slot
+		start_move(v, counter, v.move_button)
+		v.move_slot = slot
+	v.hitstop = hitstop
+	return true
+
+
 ## Flinch-immune and push-immune windows: no hit cap, full damage, half hitstop, no reaction.
 func _try_super_armor(c: Contact) -> bool:
 	var v := c.victim
@@ -2234,9 +2557,23 @@ func _try_super_armor(c: Contact) -> bool:
 	if c.effect != null:
 		e.flags |= SimEvent.FLAG_PROJECTILE
 	_drain_stagger(v, c.attacker, _stagger_of(c))
+	_on_connect(c)
 	if v.hp <= 0:
 		_ko(v)
 	return true
+
+
+## A hit or armored hit landed: brand the victim and arm the attacker's combo/chain.
+func _on_connect(c: Contact) -> void:
+	var a := c.attacker
+	if a == null or c.move == null:
+		return
+	if c.hit.mark:
+		c.victim.marks[a.slot] = c.hit.mark_frames
+	if c.effect != null:
+		_arm_follow_up(a, c.effect.skill_slot, c.move)
+	elif current_move(a) == c.move:
+		_arm_follow_up(a, a.move_slot, c.move)
 
 
 ## Outgoing damage of a contact before per-victim combo scaling: base, charge, counter hit,
@@ -2245,7 +2582,9 @@ func _hit_damage(c: Contact) -> int:
 	var v := c.victim
 	var a := c.attacker
 	var damage := c.hit.damage
-	if c.move != null and c.move.chargeable and c.effect == null and c.move.charge_max > 0:
+	if c.move != null and c.move.chargeable and not c.move.charge_levels.is_empty():
+		damage = damage * _charge_percent(c) / 100
+	elif c.move != null and c.move.chargeable and c.effect == null and c.move.charge_max > 0:
 		damage += damage * c.move.charge_damage_percent * c.charge / (100 * c.move.charge_max)
 	if c.counter:
 		damage = damage * rules.counter_damage_percent / 100
@@ -2364,6 +2703,8 @@ func _land_hit(c: Contact) -> void:
 		flags |= SimEvent.FLAG_THROW
 	if c.move != null and c.move.chargeable and c.effect == null and c.charge >= c.move.charge_max:
 		flags |= SimEvent.FLAG_FULL_CHARGE
+	if _perfect_of(c):
+		flags |= SimEvent.FLAG_PERFECT
 	var launched := false
 	if c.counter_attack:
 		flags |= SimEvent.FLAG_COUNTER_ATTACK
@@ -2385,6 +2726,7 @@ func _land_hit(c: Contact) -> void:
 	if c.counter_attack:
 		_emit(EventType.COUNTER_STUN, a.slot, v.slot, id, v.pos, v.stun)
 	_drain_stagger(v, a, _stagger_of(c) + (rules.counter_stagger if c.counter_attack else 0))
+	_on_connect(c)
 	if a != null:
 		var hook := traits[a.slot]
 		if hook != null:
@@ -2573,6 +2915,14 @@ func _gain_soul(f: FighterState, hundredths: int) -> void:
 # --- Bookkeeping ------------------------------------------------------------------------
 
 func _post_tick(f: FighterState) -> void:
+	for s in f.skill_window.size():
+		if f.skill_window[s] > 0:
+			f.skill_window[s] -= 1
+			if f.skill_window[s] == 0:
+				_end_skill_sequence(f, s)
+	for s in f.marks.size():
+		if f.marks[s] > 0:
+			f.marks[s] -= 1
 	if f.dash_recharge > 0:
 		f.dash_recharge -= 1
 		if f.dash_recharge == 0:
