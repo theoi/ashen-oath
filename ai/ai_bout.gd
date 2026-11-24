@@ -11,6 +11,9 @@ extends RefCounted
 ## Stuck detection: no fighter's HP changes for `stuck_no_damage_ticks` of fight time in a
 ## round, a fighter stays in one non-neutral action for `stuck_action_ticks`, or the match
 ## runs past `max_ticks`.
+##
+## Infinite detection: a combo (FighterState.combo_hits / combo_ticks, one victim) that
+## reaches `long_combo_hits` hits or `long_combo_ticks` of hitstun is reported in `long_combos`.
 
 const Action := FighterState.Action
 const SUM_KEYS: PackedStringArray = ["hits", "damage", "blocks", "parries", "dodges",
@@ -25,6 +28,8 @@ var stuck_no_damage_ticks: int = 1200
 var stuck_action_ticks: int = 600
 var record_replay: bool = true
 var record_checksums: bool = false
+var long_combo_hits: int = 20
+var long_combo_ticks: int = 480
 
 var sim: Sim
 var replay: Replay
@@ -36,6 +41,11 @@ var ticks: int = 0
 var rounds: Array[Dictionary] = []
 ## Human-readable stuck reports ("round 2 tick 4410: no damage for 20.0 s").
 var stuck: PackedStringArray = []
+## Human-readable long-combo reports ("round 1 tick 900: slot 1 took 21 hits over 6.2 s").
+var long_combos: PackedStringArray = []
+## Longest combo seen on any fighter: hits, and hitstun ticks.
+var longest_combo_hits: int = 0
+var longest_combo_ticks: int = 0
 ## Per slot: counters named in SUM_KEYS.
 var stats: Array[Dictionary] = []
 var final_checksum: int = 0
@@ -47,6 +57,7 @@ var _quiet_ticks: int = 0
 var _quiet_reported: bool = false
 var _action_reported: PackedInt32Array = PackedInt32Array()
 var _timeout_round: bool = false
+var _combo_reported: PackedInt32Array = PackedInt32Array()
 
 
 func _init(sim_config: SimConfig, input_sources: Array[InputSource]) -> void:
@@ -65,8 +76,10 @@ func run() -> AiBout:
 		stats.append(counters)
 	_action_reported.resize(sim.slot_count())
 	_action_reported.fill(0)
+	_combo_reported.resize(sim.slot_count())
+	_combo_reported.fill(0)
 	var limit := max_ticks if max_ticks > 0 else _default_limit()
-	var inputs := PackedInt32Array()
+	var inputs := PackedInt64Array()
 	inputs.resize(sim.slot_count())
 	while not sim.is_over() and sim.state.tick < limit:
 		var t0 := Time.get_ticks_usec()
@@ -185,6 +198,15 @@ func _track(events: Array[SimEvent]) -> void:
 			_quiet_reported = true
 			stuck.append("round %d tick %d: no damage for %.1f s (%s)" % [st.round_number, st.tick,
 					_quiet_ticks / 60.0, _describe_fighters()])
+	for f in st.fighters:
+		longest_combo_hits = maxi(longest_combo_hits, f.combo_hits)
+		longest_combo_ticks = maxi(longest_combo_ticks, f.combo_ticks)
+		if f.combo_hits == 0:
+			_combo_reported[f.slot] = 0
+		elif _combo_reported[f.slot] == 0 and (f.combo_hits >= long_combo_hits or f.combo_ticks >= long_combo_ticks):
+			_combo_reported[f.slot] = 1
+			long_combos.append("round %d tick %d: slot %d took %d hits over %.1f s of hitstun" % [st.round_number,
+					st.tick, f.slot, f.combo_hits, f.combo_ticks / 60.0])
 	for f in st.fighters:
 		if f.ko or f.action == Action.IDLE or f.action == Action.GUARD:
 			continue

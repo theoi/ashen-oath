@@ -2,7 +2,7 @@ extends SceneTree
 ## AI-vs-AI soak and difficulty harness (headless, no rendering). Runs N seeded matches with
 ## the chosen fighters, arena and difficulties, then reports win rates, round lengths,
 ## timeouts, stuck states, engine errors and sim cost. Exit code 1 on errors (and on stuck
-## states with --fail-on-stuck), so CI or the final validation can use it as a soak test.
+## states with --fail-on-stuck, on long combos with --fail-on-infinite), so CI or the final validation can use it as a soak test.
 ##
 ##   tools/ai_soak.sh --matches=40 --levels=nightmare,easy
 ##   tools/ai_soak.sh --fighters=aldric,hollowed,hollowed --levels=easy,hard,hard --arena=ashen_chapel
@@ -49,7 +49,7 @@ func _usage() -> String:
 		+ "  [--levels=normal,normal] [--teams=0,1] [--arena=training_arena] [--rounds=N] [--round-seconds=S]\n" \
 		+ "  [--profiles=1:oath_shade] [--start-soul=1:50] [--cap=easy] [--no-swap] [--stuck-seconds=20]\n" \
 		+ "  [--stuck-action-seconds=10] [--verify] [--json=path] [--replays=dir] [--save-all] [--quiet]\n" \
-		+ "  [--fail-on-stuck]"
+		+ "  [--fail-on-stuck] [--infinite-hits=20] [--infinite-seconds=8] [--fail-on-infinite]"
 
 
 func _run() -> int:
@@ -99,6 +99,9 @@ func _run() -> int:
 	var round_count := 0
 	var timeouts := 0
 	var stuck_reports: PackedStringArray = []
+	var combo_reports: PackedStringArray = []
+	var longest_hits := 0
+	var longest_ticks := 0
 	var verify_failures := 0
 	var total_ticks := 0
 	var sim_usec := 0
@@ -140,6 +143,8 @@ func _run() -> int:
 		bout.record_checksums = _opts.has("verify")
 		bout.stuck_no_damage_ticks = roundi(float(_opts.get("stuck-seconds", "20")) * 60.0)
 		bout.stuck_action_ticks = roundi(float(_opts.get("stuck-action-seconds", "10")) * 60.0)
+		bout.long_combo_hits = int(_opts.get("infinite-hits", "20"))
+		bout.long_combo_ticks = roundi(float(_opts.get("infinite-seconds", "8")) * 60.0)
 		bout.run()
 		total_ticks += bout.ticks
 		sim_usec += bout.sim_usec
@@ -157,6 +162,10 @@ func _run() -> int:
 				timeouts += 1
 		for line in bout.stuck:
 			stuck_reports.append("match %d (seed %d): %s" % [m + 1, cfg.seed, line])
+		for line in bout.long_combos:
+			combo_reports.append("match %d (seed %d): %s" % [m + 1, cfg.seed, line])
+		longest_hits = maxi(longest_hits, bout.longest_combo_hits)
+		longest_ticks = maxi(longest_ticks, bout.longest_combo_ticks)
 		for slot in slot_count:
 			for key in AiBout.SUM_KEYS:
 				totals[slot][key] = int(totals[slot][key]) + int(bout.stats[slot][key])
@@ -211,6 +220,11 @@ func _run() -> int:
 	print("  stuck states: %d" % stuck_reports.size())
 	for line in stuck_reports.slice(0, 20):
 		print("    " + line)
+	print("  long combos (>= %s hits or >= %s s of hitstun): %d, longest %d hits / %.1f s" % [
+			_opts.get("infinite-hits", "20"), _opts.get("infinite-seconds", "8"), combo_reports.size(),
+			longest_hits, longest_ticks / 60.0])
+	for line in combo_reports.slice(0, 10):
+		print("    " + line)
 	if _opts.has("verify"):
 		print("  replay verification failures: %d" % verify_failures)
 	print("  errors: %d" % _collector.errors.size())
@@ -224,7 +238,8 @@ func _run() -> int:
 			"matches": matches, "seed": base_seed, "arena": String(arena.id), "slots": labels,
 			"teams": team_of, "wins": wins, "draws": draws, "unfinished": unfinished,
 			"rounds": round_count, "average_round_seconds": round_ticks / 60.0 / maxi(1, round_count),
-			"timeouts": timeouts, "stuck": stuck_reports, "errors": _collector.errors,
+			"timeouts": timeouts, "stuck": stuck_reports, "long_combos": combo_reports,
+			"longest_combo_hits": longest_hits, "longest_combo_seconds": longest_ticks / 60.0, "errors": _collector.errors,
 			"verify_failures": verify_failures, "ms_per_tick": ms_per_tick, "totals": totals,
 			"cpu_decisions": ai_counters,
 			"match_reports": match_reports,
@@ -234,6 +249,8 @@ func _run() -> int:
 		file.close()
 	var failed := not _collector.errors.is_empty() or verify_failures > 0
 	if _opts.has("fail-on-stuck") and (not stuck_reports.is_empty() or unfinished > 0):
+		failed = true
+	if _opts.has("fail-on-infinite") and not combo_reports.is_empty():
 		failed = true
 	return 1 if failed else 0
 

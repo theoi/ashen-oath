@@ -9,3 +9,7 @@ attack_gap = 40
 aggression = 90
 strategy_period = 8
 hesitation_ticks = 24
+aim_error_cm = 80
+stance_chance = 30
+counter_chance = 30
+charge_jitter = 10

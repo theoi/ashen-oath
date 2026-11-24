@@ -26,6 +26,10 @@ const TAG_OTG := 1 << 12
 const TAG_INVULN := 1 << 13
 const TAG_WALL_SPLAT := 1 << 14
 const TAG_UNBLOCKABLE := 1 << 15
+## Has a ⚡Counter hit (beats armor inside a counter window).
+const TAG_COUNTER := 1 << 16
+## Hits every enemy carrying the user's mark, at any distance (MoveData.mark_hit).
+const TAG_MARK_HIT := 1 << 17
 
 ## How a move is started from neutral.
 enum Use { NONE, LIGHT, HEAVY, RUN_LIGHT, AIR_LIGHT, AIR_HEAVY, GRAB, ABILITY, SUPER, GETUP }
@@ -62,6 +66,18 @@ class Entry:
 	var cooldown: int = 0
 	var soul_cost: int = 0
 	var aerial: bool = false
+	## Skill-kit parts: the combo follow-up or chain move this skill's slot casts after it.
+	var follow: Entry
+	## A combo / chain part (cast only while its slot's window is open), not a root skill.
+	var part: bool = false
+	## Stance (MoveData.stance_*): absorbs a frontal hit and counters; not an attack.
+	var stance: bool = false
+	## Charge skill with levels (MoveData.charge_levels); its hit comes after the charge.
+	var charged: bool = false
+	## Speed of its first moving effect (units per tick, 0 = none), for travel time.
+	var effect_speed: int = 0
+	## Where its first effect starts in front of the user (units).
+	var effect_offset: int = 0
 
 	func has(tag: int) -> bool:
 		return tags & tag != 0
@@ -102,10 +118,11 @@ func _init(fighter: FighterData) -> void:
 	grab = _assign(fighter.grab, Use.GRAB, SimInput.GRAB)
 	getup = _assign(fighter.getup_attack, Use.GETUP, SimInput.LIGHT)
 	super_entry = _assign(fighter.super_move, Use.SUPER, SimInput.SUPER)
-	for slot in mini(3, fighter.abilities.size()):
-		var entry := _assign(fighter.abilities[slot], Use.ABILITY, SimInput.ABILITIES[slot])
+	for slot in mini(SimInput.SKILLS.size(), fighter.abilities.size()):
+		var entry := _assign(fighter.abilities[slot], Use.ABILITY, SimInput.SKILLS[slot])
 		if entry != null:
 			entry.ability_slot = slot
+			_link_parts(entry, slot)
 		abilities.append(entry)
 	for entry: Entry in [light, heavy, grab]:
 		if entry != null and entry.hit_frame <= 10:
@@ -126,6 +143,22 @@ func next_light(e: Entry) -> Entry:
 
 func next_heavy(e: Entry) -> Entry:
 	return entry(data.find_move(e.move.next_heavy)) if e != null else null
+
+
+## Combo follow-ups and chain moves cast by the same slot (Brand Rise → Brand Slam,
+## Flame Rend → Rend Ignition).
+func _link_parts(root: Entry, slot: int) -> void:
+	var e := root
+	for i in 4:
+		var next_id := e.move.follow_up if e.move.follow_up != &"" else e.move.chain_move
+		var next := entry(data.find_move(next_id)) if next_id != &"" else null
+		if next == null or next == root or next.part:
+			return
+		e.follow = next
+		next.part = true
+		next.ability_slot = slot
+		next.button = SimInput.SKILLS[slot]
+		e = next
 
 
 func _assign(move_id: StringName, use: Use, button: int) -> Entry:
@@ -173,9 +206,14 @@ func _analyze(index: int, move: MoveData) -> Entry:
 			first_blockstun = hb.hit.blockstun
 			first_hitstun = hb.hit.hitstun
 		e.tags |= _hit_tags(hb.hit)
+		if hb.rehit_frames > 0 and move.hold_end > 0:
+			# Channel ticks: count a typical hold of about half the channel.
+			e.damage += hb.hit.damage * maxi(0, (move.hold_end - start) / hb.rehit_frames / 2)
 	if first_frame < 9999:
 		e.hit_frame = first_frame
-		e.on_block = first_blockstun - (e.total - first_frame)
+		# Holds can be released at once (the tail follows hold_start).
+		var shortest := e.total - (move.hold_end - move.hold_start) if move.hold_end > 0 else e.total
+		e.on_block = first_blockstun - (shortest - first_frame)
 		e.hitstun = first_hitstun
 	for ed in move.effects:
 		# Effects past the move's last frame are only spawned by traits (Morrigan's shards).
@@ -191,6 +229,9 @@ func _analyze(index: int, move: MoveData) -> Entry:
 			range_m = ed.offset.z + travel + ed.radius + ed.grow_speed * ed.lifetime / 60.0
 			if ed.speed > 0.0 and ed.projectile:
 				e.tags |= TAG_PROJECTILE
+			if ed.speed > 0.0 and e.effect_speed == 0:
+				e.effect_speed = Fx.mps(ed.speed)
+				e.effect_offset = Fx.m(ed.offset.z)
 		e.reach = maxi(e.reach, Fx.m(range_m))
 		e.low = mini(e.low, Fx.m(ed.offset.y - ed.radius) if ed.height <= 0.0 else 0)
 		e.high = maxi(e.high, Fx.m(ed.offset.y + maxf(ed.radius, ed.height)))
@@ -198,10 +239,19 @@ func _analyze(index: int, move: MoveData) -> Entry:
 		e.hit_frame = mini(e.hit_frame, start)
 		e.last_hit_frame = maxi(e.last_hit_frame, start)
 		e.tags |= _hit_tags(ed.hit)
+	if move.mark_hit != null:
+		e.tags |= TAG_MARK_HIT | _hit_tags(move.mark_hit)
+		e.damage += move.mark_hit.damage
+		e.hit_frame = mini(e.hit_frame, move.mark_frame if move.mark_frame > 0 else move.startup)
+		if not e.melee and e.reach == 0:
+			e.low = 0
+			e.high = 0
 	if e.hit_frame == 9999:
 		e.hit_frame = 0
 		e.low = 0
 		e.high = 0
+	e.stance = move.stance_end > 0
+	e.charged = move.chargeable and not move.charge_levels.is_empty()
 	if move.teleport != null:
 		e.tags |= TAG_TELEPORT
 		if move.teleport.mode == TeleportData.Mode.BEHIND_TARGET:
@@ -253,4 +303,6 @@ static func _hit_tags(hit: HitData) -> int:
 		tags |= TAG_WALL_SPLAT
 	if hit.unblockable or hit.throw:
 		tags |= TAG_UNBLOCKABLE
+	if hit.counter:
+		tags |= TAG_COUNTER
 	return tags
