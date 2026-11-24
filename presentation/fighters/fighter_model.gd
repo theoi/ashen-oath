@@ -144,6 +144,12 @@ func set_status(color: Color, amount: float) -> void:
 		body_material.set_shader_parameter(&"status_amount", amount)
 
 
+## Armor-buff sheen on the body (0..1).
+func set_sheen(amount: float) -> void:
+	if body_material != null:
+		body_material.set_shader_parameter(&"sheen_amount", amount)
+
+
 ## Ash dissolve amount (0 = whole, 1 = gone) on every material of the fighter.
 func set_dissolve(amount: float) -> void:
 	if body_material != null:

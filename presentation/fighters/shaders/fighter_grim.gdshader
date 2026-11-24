@@ -42,6 +42,8 @@ uniform float flash_amount : hint_range(0.0, 1.0) = 0.0;
 // Status tint from debuffs (chill, ash), presentation only.
 uniform vec3 status_color : source_color = vec3(0.6, 0.85, 1.0);
 uniform float status_amount : hint_range(0.0, 1.0) = 0.0;
+// Armor buff (Iron Hide and the like): a pale metal sheen that sweeps up the body.
+uniform float sheen_amount : hint_range(0.0, 1.0) = 0.0;
 // Ash dissolve on death (0 = whole, 1 = gone): the body burns away from the head down
 // with an ember edge.
 uniform float dissolve : hint_range(0.0, 1.0) = 0.0;
@@ -168,6 +170,11 @@ void fragment() {
 	}
 	col = mix(col, status_color * 0.8, status_amount * 0.3);
 	emission += status_color * rim * status_amount * 0.5;
+	if (sheen_amount > 0.0) {
+		float sweep = smoothstep(0.85, 1.0, sin(rest_pos.y * 3.0 - TIME * 4.0) * 0.5 + 0.5);
+		emission += vec3(0.85, 0.78, 0.62) * (fres * 0.9 + sweep * 0.35) * sheen_amount;
+		rough = mix(rough, 0.35, sheen_amount);
+	}
 	ALBEDO = mix(col, flash_color, flash_amount * 0.25);
 	EMISSION = emission;
 	ROUGHNESS = rough;
