@@ -60,7 +60,7 @@ export const moves = [
   // Stance f3-34 absorbs the first frontal hit; untriggered, a shove at f35, then a recovery
   // that cannot be skill-cancelled.
   { id: 'bulwark', kind: KIND.ABILITY, skill_type: SKILL.STANCE, aim: AIM.SELF, startup: 3, active: 4, recovery: 16 + 35 - 3, skill_cancel_from: 0,
-    stance_start: 3, stance_end: 34, stance_arc: 180.0, counter_move: 'retribution', cooldown: S(8), animation: 'Blocking', cue: 'bulwark_raise',
+    stance_start: 3, stance_end: 34, stance_arc: 180.0, stance_hitstop: 6, counter_move: 'retribution', cooldown: S(8), animation: 'Blocking', cue: 'bulwark_raise',
     hitboxes: [{ start_frame: 35, end_frame: 38, offset: v3(0, 1.0, 0.6), offset_end: v3(0, 1.0, 1.4), capsule: true, radius: 0.6,
       hit: { damage: 40, weight: WEIGHT.LIGHT, hitstun: 18, knockback: 1.2, cue: 'hit_shield' } }] },
   { id: 'retribution', kind: KIND.ABILITY, aim: AIM.DIRECTION, startup: 4, active: 4, recovery: 16, no_dash_cancel: true,

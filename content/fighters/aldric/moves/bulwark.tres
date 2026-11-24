@@ -35,6 +35,7 @@ skill_cancel_from = 0
 stance_start = 3
 stance_end = 34
 stance_arc = 180
+stance_hitstop = 6
 counter_move = &"retribution"
 cooldown = 480
 animation = &"Blocking"

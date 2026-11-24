@@ -119,7 +119,10 @@ func test_flame_rend_brands_and_ignition_launches_from_anywhere() -> void:
 func test_bulwark_absorbs_a_frontal_hit_into_retribution_and_ignites() -> void:
 	_duel(1.4)
 	var ticks := F.play(sim, [BULWARK], F.held(0, 3) + [B], 30)
-	assert_not_null(F.first(ticks, T.STANCE_TRIGGER))
+	var trigger := F.first(ticks, T.STANCE_TRIGGER)
+	assert_not_null(trigger)
+	if trigger != null:
+		assert_eq(trigger.hitstop, 6, "two frames over the stance default")
 	assert_eq(me.hp, me.max_hp)
 	assert_eq(_hits_by(ticks, &"retribution").size(), 1)
 	assert_eq(foe.action == Action.KNOCKDOWN or foe.action == Action.HITSTUN or foe.action == Action.AIR_HITSTUN, true)
