@@ -17,10 +17,28 @@ const GRIM_SHADER := preload("res://presentation/arenas/shaders/grim_prop.gdshad
 const FLAME_SHADER := preload("res://presentation/arenas/shaders/flame.gdshader")
 const SHAFT_SHADER := preload("res://presentation/arenas/shaders/light_shaft.gdshader")
 const WATER_SHADER := preload("res://presentation/arenas/shaders/water.gdshader")
+const VIGNETTE_SHADER := preload("res://presentation/arenas/shaders/vignette.gdshader")
+## Render layers: fighters stay on layer 1 (the default); arena geometry moves to layer 2 so
+## the fighter-only fill and rim lights skip it.
+const FIGHTER_LAYER := 1
+const ARENA_LAYER := 2
+## Camera-side walls are cut down to about this height (m) for the gameplay camera.
+const CUT_HEIGHT := 1.1
+## Props whose origin is above CUT_HEIGHT and within this distance inside a cut floor edge
+## (or beyond it) are hidden: torches, shelves and lanterns on camera-side walls.
+const CUT_REACH := 0.6
+## Screen-space size (m at the fighter) of the dither hole around each fighter.
+const OCCLUDER_RADIUS := 1.5
+## Time constant (s) of the light pool easing after the fighters.
+const POOL_FOLLOW_SECONDS := 0.6
+## Light shaft strength under the gameplay camera.
+const GAMEPLAY_SHAFT_SCALE := 0.35
 ## Atlas cells (bit row * 8 + column) that glow: the dungeon candle flame cell, and the
 ## Halloween lantern glass cell.
 const DUNGEON_GLOW_CELLS := 1 << (2 * 8 + 7)
 const HALLOWEEN_GLOW_CELLS := 1 << (3 * 8 + 2)
+## Dungeon banner cloth cell, recoloured to the look's blood-dark stain tone.
+const DUNGEON_STAIN_CELLS := 1 << (2 * 8 + 3)
 ## Props smaller than this (largest AABB side, metres) do not cast shadows.
 const SHADOW_MIN_SIZE := 1.4
 
@@ -30,12 +48,23 @@ var _props: Node3D
 var _dungeon_material: ShaderMaterial
 var _halloween_material: ShaderMaterial
 var _flames: Array[Transform3D] = []
+var _flame_multimesh: MultiMesh
+var _overhead: Array[Node3D] = []
+## Pieces apply_gameplay_camera() stopped drawing (they still cast shadows).
+var hidden_for_camera: Array[Node3D] = []
+var _shafts: Array[MeshInstance3D] = []
+var _cut_edges: Array[Vector4] = []
+var _runner: MatchRunner
+var _rim: DirectionalLight3D
+var _pool_light: SpotLight3D
+## Where the fight light pool is centred now (x, z); follows the fighters in a match.
+var _pool_center := Vector2.ZERO
+var _pool_follow := false
+var _fill: DirectionalLight3D
 var _flicker_lights: Array[OmniLight3D] = []
 var _flicker_base: Array[float] = []
 var _time := 0.0
 
-static var _grime_texture: ImageTexture
-static var _ripple_textures: Array[ImageTexture] = []
 
 
 func _ready() -> void:
@@ -52,15 +81,142 @@ func _ready() -> void:
 
 func _process(delta: float) -> void:
 	_time += delta
+	if _runner != null and _runner.sim != null:
+		var points: Array[Vector3] = []
+		for slot in mini(4, _runner.sim.slot_count()):
+			points.append(_runner.fighter_position(slot))
+		follow_fighters(points, delta)
 	for i in _flicker_lights.size():
 		var phase := float(i) * 1.7
 		_flicker_lights[i].light_energy = _flicker_base[i] * (1.0 + 0.12 * sin(_time * 9.0 + phase) + 0.07 * sin(_time * 17.0 + phase * 2.3))
 
 
-## Follows a running match: show_sim() runs after every sim step.
+## Follows a running match: show_sim() runs after every sim step, the arena is set up for
+## the fixed gameplay camera of the match's ArenaData, and props between the camera and the
+## fighters dither out.
 func attach(runner: MatchRunner) -> void:
+	_runner = runner
 	runner.stepped.connect(func(_events: Array[SimEvent]) -> void: show_sim(runner.sim))
+	if runner.sim.config.arena != null:
+		apply_gameplay_camera(runner.sim.config.arena)
 
+
+## Sets the arena up for the high fixed-yaw gameplay camera (ArenaData.camera_yaw): walls
+## and props on the camera side are cut down to low broken stubs, roofs and ceilings are
+## hidden, and the rim light moves behind the fighters as seen from the camera with the
+## fighter fill in front. Story shots skip this and keep the full set.
+func apply_gameplay_camera(data: ArenaData) -> void:
+	var yaw := deg_to_rad(data.camera_yaw)
+	var view := Vector2(sin(yaw), cos(yaw))
+	_cut_edges = _camera_side_edges(data.floor_polygon, -view)
+	var packed: Array[Vector4] = []
+	for edge in _cut_edges:
+		packed.append(edge)
+	for material: ShaderMaterial in [_dungeon_material, _halloween_material]:
+		material.set_shader_parameter("cut_edges", packed)
+		material.set_shader_parameter("cut_edge_count", _cut_edges.size())
+		material.set_shader_parameter("cut_height", CUT_HEIGHT)
+	for node in _overhead:
+		_hide(node)
+	# Seen from above, shafts read as bright discs on the floor; the pool light does that job.
+	for shaft in _shafts:
+		var material := shaft.material_override as ShaderMaterial
+		material.set_shader_parameter("intensity", (material.get_shader_parameter("intensity") as float) * GAMEPLAY_SHAFT_SCALE)
+	for child in _props.get_children():
+		var node := child as Node3D
+		if node != null and node.position.y > CUT_HEIGHT and _is_cut(Vector2(node.position.x, node.position.z), CUT_REACH):
+			_hide(node)
+	if _flame_multimesh != null:
+		for i in _flames.size():
+			var origin := _flames[i].origin
+			if origin.y > CUT_HEIGHT and _is_cut(Vector2(origin.x, origin.z), CUT_REACH):
+				_flame_multimesh.set_instance_transform(i, Transform3D(Basis.from_scale(Vector3.ZERO), origin))
+	# Lights rotate with the camera: rim from behind the fighters, fill from the camera side.
+	var camera_light_yaw := data.camera_yaw + 180.0
+	_rim.rotation_degrees = Vector3(look.rim_camera_pitch, camera_light_yaw + 180.0 + look.rim_camera_offset, 0.0)
+	if _fill != null:
+		_fill.rotation_degrees = Vector3(look.fill_camera_pitch, camera_light_yaw + look.fill_camera_offset, 0.0)
+
+
+## Stops drawing `node` but keeps its shadows, so hiding roofs and walls for the camera
+## does not change the arena's lighting.
+func _hide(node: Node3D) -> void:
+	hidden_for_camera.append(node)
+	var meshes: Array[Node] = node.find_children("*", "GeometryInstance3D", true, false)
+	if node is GeometryInstance3D:
+		meshes.append(node)
+	for mesh: GeometryInstance3D in meshes:
+		mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_SHADOWS_ONLY
+
+
+## Floor edges whose outward normal faces `toward_camera`, as (point x, point z, normal x,
+## normal z). Up to 8.
+static func _camera_side_edges(polygon: PackedVector2Array, toward_camera: Vector2) -> Array[Vector4]:
+	var edges: Array[Vector4] = []
+	var centroid := Vector2.ZERO
+	for p in polygon:
+		centroid += p
+	centroid /= float(maxi(1, polygon.size()))
+	for i in polygon.size():
+		var a := polygon[i]
+		var b := polygon[(i + 1) % polygon.size()]
+		var n := Vector2(b.y - a.y, a.x - b.x).normalized()
+		if n.dot(a - centroid) < 0.0:
+			n = -n
+		if n.dot(toward_camera) > 0.25 and edges.size() < 8:
+			edges.append(Vector4(a.x, a.y, n.x, n.y))
+	return edges
+
+
+## True if `p` (x, z) lies beyond a cut floor edge, or within `reach` metres inside it.
+func _is_cut(p: Vector2, reach: float) -> bool:
+	for edge in _cut_edges:
+		if (p - Vector2(edge.x, edge.y)).dot(Vector2(edge.z, edge.w)) > -reach:
+			return true
+	return false
+
+
+## Marks a roof, beam or ceiling piece that the high gameplay camera would look through.
+func overhead(node: Node3D) -> Node3D:
+	_overhead.append(node)
+	return node
+
+
+## Keeps the fight readable where the fighters actually are: the light pool (spot and prop
+## darkening) eases toward the fighters' centroid, and props between them and the camera
+## dither away. attach() feeds this every frame; tools without a runner call it directly.
+func follow_fighters(fighters: Array[Vector3], delta: float) -> void:
+	if fighters.is_empty():
+		return
+	var centroid := Vector2.ZERO
+	for p in fighters:
+		centroid += Vector2(p.x, p.z)
+	centroid /= float(fighters.size())
+	var blend := 1.0 if not _pool_follow else 1.0 - exp(-delta / POOL_FOLLOW_SECONDS)
+	_pool_follow = true
+	_set_pool_center(_pool_center.lerp(centroid, blend))
+	_set_occluders(fighters)
+
+
+func _set_pool_center(center: Vector2) -> void:
+	_pool_center = center
+	var pool := Vector4(center.x, center.y, look.pool_inner, look.pool_outer)
+	_dungeon_material.set_shader_parameter("pool", pool)
+	_halloween_material.set_shader_parameter("pool", pool)
+	if _pool_light != null:
+		_pool_light.position = Vector3(center.x, look.pool_light_height, center.y)
+
+
+func _set_occluders(fighters: Array[Vector3]) -> void:
+	var targets: Array[Vector4] = []
+	for i in 4:
+		if i < fighters.size():
+			var p := fighters[i]
+			targets.append(Vector4(p.x, p.y + 1.0, p.z, OCCLUDER_RADIUS))
+		else:
+			targets.append(Vector4.ZERO)
+	_dungeon_material.set_shader_parameter("occluder_targets", targets)
+	_halloween_material.set_shader_parameter("occluder_targets", targets)
 
 ## Shows the sim state the arena reacts to (hazard phases). Call after every sim step;
 ## visuals derive from sim state only, so they stay in step through hitstop and replays.
@@ -100,6 +256,7 @@ func _apply_material(node: Node, material: ShaderMaterial) -> void:
 	if node is MeshInstance3D:
 		var mesh_instance: MeshInstance3D = node
 		mesh_instance.material_override = material
+		mesh_instance.layers = ARENA_LAYER
 		var size := mesh_instance.get_aabb().size
 		var biggest := maxf(size.x, maxf(size.y, size.z))
 		if biggest < SHADOW_MIN_SIZE:
@@ -120,6 +277,7 @@ func block(size: Vector3, pos: Vector3, rotation_deg: Vector3, color: Color) -> 
 	instance.material_override = material
 	instance.position = pos
 	instance.rotation_degrees = rotation_deg
+	instance.layers = ARENA_LAYER
 	_props.add_child(instance)
 	return instance
 
@@ -186,6 +344,7 @@ func light_shaft(top: Vector3, bottom: Vector3, radius_top: float, radius_bottom
 	side = side.normalized()
 	instance.transform = Transform3D(Basis(side, up, side.cross(up)), (top + bottom) * 0.5)
 	add_child(instance)
+	_shafts.append(instance)
 
 
 func _build_flames() -> void:
@@ -198,6 +357,7 @@ func _build_flames() -> void:
 	material.set_shader_parameter("edge_color", look.fire_color)
 	material.set_shader_parameter("energy", look.flame_energy)
 	var multimesh := MultiMesh.new()
+	_flame_multimesh = multimesh
 	multimesh.transform_format = MultiMesh.TRANSFORM_3D
 	multimesh.mesh = quad
 	multimesh.instance_count = _flames.size()
@@ -221,12 +381,17 @@ func water(center: Vector2, size: Vector2) -> MeshInstance3D:
 	material.set_shader_parameter("sheen_color", look.water_sheen)
 	material.set_shader_parameter("ripple_a", _ripples(0))
 	material.set_shader_parameter("ripple_b", _ripples(1))
+	material.set_shader_parameter("opacity", look.water_opacity)
+	material.set_shader_parameter("murk_color", look.water_murk_color)
+	material.set_shader_parameter("murk", look.water_murk)
+	material.set_shader_parameter("murk_noise", noise_texture())
 	var instance := MeshInstance3D.new()
 	instance.name = "Water"
 	instance.mesh = plane
 	instance.material_override = material
 	instance.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	instance.position = Vector3(center.x, look.water_level, center.y)
+	instance.layers = ARENA_LAYER
 	add_child(instance)
 	return instance
 
@@ -245,6 +410,22 @@ func soul_motes(center: Vector3, extents: Vector3, amount: int) -> CPUParticles3
 	particles.initial_velocity_min = 0.1
 	particles.initial_velocity_max = 0.35
 	particles.preprocess = 6.0
+	return particles
+
+
+## Fine dust hanging in a light shaft, drifting slowly (catches the shaft colour).
+func dust(center: Vector3, extents: Vector3, amount: int) -> CPUParticles3D:
+	var color := Color(look.shaft_color, 0.5)
+	var particles := _particles(amount, 12.0, color, Vector2(0.02, 0.02), true)
+	particles.position = center
+	particles.emission_shape = CPUParticles3D.EMISSION_SHAPE_BOX
+	particles.emission_box_extents = extents
+	particles.direction = Vector3(0.2, -0.3, 0.1)
+	particles.spread = 180.0
+	particles.gravity = Vector3(0.0, -0.01, 0.0)
+	particles.initial_velocity_min = 0.02
+	particles.initial_velocity_max = 0.08
+	particles.preprocess = 12.0
 	return particles
 
 
@@ -349,17 +530,66 @@ func _build_environment() -> void:
 	add_child(key)
 
 	var rim := DirectionalLight3D.new()
+	_rim = rim
 	rim.name = "RimLight"
 	rim.light_color = look.rim_color
 	rim.light_energy = look.rim_energy
 	rim.rotation_degrees = look.rim_rotation
 	rim.shadow_enabled = false
 	rim.light_specular = 1.0
+	if not look.rim_lights_props:
+		rim.light_cull_mask = FIGHTER_LAYER
 	add_child(rim)
+
+	if look.fighter_fill_energy > 0.0:
+		var fill := DirectionalLight3D.new()
+		_fill = fill
+		fill.name = "FighterFill"
+		fill.light_color = look.fighter_fill_color
+		fill.light_energy = look.fighter_fill_energy
+		fill.rotation_degrees = look.fighter_fill_rotation
+		fill.shadow_enabled = false
+		fill.light_specular = 0.3
+		fill.light_cull_mask = FIGHTER_LAYER
+		add_child(fill)
+
+	if look.pool_light_energy > 0.0:
+		var spot := SpotLight3D.new()
+		_pool_light = spot
+		spot.name = "PoolLight"
+		spot.light_color = look.pool_light_color
+		spot.light_energy = look.pool_light_energy
+		spot.spot_range = look.pool_light_height + 4.0
+		# Wide cone with a steep angular falloff: bright centre fading to nothing well before
+		# the cone edge, so the pool has no visible rim on the floor.
+		spot.spot_angle = minf(look.pool_light_angle * 1.6, 80.0)
+		spot.spot_angle_attenuation = 3.0
+		spot.spot_attenuation = 0.4
+		spot.shadow_enabled = false
+		# Mostly diffuse: a full-strength specular glares off the crypt water toward the camera.
+		spot.light_specular = 0.15
+		spot.position = Vector3(look.pool_center.x, look.pool_light_height, look.pool_center.y)
+		spot.rotation_degrees = Vector3(-90.0, 0.0, 0.0)
+		add_child(spot)
+
+	if look.vignette > 0.0:
+		var layer := CanvasLayer.new()
+		layer.name = "Vignette"
+		layer.layer = -10
+		var rect := ColorRect.new()
+		rect.set_anchors_preset(Control.PRESET_FULL_RECT)
+		rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		var material := ShaderMaterial.new()
+		material.shader = VIGNETTE_SHADER
+		material.set_shader_parameter("strength", look.vignette)
+		rect.material = material
+		layer.add_child(rect)
+		add_child(layer)
 
 
 func _make_materials() -> void:
 	_dungeon_material = _grim_material(load(DUNGEON_ATLAS), DUNGEON_GLOW_CELLS, look.fire_color)
+	_dungeon_material.set_shader_parameter("stain_cells", DUNGEON_STAIN_CELLS)
 	_halloween_material = _grim_material(load(HALLOWEEN_ATLAS), HALLOWEEN_GLOW_CELLS, _lantern_color())
 
 
@@ -371,47 +601,57 @@ func _lantern_color() -> Color:
 func _grim_material(atlas: Texture2D, glow_cells: int, glow_color: Color) -> ShaderMaterial:
 	var material := ShaderMaterial.new()
 	material.shader = GRIM_SHADER
-	material.set_shader_parameter("atlas", atlas)
-	material.set_shader_parameter("tint", look.prop_tint)
-	material.set_shader_parameter("desaturate", look.prop_desaturate)
-	material.set_shader_parameter("brightness", look.prop_brightness)
-	material.set_shader_parameter("contrast", look.prop_contrast)
-	material.set_shader_parameter("grime_color", look.grime_color)
-	material.set_shader_parameter("grime_amount", look.grime_amount)
-	material.set_shader_parameter("grime_noise", _grime())
-	material.set_shader_parameter("rim_strength", look.prop_rim)
-	material.set_shader_parameter("glow_cells", glow_cells)
-	material.set_shader_parameter("glow_color", glow_color)
+	var params := {
+		"atlas": atlas,
+		"tint": look.prop_tint,
+		"desaturate": look.prop_desaturate,
+		"brightness": look.prop_brightness,
+		"contrast": look.prop_contrast,
+		"grime_color": look.grime_color,
+		"grime_amount": look.grime_amount,
+		"grime_noise": noise_texture(),
+		"breakup": look.breakup,
+		"damp_color": look.damp_color,
+		"damp_amount": look.damp_amount,
+		"damp_height": look.damp_height,
+		"soot_color": look.soot_color,
+		"soot_amount": look.soot_amount,
+		"soot_start": look.soot_start,
+		"streak_amount": look.streak_amount,
+		"stain_color": look.stain_color,
+		"stain_amount": look.stain_amount,
+		"pool": Vector4(look.pool_center.x, look.pool_center.y, look.pool_inner, look.pool_outer),
+		"pool_darken": look.pool_darken,
+		"rim_strength": look.prop_rim,
+		"glow_cells": glow_cells,
+		"glow_color": glow_color,
+	}
+	for key: String in params:
+		material.set_shader_parameter(key, params[key])
 	return material
 
 
-## Tileable ripple normal maps, generated synchronously (the web build has no threads).
+## Tileable ripple normal map `index` (0 or 1), generated synchronously (the web build has
+## no threads).
 static func _ripples(index: int) -> ImageTexture:
-	if _ripple_textures.is_empty():
-		for i in 2:
-			var noise := FastNoiseLite.new()
-			noise.seed = 77 + i * 31
-			noise.frequency = 0.05 + 0.03 * float(i)
-			noise.fractal_octaves = 3
-			var image := noise.get_seamless_image(128, 128)
-			image.bump_map_to_normal_map(6.0)
-			image.generate_mipmaps()
-			_ripple_textures.append(ImageTexture.create_from_image(image))
-	return _ripple_textures[index]
+	return TreeCache.get_or_make(&"arena_ripples_%d" % index, func() -> ImageTexture:
+		var noise := FastNoiseLite.new()
+		noise.seed = 77 + index * 31
+		noise.frequency = 0.05 + 0.03 * float(index)
+		noise.fractal_octaves = 3
+		var image := noise.get_seamless_image(128, 128)
+		image.bump_map_to_normal_map(6.0)
+		image.generate_mipmaps()
+		return ImageTexture.create_from_image(image))
 
 
-## Greyscale tileable noise (grime, fire tongues).
+## Greyscale tileable noise (grime, fire tongues, water murk).
 static func noise_texture() -> ImageTexture:
-	return _grime()
-
-
-static func _grime() -> ImageTexture:
-	if _grime_texture == null:
+	return TreeCache.get_or_make(&"arena_noise", func() -> ImageTexture:
 		var noise := FastNoiseLite.new()
 		noise.seed = 1213
 		noise.frequency = 0.03
 		noise.fractal_octaves = 4
 		var image := noise.get_seamless_image(128, 128)
 		image.generate_mipmaps()
-		_grime_texture = ImageTexture.create_from_image(image)
-	return _grime_texture
+		return ImageTexture.create_from_image(image))

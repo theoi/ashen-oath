@@ -8,7 +8,7 @@ uniform float intensity = 0.12;
 
 void fragment() {
 	float facing = pow(abs(dot(NORMAL, VIEW)), 2.0);
-	float ends = smoothstep(0.0, 0.2, UV.y) * (1.0 - smoothstep(0.75, 1.0, UV.y));
+	float ends = smoothstep(0.0, 0.2, UV.y) * (1.0 - smoothstep(0.45, 1.0, UV.y));
 	float dust = 0.75 + 0.25 * sin(TIME * 0.4 + UV.x * 25.0 + UV.y * 6.0);
 	ALBEDO = color;
 	ALPHA = clamp(intensity * facing * ends * dust, 0.0, 1.0);

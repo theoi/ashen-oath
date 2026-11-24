@@ -175,16 +175,20 @@ func _build_ceiling() -> void:
 	# The vault casts no shadow so the key light can stand in for light leaking through it.
 	var vault := block(Vector3(2.0 * HALF.x + 4.0, 0.4, 2.0 * HALF.y + 4.0), Vector3(0.0, CEILING, 0.0), Vector3.ZERO, Color(0.02, 0.02, 0.025))
 	vault.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	overhead(vault)
+	overhead(dungeon("floor_tile_grate", Vector3(-0.8, CEILING - 0.22, 0.6), 90.0)).rotation_degrees.x = 180.0
 	for x: float in [-8.0, -2.0, 2.0, 8.0]:
 		var rib := block(Vector3(0.7, 0.8, 2.0 * HALF.y + 2.0), Vector3(x, CEILING - 0.5, 0.0), Vector3.ZERO, Color(0.06, 0.065, 0.07))
 		rib.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		overhead(rib)
 
 
 func _build_pillars() -> void:
 	for i in PILLARS.size():
 		var p := PILLARS[i]
 		dungeon("pillar", Vector3(p.x, 0.0, p.y), 90.0 * float(i))
-		dungeon("pillar", Vector3(p.x, WALL_HEIGHT, p.y), 90.0 * float(i + 1), Vector3(1.0, 1.25, 1.0))
+		# The upper drum would wall off the view from the high gameplay camera.
+		overhead(dungeon("pillar", Vector3(p.x, WALL_HEIGHT, p.y), 90.0 * float(i + 1), Vector3(1.0, 1.25, 1.0)))
 		if depths:
 			var hang := Vector3(p.x + (0.9 if p.x > 0.0 else -0.9), 3.7, p.y)
 			halloween("lantern_hanging", hang, 0.0, Vector3(0.8, 0.8, 0.8))
@@ -266,9 +270,12 @@ func _build_vents() -> void:
 func _build_atmosphere() -> void:
 	soul_motes(Vector3(0.0, look.water_level + 0.1, 0.0), Vector3(HALF.x, 0.05, HALF.y), look.mote_amount)
 	ash(Vector3(0.0, 6.0, 0.0), Vector3(HALF.x, 1.0, HALF.y), look.ash_amount)
-	# Pale light falls through a broken grate in the vault.
-	light_shaft(Vector3(-4.0, CEILING, 2.0), Vector3(-2.5, 0.0, 0.5), 0.9, 1.8, 1.0)
-	light_shaft(Vector3(5.0, CEILING, -2.5), Vector3(3.5, 0.0, -1.5), 0.7, 1.5, 0.7)
+	# Pale light falls through a broken grate in the middle of the vault onto the fight, with
+	# thinner shafts from cracks.
+	light_shaft(Vector3(-0.8, CEILING, 0.6), Vector3(0.0, 0.0, 0.0), 1.6, 3.6, 1.2)
+	light_shaft(Vector3(-5.0, CEILING, 2.5), Vector3(-3.5, 0.0, 1.0), 0.6, 1.3, 0.6)
+	light_shaft(Vector3(5.5, CEILING, -2.5), Vector3(4.0, 0.0, -1.5), 0.5, 1.1, 0.5)
+	dust(Vector3(-0.4, 4.5, 0.3), Vector3(1.8, 4.0, 1.8), 50)
 	if depths:
 		# Soul-light welling up from the deep water around the pillars.
 		for p: Vector2 in [Vector2(-5.0, 0.0), Vector2(5.0, 0.0)]:

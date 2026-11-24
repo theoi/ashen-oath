@@ -33,6 +33,7 @@ func test_floor_is_convex_and_about_24_by_20() -> void:
 		assert_almost_eq(box.size.x, 24.0, 1.0, "%s width" % path)
 		assert_almost_eq(box.size.y, 20.0, 1.0, "%s depth" % path)
 		assert_true(box.encloses(data.camera_bounds), "%s camera bounds inside the floor" % path)
+		assert_true(data.camera_yaw >= 0.0 and data.camera_yaw < 360.0, "%s camera yaw in [0, 360)" % path)
 
 
 func test_spawns_are_clear() -> void:

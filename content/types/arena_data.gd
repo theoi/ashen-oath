@@ -20,3 +20,8 @@ extends Resource
 @export var scene: String = ""
 ## Camera hints for presentation (x-z rectangle the camera may move in).
 @export var camera_bounds: Rect2 = Rect2(-11.0, -9.0, 22.0, 18.0)
+## Fixed yaw of the gameplay camera, in degrees, as the direction it looks: the view
+## direction on the floor is (sin(yaw), cos(yaw)) in (x, z), so 0 looks along +z and 180
+## looks along -z from the +z side (the FightCamera yaw convention). Movement is relative
+## to it. FightCamera reads it; ArenaView cuts the walls on the camera side. Presentation only.
+@export var camera_yaw: float = 0.0

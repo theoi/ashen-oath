@@ -15,6 +15,38 @@ at x = -4, slot 1 at x = +4, slot 2 further east as the second 1v2 opponent, slo
 with slot 0) and
 `camera_bounds` of 22 × 18 m.
 
+## Gameplay camera
+
+The fight camera is a fixed-yaw high three-quarter view (`design-lost-ark.md` §3). Each
+`ArenaData` has `camera_yaw` (degrees, the direction the camera looks on the floor:
+(sin, cos) in (x, z), the `FightCamera` convention). All four slice arenas use 0: the camera
+sits on the north (−z) side looking along +z, the long nave runs across the screen and the
+Chapel altar is on the left. `attach(runner)` calls `apply_gameplay_camera(data)`, which:
+
+- cuts the walls whose outward normal faces the camera down to ragged ~1.1 m stubs (in
+  `grim_prop.gdshader`; back faces draw as a dark cap) and hides props on those walls,
+- hides roofs, beams, the crypt vault and upper pillar drums (`overhead()`); hidden pieces
+  keep casting shadows so the lighting does not change,
+- turns the rim light so it backlights fighters as seen from the camera, with the
+  fighter-only fill from the camera side,
+- dithers props within ~1.5 m (on screen) of each fighter down to 25 % when they are
+  between the camera and the fighter.
+
+Story stills don't call it and keep the full set. `ArenaCutaway` (the generic cutaway in
+`presentation/fight/`) skips `ArenaView` scenes, which cut themselves. To preview:
+`tools/arena_shot.sh /tmp/a.png --arena=res://content/arenas/drowned_crypt.tres --game`
+(capsules) or `--real=aldric,gorrath` (real fighters sparring through `FightView`).
+
+## Grim look and readability
+
+`ArenaLook` drives the mood. Surface decay (`breakup`, `damp_*`, `soot_*`, `streak_amount`,
+`stain_*`) dirties every prop; blood-dark stains and banners are kept sparse. Readability
+comes from the fight light pool, not from brighter walls: props darken away from
+`pool_center` (`pool_darken`), a soft `PoolLight` spot lights the middle of the floor, and
+two lights on render layer 1 only (fighters; arena geometry is on layer 2) keep fighters
+separated from the dark: the rim light from behind and `FighterFill` from the camera side.
+Grave vents keep a faint border while dormant and a bright border plus fill while warning.
+Murky water: `water_opacity`, `water_murk` (drifting scum and silt).
 ## Using an arena in a match
 
 ```gdscript
@@ -47,8 +79,9 @@ Layout scripts declare `PILLARS` (and `VENTS`); `tests/content/arenas/` checks t
 the ArenaData, so moving a pillar means changing both.
 
 Web budget (Compatibility renderer): at most 16 short-range omni lights without shadows
-(each one adds a draw pass per lit object; vent lights are off between eruptions), shadows
-only from the key light and large props, CPU particles under 700, about 300 draw calls.
+(each one adds a draw pass per lit object; vent lights are off between eruptions), one
+unshadowed pool spot and two fighter-only directionals, shadows only from the key light and
+large props, CPU particles under 700, about 300 draw calls.
 `tests/presentation/arenas/` checks the light and particle counts.
 
 ## Screenshots and clips (Xvfb, software OpenGL)

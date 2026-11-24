@@ -30,3 +30,13 @@ func test_arenas_build_within_budget() -> void:
 			particles += (node as CPUParticles3D).amount
 		assert_true(particles <= MAX_PARTICLES, "%s spawns %d particles" % [path, particles])
 		assert_not_null(arena.get_node_or_null("Flames"), "%s has candle flames" % path)
+		# Shadowed lights are the costliest in the Compatibility renderer: only the key light.
+		var shadowed := 0
+		for light: Light3D in arena.find_children("*", "Light3D", true, false):
+			if light.shadow_enabled:
+				shadowed += 1
+		assert_true(shadowed <= 1, "%s has %d shadowed lights" % [path, shadowed])
+		# Fighter-only lights must skip arena geometry (layer 2).
+		var fill := arena.get_node_or_null("FighterFill") as Light3D
+		if fill != null:
+			assert_eq(fill.light_cull_mask & ArenaView.ARENA_LAYER, 0, "%s fill skips the arena" % path)

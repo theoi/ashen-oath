@@ -109,3 +109,4 @@ hazards = Array[ExtResource("3_hazard")]([SubResource("Resource_vent_0"), SubRes
 spawn_points = PackedVector2Array(-4, 0, 4, 0, 4, -6.5, -4, 6.5)
 scene = "res://presentation/arenas/drowned_crypt/drowned_crypt.tscn"
 camera_bounds = Rect2(-11, -9, 22, 18)
+camera_yaw = 0.0
