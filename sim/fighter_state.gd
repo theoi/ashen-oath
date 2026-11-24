@@ -75,6 +75,8 @@ var move_frame: int = 0
 var move_button: int = 0
 ## 0 = no contact yet, 1 = blocked/armored/parried, 2 = hit.
 var move_contact: int = 0
+## Counts every move started; the current move's cast id (buff uses are spent per cast).
+var move_cast: int = 0
 ## World point (y = 0) an aimed move targets (MoveData.aim other than AUTO), set on frame 1.
 var move_point: Vector3i = Vector3i.ZERO
 ## Per hitbox group (0-7): bitmask of slots already hit by this move.

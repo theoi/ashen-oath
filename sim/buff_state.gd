@@ -7,5 +7,12 @@ extends SimRecord
 var source: int = -1
 var ticks_left: int = 0
 var uses_left: int = 0
+## Buffs with uses apply to casts with a FighterState.move_cast above this (not the one
+## running when they were applied).
+var after_cast: int = 0
+## The last cast that spent a use; its later hits keep the bonus.
+var last_cast: int = -1
+## All uses are spent; the buff ends once last_cast is over.
+var spent: bool = false
 var damage_bonus_percent: int = 0
 var speed_bonus_percent: int = 0

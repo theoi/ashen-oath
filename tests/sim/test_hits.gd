@@ -132,6 +132,7 @@ func test_parry_buff_from_fighter_data() -> void:
 	F.place(sim, 1, 0.0, 1.2, Fx.HALF_TURN)
 	ticks = F.play(sim, [], [F.L], 6)
 	assert_eq(F.first(ticks, T.HIT).amount, 45)
+	F.until_action(sim, sim.fighter(1), FighterState.Action.IDLE)
 	assert_eq(sim.fighter(1).buffs.size(), 0, "single use")
 
 

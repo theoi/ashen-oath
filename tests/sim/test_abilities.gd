@@ -267,7 +267,8 @@ func test_damage_buff_applies_to_the_next_hit() -> void:
 	F.place(sim, 1, 0.0, 1.2, Fx.HALF_TURN)
 	var ticks := F.play(sim, [F.L], [], 6)
 	assert_eq(F.first(ticks, T.HIT).amount, 45)
-	assert_eq(me.buffs.size(), 0)
+	F.until_action(sim, me, Action.IDLE)
+	assert_eq(me.buffs.size(), 0, "spent once the buffed move is over")
 
 
 func test_perfect_dodge_grants_soul() -> void:
