@@ -28,8 +28,8 @@ const CAMERA_FOV := &"camera_fov"
 ## Follow spring angular frequency ω (rad/s); higher follows tighter.
 const CAMERA_FOLLOW := &"camera_follow"
 ## How far the camera leads toward the aim point, per aiming device.
-const AIM_LEAD_MOUSE := &"aim_lead_mouse"
-const AIM_LEAD_PAD := &"aim_lead_pad"
+const CAMERA_LEAD_MOUSE := &"camera_lead_mouse"
+const CAMERA_LEAD_PAD := &"camera_lead_pad"
 const HITSTOP_SCALE := &"hitstop_scale"
 const SKILL_SPEED := &"skill_speed"
 const DASH_DISTANCE := &"dash_distance"
@@ -79,13 +79,13 @@ static func settings() -> Array[Setting]:
 	return [
 		Setting.new(SHAKE_SCALE, "Shake scale", 1.0, 0.0, 2.0, 0.05, "×"),
 		Setting.new(FLASH_INTENSITY, "Flash intensity", 1.0, 0.0, 2.0, 0.05, "×"),
-		Setting.new(CAMERA_PITCH, "Camera pitch", 48.0, 35.0, 65.0, 1.0, "°"),
+		Setting.new(CAMERA_PITCH, "Camera pitch", 48.0, 44.0, 60.0, 1.0, "°"),
 		Setting.new(CAMERA_DISTANCE, "Camera distance", 14.0, 8.0, 24.0, 0.5, " m"),
 		Setting.new(CAMERA_DISTANCE_MAX, "Max distance", 20.0, 10.0, 30.0, 0.5, " m"),
 		Setting.new(CAMERA_FOV, "Field of view", 35.0, 20.0, 60.0, 1.0, "°"),
-		Setting.new(CAMERA_FOLLOW, "Follow speed (ω)", 14.0, 2.0, 30.0, 0.5, " rad/s"),
-		Setting.new(AIM_LEAD_MOUSE, "Aim lead (mouse)", 0.5, 0.0, 3.0, 0.1, " m"),
-		Setting.new(AIM_LEAD_PAD, "Aim lead (gamepad)", 0.0, 0.0, 3.0, 0.1, " m"),
+		Setting.new(CAMERA_FOLLOW, "Follow speed (ω)", 14.0, 4.0, 30.0, 0.5, " rad/s"),
+		Setting.new(CAMERA_LEAD_MOUSE, "Aim lead (mouse)", 0.5, 0.0, 2.0, 0.1, " m"),
+		Setting.new(CAMERA_LEAD_PAD, "Aim lead (gamepad)", 0.0, 0.0, 2.0, 0.1, " m"),
 		Setting.new(SLOW_MOTION, "Slow motion", 0.4, 0.1, 1.0, 0.05, "×"),
 		Setting.new(RUMBLE_SCALE, "Rumble scale", 1.0, 0.0, 2.0, 0.05, "×"),
 		Setting.new(DAMAGE_NUMBERS, "Damage numbers", 1.0, 0.0, 1.0, 1.0),
@@ -164,8 +164,7 @@ func apply_to(config: SimConfig) -> void:
 		if not s.sim:
 			continue
 		_applied[key] = _values[key]
-		# Overrides the sim does not support yet are skipped (still listed for restart).
-		if is_equal_approx(_values[key], s.default) or not s.sim_property in config:
+		if is_equal_approx(_values[key], s.default):
 			continue
 		var current: Variant = config.get(s.sim_property)
 		var scaled := _values[key] * s.sim_factor

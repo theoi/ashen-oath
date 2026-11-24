@@ -141,23 +141,26 @@ static func title_for(prompt: StoryPrompt, fighter: StringName) -> String:
 	return ""
 
 
-## The actions whose buttons a tip shows: its own, or the input for its ability slot / super.
-static func actions_for(prompt: StoryPrompt) -> Array[StringName]:
+## The actions whose buttons a tip shows: its own, or the input for its ability slot,
+## awakening or Soul Burst. Skill-kit fighters (FighterData.dash set) burst with the dash.
+static func actions_for(prompt: StoryPrompt, fighter: FighterData = null) -> Array[StringName]:
 	if not prompt.actions.is_empty():
 		return prompt.actions
 	match prompt.goal:
 		Goal.ABILITY:
 			if prompt.ability_slot >= 0 and prompt.ability_slot < DefaultBindings.ability_actions().size():
 				return [DefaultBindings.ability_action(prompt.ability_slot)]
-		Goal.SUPER, Goal.BURST:
-			return [DefaultBindings.SUPER]
+		Goal.SUPER:
+			return [DefaultBindings.AWAKEN]
+		Goal.BURST:
+			return [DefaultBindings.DASH if fighter != null and fighter.dash != null else DefaultBindings.AWAKEN]
 	return []
 
 
 ## One line with the buttons of every action of `prompt`.
-static func hint_for(prompt: StoryPrompt) -> String:
+static func hint_for(prompt: StoryPrompt, fighter: FighterData = null) -> String:
 	var parts := PackedStringArray()
-	for action in actions_for(prompt):
+	for action in actions_for(prompt, fighter):
 		var text := binding_text(action)
 		if not text.is_empty():
 			parts.append(text)
@@ -373,7 +376,7 @@ func _fill_buttons(prompt: StoryPrompt) -> void:
 	for child in _buttons.get_children():
 		_buttons.remove_child(child)
 		child.queue_free()
-	var actions := actions_for(prompt)
+	var actions := actions_for(prompt, runner.sim.fighter_data[slot] if runner != null and runner.sim != null else null)
 	for action in actions:
 		var label := _label(&"StrongLabel", _buttons)
 		label.text = binding_text(action)

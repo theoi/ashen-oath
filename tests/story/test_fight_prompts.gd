@@ -113,9 +113,24 @@ func test_fight_two_teaches_abilities_and_cuts_in_for_super_and_burst() -> void:
 	player.stun = 40
 	_step(2)
 	assert_eq(overlay.current().goal, Goal.BURST, "caught in a combo with 50 Soul brings up Soul Burst")
-	source.tap(SimInput.SUPER, 30)
+	var data := screen.runner.sim.fighter_data[0]
+	var burst_action := DefaultBindings.DASH if data.dash != null else DefaultBindings.AWAKEN
+	assert_eq(FightPrompts.actions_for(overlay.current(), data), [burst_action] as Array[StringName],
+			"the Burst tip shows the button that bursts for this fighter")
+	source.tap(SimInput.DASH if data.dash != null else SimInput.SUPER, 30)
 	_step(40)
 	assert_has(overlay.completed, "Caught")
+
+
+func test_burst_tip_shows_dash_for_skill_kit_fighters() -> void:
+	var tip := StoryPrompt.new()
+	tip.goal = Goal.BURST
+	var old_kit := FighterData.new()
+	assert_eq(FightPrompts.actions_for(tip, old_kit), [DefaultBindings.AWAKEN] as Array[StringName])
+	var skill_kit := FighterData.new()
+	skill_kit.dash = DashData.new()
+	assert_eq(FightPrompts.actions_for(tip, skill_kit), [DefaultBindings.DASH] as Array[StringName])
+	assert_eq(FightPrompts.hint_for(tip, skill_kit), FightPrompts.binding_text(DefaultBindings.DASH))
 
 
 func _open_fight(step_id: StringName, new_run: bool = true) -> void:

@@ -22,7 +22,7 @@ func test_defaults_follow_the_design_table() -> void:
 		FeelTuning.SKILL_SPEED: 100.0, FeelTuning.DASH_DISTANCE: 4.5, FeelTuning.DASH_CHARGES: 2.0,
 		FeelTuning.DASH_RECHARGE: 5.0, FeelTuning.CAMERA_PITCH: 48.0, FeelTuning.CAMERA_DISTANCE: 14.0,
 		FeelTuning.CAMERA_DISTANCE_MAX: 20.0, FeelTuning.CAMERA_FOV: 35.0, FeelTuning.CAMERA_FOLLOW: 14.0,
-		FeelTuning.AIM_LEAD_MOUSE: 0.5, FeelTuning.AIM_LEAD_PAD: 0.0, FeelTuning.SLOW_MOTION: 0.4,
+		FeelTuning.CAMERA_LEAD_MOUSE: 0.5, FeelTuning.CAMERA_LEAD_PAD: 0.0, FeelTuning.SLOW_MOTION: 0.4,
 	}
 	for key: StringName in expected:
 		assert_almost_eq(FeelTuning.value(key), expected[key], 0.0001, String(key))
@@ -38,11 +38,11 @@ func test_values_clamp_snap_persist_and_signal() -> void:
 	FeelTuning.set_value(FeelTuning.SHAKE_SCALE, 0.512)
 	FeelTuning.changed.disconnect(count)
 	assert_eq(seen[0], 2)
-	assert_almost_eq(FeelTuning.value(FeelTuning.CAMERA_PITCH), 65.0, 0.0001, "clamped to the range")
+	assert_almost_eq(FeelTuning.value(FeelTuning.CAMERA_PITCH), 60.0, 0.0001, "clamped to the range")
 	assert_almost_eq(FeelTuning.value(FeelTuning.SHAKE_SCALE), 0.5, 0.0001, "snapped to the step")
 	FeelTuning.reset_to_defaults()
 	FeelTuning.load_values()
-	assert_almost_eq(FeelTuning.value(FeelTuning.CAMERA_PITCH), 65.0, 0.0001, "saved on change")
+	assert_almost_eq(FeelTuning.value(FeelTuning.CAMERA_PITCH), 60.0, 0.0001, "saved on change")
 
 
 func test_sim_values_apply_only_through_the_config_at_match_start() -> void:
@@ -60,8 +60,7 @@ func test_sim_values_apply_only_through_the_config_at_match_start() -> void:
 	assert_eq(config.hitstop_percent, 250)
 	FeelTuning.set_value(FeelTuning.DASH_RECHARGE, 4.0)
 	FeelTuning.apply_to(config)
-	if &"dash_recharge_frames" in config:
-		assert_eq(config.get(&"dash_recharge_frames"), 240, "seconds to frames")
+	assert_eq(config.dash_recharge_frames, 240, "seconds to frames")
 	assert_almost_eq(config.dash_distance, 6.0, 0.0001)
 	FeelTuning.set_value(FeelTuning.DASH_CHARGES, 3.0)
 	assert_eq(FeelTuning.pending_restart(), PackedStringArray(["Dash charges"]))
