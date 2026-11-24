@@ -42,11 +42,11 @@ func set_pose(pose_clip: StringName, time: float = -1.0) -> void:
 	_apply()
 
 
-## World position of the head (portrait framing).
+## World position of the rig's head bone, at the base of the head (portrait framing).
 func head_position() -> Vector3:
 	if model != null and model.has_method("bone_position"):
 		return model.call("bone_position", &"head")
-	return global_position + Vector3(0.0, 1.55 * scale.y, 0.0)
+	return global_position + Vector3(0.0, 1.36 * scale.y, 0.0)
 
 
 func _process(delta: float) -> void:

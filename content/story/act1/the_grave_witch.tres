@@ -76,21 +76,21 @@ shot = 1
 
 [sub_resource type="Resource" id="Resource_fuwsk"]
 script = ExtResource("5_g5wsu")
-position = Vector3(0.6, 1.9, 6)
-target = Vector3(0.8, 1.2, 0.2)
-fov = 46.0
+position = Vector3(2.62, 1.9, 5.49)
+target = Vector3(0.79999995, 0.9, 0.29999998)
+fov = 44.0
 
 [sub_resource type="Resource" id="Resource_aowxq"]
 script = ExtResource("5_g5wsu")
-position = Vector3(-2.9, 1.75, 2.2)
-target = Vector3(2.8, 1.45, -0.4)
-fov = 36.0
+position = Vector3(-1.48, 1.75, 0.08)
+target = Vector3(2.8, 1.15, -0.39999998)
+fov = 40.0
 
 [sub_resource type="Resource" id="Resource_rytkt"]
 script = ExtResource("5_g5wsu")
-position = Vector3(4.4, 1.75, -1.4)
-target = Vector3(-1.2, 1.45, 1)
-fov = 36.0
+position = Vector3(2.45, 1.75, -1.29)
+target = Vector3(-1.1999999, 1.15, 1)
+fov = 40.0
 
 [resource]
 script = ExtResource("4_as77s")

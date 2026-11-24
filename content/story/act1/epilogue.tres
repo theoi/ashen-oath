@@ -55,9 +55,9 @@ text = "The Bell Wakes"
 
 [sub_resource type="Resource" id="Resource_bhqnr"]
 script = ExtResource("5_ogkdq")
-position = Vector3(-1.4, 1.7, 4)
-target = Vector3(1, 1, 0.6)
-fov = 42.0
+position = Vector3(2.86, 1.9, 5.24)
+target = Vector3(1, 0.9, 0.59999996)
+fov = 44.0
 
 [sub_resource type="Resource" id="Resource_kw7wu"]
 script = ExtResource("5_ogkdq")

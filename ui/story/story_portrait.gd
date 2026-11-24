@@ -4,6 +4,9 @@ extends SubViewport
 ## world with the model idling, framed on the head and lit with an ember key and a cold rim.
 
 const SIZE := Vector2i(256, 256)
+## The rig's "head" bone sits at the neck; the (large) KayKit head is above it.
+const HEAD_CENTER := 0.26
+const DISTANCE := 1.45
 
 var fighter: StringName = &""
 var actor: StoryActorView
@@ -43,7 +46,7 @@ func setup(id: StringName) -> void:
 	add_child(actor)
 	actor.setup(id, &"Idle")
 	camera = Camera3D.new()
-	camera.fov = 28.0
+	camera.fov = 30.0
 	add_child(camera)
 	camera.current = true
 	frame()
@@ -51,9 +54,9 @@ func setup(id: StringName) -> void:
 
 ## Points the camera at the model's head.
 func frame() -> void:
-	var head := actor.head_position()
-	camera.position = head + Vector3(0.0, 0.02, 0.95)
-	camera.look_at(head + Vector3(0.0, -0.07, 0.0))
+	var face := actor.head_position() + Vector3(0.0, HEAD_CENTER, 0.0)
+	camera.position = face + Vector3(0.0, 0.05, DISTANCE)
+	camera.look_at(face + Vector3(0.0, -0.06, 0.0))
 
 
 func _process(_delta: float) -> void:

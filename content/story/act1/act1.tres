@@ -108,20 +108,19 @@ position = Vector3(-2.4, 0, 3.6)
 
 [sub_resource type="Resource" id="Resource_hls2x"]
 script = ExtResource("7_b4dp1")
-position = Vector3(6.5, 3.6, 7.5)
-target = Vector3(-3, 0.6, 1)
-fov = 48.0
+position = Vector3(4.5, 3.2, 7)
+target = Vector3(-3, 0.6, 1.5)
 
 [sub_resource type="Resource" id="Resource_pvqom"]
 script = ExtResource("7_b4dp1")
-position = Vector3(-1.6, 1.1, 4.6)
-target = Vector3(-3.4, 0.35, 2)
-fov = 42.0
+position = Vector3(-1.8000001, 2, 5.6)
+target = Vector3(-3.4, 0.2, 2)
+fov = 40.0
 
 [sub_resource type="Resource" id="Resource_v8u0j"]
 script = ExtResource("7_b4dp1")
-position = Vector3(-0.6, 1.75, 4.9)
-target = Vector3(-3.2, 1.35, 1.6)
+position = Vector3(0.25, 1.75, 4.14)
+target = Vector3(-3.1999998, 1.15, 1.5999999)
 fov = 40.0
 
 [sub_resource type="Resource" id="Resource_x4rvy"]
@@ -273,14 +272,14 @@ yaw_degrees = 20.0
 
 [sub_resource type="Resource" id="Resource_lo8jy"]
 script = ExtResource("7_b4dp1")
-position = Vector3(-3.6, 2, 3.4)
-target = Vector3(2.4, 0.9, 0.6)
+position = Vector3(-3.8, 1.9, 3)
+target = Vector3(2.65, 0.8, 0.8)
 fov = 46.0
 
 [sub_resource type="Resource" id="Resource_1s5j5"]
 script = ExtResource("7_b4dp1")
-position = Vector3(1, 1.65, 2.3)
-target = Vector3(-0.8, 1.35, 1.2)
+position = Vector3(3.26, 1.75, -0.24)
+target = Vector3(-0.79999995, 1.15, 1.1999999)
 fov = 40.0
 
 [sub_resource type="Resource" id="Resource_lpfgv"]
@@ -398,21 +397,21 @@ shot = 1
 
 [sub_resource type="Resource" id="Resource_fuwsk"]
 script = ExtResource("7_b4dp1")
-position = Vector3(0.6, 1.9, 6)
-target = Vector3(0.8, 1.2, 0.2)
-fov = 46.0
+position = Vector3(2.62, 1.9, 5.49)
+target = Vector3(0.79999995, 0.9, 0.29999998)
+fov = 44.0
 
 [sub_resource type="Resource" id="Resource_aowxq"]
 script = ExtResource("7_b4dp1")
-position = Vector3(-2.9, 1.75, 2.2)
-target = Vector3(2.8, 1.45, -0.4)
-fov = 36.0
+position = Vector3(-1.48, 1.75, 0.08)
+target = Vector3(2.8, 1.15, -0.39999998)
+fov = 40.0
 
 [sub_resource type="Resource" id="Resource_rytkt"]
 script = ExtResource("7_b4dp1")
-position = Vector3(4.4, 1.75, -1.4)
-target = Vector3(-1.2, 1.45, 1)
-fov = 36.0
+position = Vector3(2.45, 1.75, -1.29)
+target = Vector3(-1.1999999, 1.15, 1)
+fov = 40.0
 
 [sub_resource type="Resource" id="Resource_4a7lm"]
 script = ExtResource("6_o82v2")
@@ -488,21 +487,21 @@ shot = 0
 
 [sub_resource type="Resource" id="Resource_ms53g"]
 script = ExtResource("7_b4dp1")
-position = Vector3(0.2, 1.7, 5.6)
-target = Vector3(0.6, 0.9, 0.4)
+position = Vector3(3.12, 1.9, 5.02)
+target = Vector3(0.59999996, 0.9, 0.7)
 fov = 44.0
 
 [sub_resource type="Resource" id="Resource_fox03"]
 script = ExtResource("7_b4dp1")
-position = Vector3(-1.8, 1.4, 2.6)
+position = Vector3(-1.16, 1.4, -0.08)
 target = Vector3(1.8, 0.75, 0)
-fov = 36.0
+fov = 40.0
 
 [sub_resource type="Resource" id="Resource_d02wm"]
 script = ExtResource("7_b4dp1")
-position = Vector3(2.8, 1.2, 0.2)
-target = Vector3(-0.6, 1.45, 1.4)
-fov = 38.0
+position = Vector3(2.54, 1.75, -1.55)
+target = Vector3(-0.59999996, 1.15, 1.4)
+fov = 40.0
 
 [sub_resource type="Resource" id="Resource_bc24k"]
 script = ExtResource("6_o82v2")
@@ -591,15 +590,15 @@ fov = 46.0
 
 [sub_resource type="Resource" id="Resource_qsgfa"]
 script = ExtResource("7_b4dp1")
-position = Vector3(-1.2, 1.7, 3)
-target = Vector3(2.6, 1.6, -0.2)
-fov = 38.0
+position = Vector3(-1.9699999, 1.9, 0.19)
+target = Vector3(2.6, 1.3, -0.19999999)
+fov = 40.0
 
 [sub_resource type="Resource" id="Resource_dok63"]
 script = ExtResource("7_b4dp1")
-position = Vector3(3.6, 1.8, 0.6)
-target = Vector3(-2, 1.4, 1.2)
-fov = 38.0
+position = Vector3(1.74, 1.75, -0.94)
+target = Vector3(-2, 1.15, 1.1999999)
+fov = 40.0
 
 [sub_resource type="Resource" id="Resource_4rlet"]
 script = ExtResource("6_o82v2")
@@ -700,26 +699,26 @@ text = "Kneel. It is easier than what comes next."
 
 [sub_resource type="Resource" id="Resource_jgvvv"]
 script = ExtResource("7_b4dp1")
-position = Vector3(-1, 1.6, 4.4)
-target = Vector3(-1.2, 0.9, 0.3)
-fov = 42.0
+position = Vector3(-3.1999998, 1.9, 4.94)
+target = Vector3(-1.1, 0.9, 0.39999998)
+fov = 44.0
 
 [sub_resource type="Resource" id="Resource_35rjb"]
 script = ExtResource("7_b4dp1")
-position = Vector3(-2.6, 1.9, 4.2)
-target = Vector3(0.6, 1.3, 0.6)
+position = Vector3(4.0299997, 1.9, 5.2799997)
+target = Vector3(1.6999999, 0.9, 0.29999998)
 fov = 44.0
 
 [sub_resource type="Resource" id="Resource_cysai"]
 script = ExtResource("7_b4dp1")
-position = Vector3(-1.6, 1.8, 3)
-target = Vector3(3.2, 1.5, -0.4)
-fov = 36.0
+position = Vector3(-1.01, 1.75, 0.51)
+target = Vector3(3.1999998, 1.15, -0.39999998)
+fov = 40.0
 
 [sub_resource type="Resource" id="Resource_qvc4n"]
 script = ExtResource("7_b4dp1")
-position = Vector3(1, 1.6, 2.4)
-target = Vector3(0.2, 1.4, 1)
+position = Vector3(-0.45999998, 1.75, -2.9299998)
+target = Vector3(0.19999999, 1.15, 1)
 fov = 40.0
 
 [sub_resource type="Resource" id="Resource_q7ot7"]
@@ -790,9 +789,9 @@ text = "The Bell Wakes"
 
 [sub_resource type="Resource" id="Resource_bhqnr"]
 script = ExtResource("7_b4dp1")
-position = Vector3(-1.4, 1.7, 4)
-target = Vector3(1, 1, 0.6)
-fov = 42.0
+position = Vector3(2.86, 1.9, 5.24)
+target = Vector3(1, 0.9, 0.59999996)
+fov = 44.0
 
 [sub_resource type="Resource" id="Resource_kw7wu"]
 script = ExtResource("7_b4dp1")

@@ -89,14 +89,14 @@ yaw_degrees = 20.0
 
 [sub_resource type="Resource" id="Resource_lo8jy"]
 script = ExtResource("5_d74ah")
-position = Vector3(-3.6, 2, 3.4)
-target = Vector3(2.4, 0.9, 0.6)
+position = Vector3(-3.8, 1.9, 3)
+target = Vector3(2.65, 0.8, 0.8)
 fov = 46.0
 
 [sub_resource type="Resource" id="Resource_1s5j5"]
 script = ExtResource("5_d74ah")
-position = Vector3(1, 1.65, 2.3)
-target = Vector3(-0.8, 1.35, 1.2)
+position = Vector3(3.26, 1.75, -0.24)
+target = Vector3(-0.79999995, 1.15, 1.1999999)
 fov = 40.0
 
 [resource]
