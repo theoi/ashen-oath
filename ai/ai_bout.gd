@@ -18,7 +18,7 @@ extends RefCounted
 const Action := FighterState.Action
 const SUM_KEYS: PackedStringArray = ["hits", "damage", "blocks", "parries", "dodges",
 		"perfect_dodges", "abilities", "supers", "bursts", "grabs", "grab_techs", "techs",
-		"launches", "wall_splats", "guard_breaks"]
+		"launches", "wall_splats", "guard_breaks", "spawns"]
 
 var config: SimConfig
 var sources: Array[InputSource] = []
@@ -58,6 +58,8 @@ var _quiet_reported: bool = false
 var _action_reported: PackedInt32Array = PackedInt32Array()
 var _timeout_round: bool = false
 var _combo_reported: PackedInt32Array = PackedInt32Array()
+## Team each slot last fought for (wave slots take their team when they spawn; -1 = never).
+var _slot_team: PackedInt32Array = PackedInt32Array()
 
 
 func _init(sim_config: SimConfig, input_sources: Array[InputSource]) -> void:
@@ -78,6 +80,8 @@ func run() -> AiBout:
 	_action_reported.fill(0)
 	_combo_reported.resize(sim.slot_count())
 	_combo_reported.fill(0)
+	_slot_team.resize(sim.slot_count())
+	_slot_team.fill(-1)
 	var limit := max_ticks if max_ticks > 0 else _default_limit()
 	var inputs := PackedInt64Array()
 	inputs.resize(sim.slot_count())
@@ -123,7 +127,10 @@ func timeouts() -> int:
 func team_stat(team: int, key: String) -> int:
 	var total := 0
 	for slot in stats.size():
-		if config.slots[slot].team == team:
+		var slot_team := _slot_team[slot] if slot < _slot_team.size() else -1
+		if slot_team < 0 and slot < config.slots.size():
+			slot_team = config.slots[slot].team
+		if slot_team == team:
 			total += int(stats[slot][key])
 	return total
 
@@ -173,6 +180,8 @@ func _track(events: Array[SimEvent]) -> void:
 				_add(e.source, "wall_splats", 1)
 			SimEvent.Type.GUARD_BREAK:
 				_add(e.source, "guard_breaks", 1)
+			SimEvent.Type.SPAWN:
+				_add(e.source, "spawns", 1)
 			SimEvent.Type.TIME_UP:
 				_timeout_round = true
 			SimEvent.Type.ROUND_END:
@@ -199,6 +208,12 @@ func _track(events: Array[SimEvent]) -> void:
 			stuck.append("round %d tick %d: no damage for %.1f s (%s)" % [st.round_number, st.tick,
 					_quiet_ticks / 60.0, _describe_fighters()])
 	for f in st.fighters:
+		if f.active:
+			_slot_team[f.slot] = f.team
+	for f in st.fighters:
+		if not f.active:
+			_combo_reported[f.slot] = 0
+			continue
 		longest_combo_hits = maxi(longest_combo_hits, f.combo_hits)
 		longest_combo_ticks = maxi(longest_combo_ticks, f.combo_ticks)
 		if f.combo_hits == 0:
@@ -208,7 +223,7 @@ func _track(events: Array[SimEvent]) -> void:
 			long_combos.append("round %d tick %d: slot %d took %d hits over %.1f s of hitstun" % [st.round_number,
 					st.tick, f.slot, f.combo_hits, f.combo_ticks / 60.0])
 	for f in st.fighters:
-		if f.ko or f.action == Action.IDLE or f.action == Action.GUARD:
+		if not f.active or f.ko or f.action == Action.IDLE or f.action == Action.GUARD:
 			continue
 		if f.action_tick >= stuck_action_ticks and _action_reported[f.slot] == 0:
 			_action_reported[f.slot] = 1

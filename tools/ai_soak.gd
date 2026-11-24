@@ -49,6 +49,7 @@ func _usage() -> String:
 		+ "  [--levels=normal,normal] [--teams=0,1] [--arena=training_arena] [--rounds=N] [--round-seconds=S]\n" \
 		+ "  [--profiles=1:oath_shade] [--start-soul=1:50] [--cap=easy] [--no-swap] [--stuck-seconds=20]\n" \
 		+ "  [--stuck-action-seconds=10] [--verify] [--json=path] [--replays=dir] [--save-all] [--quiet]\n" \
+		+ "  [--waves=3] [--wave-fighters=hollowed] [--wave-size=2] [--wave-level=normal] [--wave-team=1] [--wave-hp=100]\n" \
 		+ "  [--fail-on-stuck] [--allow-guard] [--infinite-hits=20] [--infinite-seconds=8] [--fail-on-infinite]"
 
 
@@ -86,12 +87,33 @@ func _run() -> int:
 		team_of.append(team)
 		labels.append("%s %s" % [level_names[slot], fighters[slot].id])
 
+	var waves := _waves()
+	var wave_level: String = _opts.get("wave-level", "normal")
+	var total := slot_count
+	if _opts.has("waves") and waves.is_empty():
+		return 1
+	if not waves.is_empty():
+		var sample := SimConfig.new()
+		for slot in slot_count:
+			sample.slots.append(SlotConfig.new())
+		sample.waves = waves
+		total = sample.total_slots()
+		swap = false
+		labels.append("%d waves of %d× %s (%s, %d%% HP)" % [waves.size(), waves[0].entries[0].count,
+				",".join(_list("wave-fighters", "hollowed")), wave_level, waves[0].entries[0].hp_percent])
 	print("AI soak: %d matches, %s, arena %s, seed %d%s" % [matches, " vs ".join(labels),
 			arena.id, base_seed, ", sides swapped every other match" if swap else ""])
 	var team_names: Dictionary[int, String] = {}
 	for slot in slot_count:
 		var name: String = team_names.get(team_of[slot], "")
 		team_names[team_of[slot]] = labels[slot] if name.is_empty() else name + " + " + labels[slot]
+	if not waves.is_empty():
+		var wave_team := waves[0].entries[0].team
+		var existing: String = team_names.get(wave_team, "")
+		team_names[wave_team] = labels[slot_count] if existing.is_empty() else existing + " + " + labels[slot_count]
+		labels.resize(slot_count)
+		for slot in range(slot_count, total):
+			labels.append("%s wave slot" % wave_level)
 	var wins: Dictionary[int, int] = {}
 	var draws := 0
 	var unfinished := 0
@@ -107,14 +129,14 @@ func _run() -> int:
 	var sim_usec := 0
 	var input_usec := 0
 	var totals: Array[Dictionary] = []
-	for slot in slot_count:
+	for slot in total:
 		var counters: Dictionary = {}
 		for key in AiBout.SUM_KEYS:
 			counters[key] = 0
 		totals.append(counters)
 	var match_reports: Array[Dictionary] = []
 	var ai_counters: Array[Dictionary] = []
-	for _slot in slot_count:
+	for _slot in total:
 		ai_counters.append({})
 	var replay_dir: String = _opts.get("replays", "")
 	if not replay_dir.is_empty():
@@ -138,7 +160,8 @@ func _run() -> int:
 			if swapped:
 				sc.spawn = 1 - slot
 			cfg.slots.append(sc)
-		var sources := _sources(cfg, level_names, profile_overrides, cap)
+		cfg.waves = waves
+		var sources := _sources(cfg, level_names, profile_overrides, cap, wave_level)
 		var bout := AiBout.new(cfg, sources)
 		bout.record_checksums = _opts.has("verify")
 		bout.stuck_no_damage_ticks = roundi(float(_opts.get("stuck-seconds", "20")) * 60.0)
@@ -166,7 +189,7 @@ func _run() -> int:
 			combo_reports.append("match %d (seed %d): %s" % [m + 1, cfg.seed, line])
 		longest_hits = maxi(longest_hits, bout.longest_combo_hits)
 		longest_ticks = maxi(longest_ticks, bout.longest_combo_ticks)
-		for slot in slot_count:
+		for slot in total:
 			for key in AiBout.SUM_KEYS:
 				totals[slot][key] = int(totals[slot][key]) + int(bout.stats[slot][key])
 			var ai := sources[slot] as AiInputSource
@@ -205,12 +228,12 @@ func _run() -> int:
 	print("  draws %d, unfinished %d" % [draws, unfinished])
 	print("  rounds %d, average %.1f s, timeouts %d" % [round_count, round_ticks / 60.0 / maxi(1, round_count), timeouts])
 	print("  per slot (hits / blocks / parries / dodges / abilities / supers / bursts / grabs / techs):")
-	for slot in slot_count:
+	for slot in total:
 		var t := totals[slot]
 		print("    %d %-28s %d / %d / %d / %d / %d / %d / %d / %d / %d" % [slot, labels[slot], t["hits"], t["blocks"],
 				t["parries"], t["dodges"], t["abilities"], t["supers"], t["bursts"], t["grabs"], t["techs"]])
 	print("  CPU decisions per slot:")
-	for slot in slot_count:
+	for slot in total:
 		var keys: Array = ai_counters[slot].keys()
 		keys.sort()
 		var parts := PackedStringArray()
@@ -256,11 +279,11 @@ func _run() -> int:
 
 
 func _sources(cfg: SimConfig, level_names: PackedStringArray, profile_overrides: Dictionary,
-		cap: int) -> Array[InputSource]:
+		cap: int, wave_level: String) -> Array[InputSource]:
 	var cpu_slots := PackedInt32Array()
 	var levels := PackedInt32Array()
-	for slot in cfg.slots.size():
-		var name := level_names[slot].to_lower()
+	for slot in cfg.total_slots():
+		var name := (level_names[slot] if slot < cfg.slots.size() else wave_level).to_lower()
 		var level := LEVELS.find(name)
 		if level < 0:
 			level = -1 if name == "none" or name == "dummy" else clampi(int(name), 0, 3)
@@ -272,20 +295,43 @@ func _sources(cfg: SimConfig, level_names: PackedStringArray, profile_overrides:
 	for level in levels:
 		if level >= 0:
 			token_count = maxi(token_count, AiDifficulty.preset(level, cap).attack_tokens)
-	var team_tokens := AiInputSource.shared_tokens(cfg, cpu_slots, token_count)
+	var wave_tokens := AiDifficulty.preset(maxi(0, LEVELS.find(wave_level.to_lower())), cap).wave_attack_tokens
+	var team_tokens := AiInputSource.shared_tokens(cfg, cpu_slots, token_count, wave_tokens)
 	var sources: Array[InputSource] = []
-	for slot in cfg.slots.size():
+	for slot in cfg.total_slots():
 		if levels[slot] < 0:
 			sources.append(null)
 			continue
 		var profile: AiProfile = null
 		if profile_overrides.has(slot):
 			profile = AiProfile.by_id(StringName(profile_overrides[slot]))
-		var ai := AiInputSource.new(AiDifficulty.preset(levels[slot], cap), profile,
-				team_tokens.get(cfg.slots[slot].team))
+		var ai := AiInputSource.new(AiDifficulty.preset(levels[slot], cap), profile)
+		# Tokens follow each fighter's current team (wave slots get theirs on spawn).
+		ai.team_tokens = team_tokens
 		ai.allow_guard = _opts.has("allow-guard")
 		sources.append(ai)
 	return sources
+
+
+## --waves=N: N waves of --wave-size copies of --wave-fighters (cycled per wave) on --wave-team.
+func _waves() -> Array[WaveData]:
+	var result: Array[WaveData] = []
+	var ids := _list("wave-fighters", "hollowed")
+	for w in int(_opts.get("waves", "0")):
+		var data := _resolve_fighter(ids[w % ids.size()])
+		if data == null:
+			push_error("unknown wave fighter '%s'" % ids[w % ids.size()])
+			return []
+		var entry := WaveEntry.new()
+		entry.fighter = data
+		entry.count = int(_opts.get("wave-size", "2"))
+		entry.team = int(_opts.get("wave-team", "1"))
+		entry.interval = 30
+		entry.hp_percent = int(_opts.get("wave-hp", "100"))
+		var wave := WaveData.new()
+		wave.entries.append(entry)
+		result.append(wave)
+	return result
 
 
 func _resolve_fighter(id: String) -> FighterData:
