@@ -48,16 +48,31 @@ const GROUND_SIZE := 2.6
 const ASH_HOLD := 0.1
 const ASH_TIME := 0.667
 
+const ROOT_SHADER := preload("res://presentation/fighters/shaders/root_chains.gdshader")
+const GAUGE_SHADER := preload("res://presentation/fighters/shaders/channel_gauge.gdshader")
+const CHILL := Color(0.55, 0.82, 1.0)
+const ASH_TINT := Color(0.5, 0.4, 0.62)
+## Seconds the channel-break gauge takes to shatter.
+const GAUGE_BREAK_TIME := 0.45
+
+## Scene the current model came from (a wave slot can change fighter on SPAWN).
+var scene_path := ""
+## Chains of ash at the feet while rooted.
+var _root_ring: MeshInstance3D
+var _root_fade := 0.0
+## Orange channel-break gauge over the head (bosses).
+var _gauge: MeshInstance3D
+var _gauge_break := -1.0
+var _gauge_fill := 1.0
+var _status := 0.0
+var _status_color := CHILL
+
 
 ## Builds the view for `slot` of the runner's match.
 func setup(match_runner: MatchRunner, fighter_slot: int) -> void:
 	runner = match_runner
 	slot = fighter_slot
 	name = "Fighter%d" % slot
-	var data := runner.sim.fighter_data[slot]
-	var path := data.scene if data.scene != "" and ResourceLoader.exists(data.scene) else FALLBACK_SCENE
-	var scene: PackedScene = load(path)
-	model = scene.instantiate() as FighterModel
 	_pivot = Node3D.new()
 	_pivot.name = "Pivot"
 	add_child(_pivot)
@@ -65,18 +80,16 @@ func setup(match_runner: MatchRunner, fighter_slot: int) -> void:
 	_body.name = "Body"
 	_body.position.y = -FighterModel.HIP_HEIGHT
 	_pivot.add_child(_body)
-	_body.add_child(model)
-	model.build()
-	poser.model = model
-	poser.idle_clip = model.idle_clip
-	poser.run_clip = model.run_clip
-	poser.guard_clip = model.guard_clip
 	_trail = WeaponTrail.new()
 	_trail.name = "Trail"
-	_trail.color = model.trail_color
 	add_child(_trail)
 	_ground = _make_ground()
 	add_child(_ground)
+	_root_ring = _make_flat(&"RootChains", ROOT_SHADER, 1.6)
+	add_child(_root_ring)
+	_gauge = _make_gauge()
+	add_child(_gauge)
+	_build_model()
 	var f := runner.sim.fighter(slot)
 	_prev_facing = f.facing
 	_cur_facing = f.facing
@@ -86,6 +99,29 @@ func setup(match_runner: MatchRunner, fighter_slot: int) -> void:
 
 func fighter() -> FighterState:
 	return runner.sim.fighter(slot)
+
+
+## The model for the slot's current fighter (sim.fighter_data[slot]); replaces the old one
+## when a wave slot changed fighter.
+func _build_model() -> void:
+	var data := runner.sim.fighter_data[slot]
+	var path := data.scene if data.scene != "" and ResourceLoader.exists(data.scene) else FALLBACK_SCENE
+	if model != null:
+		if path == scene_path:
+			return
+		_body.remove_child(model)
+		model.queue_free()
+	scene_path = path
+	model = (load(path) as PackedScene).instantiate() as FighterModel
+	_body.add_child(model)
+	model.build()
+	poser.model = model
+	poser.idle_clip = model.idle_clip
+	poser.run_clip = model.run_clip
+	poser.guard_clip = model.guard_clip
+	_trail.color = model.trail_color
+	(_ground.material_override as ShaderMaterial).set_shader_parameter(&"glow_color", model.rim_color.lerp(Color.WHITE, 0.35))
+	_last_key = ""
 
 
 ## Reacts to an event that involves this fighter (called by FightFx for every event).
@@ -116,11 +152,34 @@ func on_event(e: SimEvent) -> void:
 				flash(Color(0.6, 0.8, 1.0), 0.9)
 				_shake = 1.0
 		SimEvent.Type.ROUND_START:
-			_trail.clear()
-			_ash = -1.0
-			model.set_dissolve(0.0)
-			if _ash_embers != null:
-				_ash_embers.emitting = false
+			_reset_status()
+		SimEvent.Type.SPAWN:
+			if e.source == slot:
+				_build_model()
+				_reset_status()
+				_prev_facing = fighter().facing
+				_cur_facing = _prev_facing
+		SimEvent.Type.DESPAWN:
+			if e.source == slot:
+				_reset_status()
+				visible = false
+		SimEvent.Type.CHANNEL_BREAK:
+			if e.target == slot:
+				_gauge_break = 0.0
+				flash(Color(1.0, 0.55, 0.15), 1.0)
+				_shake = 1.0
+
+
+func _reset_status() -> void:
+	_trail.clear()
+	_ash = -1.0
+	model.set_dissolve(0.0)
+	if _ash_embers != null:
+		_ash_embers.emitting = false
+	_gauge_break = -1.0
+	_root_fade = 0.0
+	_status = 0.0
+	model.set_status(_status_color, 0.0)
 
 
 ## Burns the model away into ash with rising embers (Hollowed deaths).
@@ -161,6 +220,9 @@ func _update(delta: float) -> void:
 	_time += delta
 	var sim := runner.sim
 	var f := fighter()
+	visible = f.active
+	if not f.active:
+		return
 	var frozen := f.hitstop > 0 or sim.state.freeze > 0 or runner.paused
 	var sub := 0.0 if frozen else clampf(runner.alpha(), 0.0, 1.0)
 	if not frozen:
@@ -180,6 +242,7 @@ func _update(delta: float) -> void:
 	model.set_flash(_flash_color, _flash)
 	_update_ash(delta)
 	_update_ground()
+	_update_statuses(f, delta)
 	_trail.feed(model.trail_segment(), _pose.trail and not frozen, 0.0 if frozen else delta)
 	model.update_extras(sim, f, delta)
 
@@ -236,10 +299,84 @@ func _update_ground() -> void:
 	(_ground.material_override as ShaderMaterial).set_shader_parameter(&"fade", lift * (1.0 - gone))
 
 
+## Root chains, debuff tint and the channel-break gauge, from sim state.
+func _update_statuses(f: FighterState, delta: float) -> void:
+	var p := global_position
+	_root_fade = move_toward(_root_fade, 1.0 if f.rooted > 0 and not f.ko else 0.0, delta * 6.0)
+	_root_ring.visible = _root_fade > 0.01
+	if _root_ring.visible:
+		_root_ring.global_position = Vector3(p.x, 0.04, p.z)
+		(_root_ring.material_override as ShaderMaterial).set_shader_parameter(&"fade", _root_fade)
+	var want := 0.0
+	for buff in f.buffs:
+		if buff.source == Sim.VICTIM_BUFF:
+			_status_color = CHILL if buff.speed_bonus_percent < 0 else ASH_TINT
+			want = 0.75 if buff.speed_bonus_percent < 0 else 0.5
+	_status = move_toward(_status, want if not f.ko else 0.0, delta * 4.0)
+	model.set_status(_status_color, _status * (0.85 + 0.15 * sin(_time * 5.0)))
+	var material := _gauge.material_override as ShaderMaterial
+	if _gauge_break >= 0.0:
+		_gauge_break += delta
+		var t := clampf(_gauge_break / GAUGE_BREAK_TIME, 0.0, 1.0)
+		material.set_shader_parameter(&"fill", 0.0)
+		material.set_shader_parameter(&"broken", maxf(0.001, t))
+		_gauge.visible = t < 1.0
+		if t >= 1.0:
+			_gauge_break = -1.0
+	elif f.channel_max > 0 and f.channel > 0:
+		_gauge.visible = true
+		_gauge_fill = float(f.channel) / float(f.channel_max)
+		material.set_shader_parameter(&"fill", _gauge_fill)
+		material.set_shader_parameter(&"broken", 0.0)
+	else:
+		_gauge.visible = false
+	if _gauge.visible:
+		_gauge.global_position = p + Vector3.UP * (runner.sim.fighter_data[slot].height + 0.75)
+
+
+## True while the orange channel-break gauge shows (or is shattering).
+func gauge_shown() -> bool:
+	return _gauge.visible
+
+
+func gauge_fill() -> float:
+	return _gauge_fill
+
+
+func _make_flat(node_name: StringName, shader: Shader, size: float) -> MeshInstance3D:
+	var material := ShaderMaterial.new()
+	material.shader = shader
+	var plane := PlaneMesh.new()
+	plane.size = Vector2(size, size)
+	var flat := MeshInstance3D.new()
+	flat.name = node_name
+	flat.mesh = plane
+	flat.material_override = material
+	flat.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	flat.top_level = true
+	flat.visible = false
+	return flat
+
+
+func _make_gauge() -> MeshInstance3D:
+	var material := ShaderMaterial.new()
+	material.shader = GAUGE_SHADER
+	material.render_priority = 20
+	var quad := QuadMesh.new()
+	quad.size = Vector2(1.7, 0.16)
+	var gauge := MeshInstance3D.new()
+	gauge.name = "ChannelGauge"
+	gauge.mesh = quad
+	gauge.material_override = material
+	gauge.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	gauge.top_level = true
+	gauge.visible = false
+	return gauge
+
+
 func _make_ground() -> MeshInstance3D:
 	var material := ShaderMaterial.new()
 	material.shader = GROUND_SHADER
-	material.set_shader_parameter(&"glow_color", model.rim_color.lerp(Color.WHITE, 0.35))
 	material.render_priority = -1
 	var quad := PlaneMesh.new()
 	quad.size = Vector2(GROUND_SIZE, GROUND_SIZE)

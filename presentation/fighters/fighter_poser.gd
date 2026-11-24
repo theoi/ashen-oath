@@ -12,6 +12,8 @@ const MIN_FOLLOW_SPEED := 0.7
 const MAX_FOLLOW_SPEED := 2.2
 const RUN_CLIP_SPEED := 5.5
 const KNOCKDOWN_FALL := 0.42
+## Wave spawns rise from the floor with this clip.
+const SPAWN_CLIP := &"Skeletons_Awaken_Floor"
 
 ## Clip overrides by role, for fighters whose idle/run differ (two-handed, casters, dead).
 var idle_clip: StringName = &"Idle"
@@ -106,6 +108,11 @@ func evaluate(sim: Sim, f: FighterState, pose: FighterPose, sub: float, clock: f
 			pose.shake = 0.25
 		Action.KO:
 			_ko(f, pose, ticks)
+		Action.SPAWN:
+			# Rises out of the floor: the awaken clip over the spawn frames, starting sunk in.
+			var rise := clampf(ticks / maxf(1.0, float(f.action_len)), 0.0, 1.0)
+			pose.set_clip(SPAWN_CLIP, rise * FighterClips.length(SPAWN_CLIP), "spawn", 0.0)
+			pose.lift = -0.5 * (1.0 - smoothstep(0.0, 0.35, rise))
 		_:
 			_locomotion(f, data, pose, clock)
 	if model != null:

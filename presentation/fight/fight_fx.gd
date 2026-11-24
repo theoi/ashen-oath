@@ -195,9 +195,37 @@ func _on_event(e: SimEvent) -> void:
 			Sound.play(&"swing_heavy")
 		SimEvent.Type.BUFF:
 			var at := _body_point(e.source)
-			flash_at(at, _accent(e.source), 0.9, 0.2)
-			burst(at, _accent(e.source), 26, 3.0, Vector3.UP)
+			if _is_victim_buff(e):
+				# A debuff landing on the victim: a cold or ashen puff, not a power-up.
+				var chill := _victim_buff_slows(e)
+				var tint := Color(0.6, 0.85, 1.0) if chill else Color(0.5, 0.42, 0.6)
+				burst(at, tint, 16, 1.6, Vector3.DOWN)
+				ring_at(_ground_point(e.source), tint, 1.2)
+			else:
+				flash_at(at, _accent(e.source), 0.9, 0.2)
+				burst(at, _accent(e.source), 26, 3.0, Vector3.UP)
 			_play(e.cue, &"")
+		SimEvent.Type.ROOT:
+			# Chains of ash snap shut around the feet.
+			var at := _ground_point(e.target)
+			burst(at + Vector3.UP * 0.15, Color(0.35, 0.3, 0.28), 18, 2.0, Vector3.UP)
+			ring_at(at, Color(1.0, 0.45, 0.12), 1.3)
+			_play(&"root", &"grab")
+		SimEvent.Type.SPAWN:
+			# Rises from the floor in a burst of ash and bone dust.
+			var at := _ground_point(e.source)
+			ring_at(at, Color(0.55, 0.5, 0.45), 2.2)
+			burst(at + Vector3.UP * 0.1, Color(0.6, 0.56, 0.5), 34, 2.4, Vector3.UP)
+			burst(at + Vector3.UP * 0.2, Color(1.0, 0.5, 0.15), 14, 1.8, Vector3.UP)
+			_shake(0.02, 6)
+			_play(&"spawn_rise", &"body_fall")
+		SimEvent.Type.CHANNEL_START:
+			var at := _body_point(e.source)
+			ring_at(_ground_point(e.source), Color(1.0, 0.5, 0.1), 3.0)
+			flash_at(at, Color(1.0, 0.55, 0.15), 1.2, 0.25)
+			_play(&"channel_start", &"super_flash")
+		SimEvent.Type.CHANNEL_BREAK:
+			_on_channel_break(e)
 		SimEvent.Type.KO:
 			var at := _body_point(e.target)
 			var dead := _view(e.target)
@@ -302,6 +330,44 @@ func _on_super_flash(e: SimEvent) -> void:
 		var side := Vector3(ahead.z, 0.0, -ahead.x)
 		var base := runner.fighter_position(e.source)
 		camera.cinematic(base + ahead * 2.4 + side * 1.0 + Vector3.UP * 0.7, base + Vector3.UP * 1.1, seconds + 0.33)
+
+
+## The channel-break moment (design-lost-ark §5.8): the boss's special is broken. A big
+## orange flash and ring, a heavy shake and zoom punch, a short slow motion and the break
+## sound.
+func _on_channel_break(e: SimEvent) -> void:
+	var at := _body_point(e.target)
+	flash_at(at, Color(1.0, 0.6, 0.2), flash_size(at, WEIGHT_FLASH[MASSIVE].x * maxf(0.2, Feel.flash_intensity())), 0.35)
+	ring_at(_ground_point(e.target), Color(1.0, 0.5, 0.1), 4.5)
+	ring_at(at, Color(1.0, 0.75, 0.4), 2.6, true)
+	burst(at, Color(1.0, 0.55, 0.15), 48, 8.0, Vector3.ZERO)
+	_shake(WEIGHT_SHAKE[MASSIVE].x, WEIGHT_SHAKE[MASSIVE].y)
+	_punch(0.3)
+	_overlay_pulse(Color(1.0, 0.55, 0.2), 0.22)
+	runner.slow_motion(Feel.slow_motion(), SLOW_MOTION_TICKS)
+	if _local(e.source) or _local(e.target):
+		_rumble(MASSIVE)
+	_play(&"channel_break", &"guard_break")
+
+
+## True when a BUFF event is a debuff a hit put on its victim (Sim.VICTIM_BUFF).
+func _is_victim_buff(e: SimEvent) -> bool:
+	return _victim_buff(e) != null
+
+
+func _victim_buff_slows(e: SimEvent) -> bool:
+	var buff := _victim_buff(e)
+	return buff != null and buff.speed_bonus_percent < 0
+
+
+func _victim_buff(e: SimEvent) -> BuffState:
+	if e.source < 0 or e.source >= runner.sim.slot_count():
+		return null
+	var key := String(e.id).hash()
+	for buff in runner.sim.fighter(e.source).buffs:
+		if buff.source == Sim.VICTIM_BUFF and buff.key == key:
+			return buff
+	return null
 
 
 # --- Impact by weight (design-lost-ark §1.12) -----------------------------------------------
