@@ -16,8 +16,8 @@ stop_at_distance = 0.9
 script = ExtResource("4_hit_datagd")
 damage = 40
 weight = 1
-hitstun = 16
-knockback = 1
+hitstun = 10
+knockback = 2.5
 cue = &"hit_shield"
 
 [sub_resource type="Resource" id="Hitbox_2"]
@@ -37,6 +37,5 @@ startup = 6
 active = 2
 recovery = 14
 animation = &"Block_Attack"
-next_light = &"aldric_b1"
 motions = Array[ExtResource("2_motion_datag")]([SubResource("Motion_1")])
 hitboxes = Array[ExtResource("3_hitbox_datag")]([SubResource("Hitbox_2")])

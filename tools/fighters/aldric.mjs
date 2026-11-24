@@ -22,9 +22,9 @@ export const moves = [
   { id: 'aldric_b2', kind: KIND.LIGHT, aim: AIM.DIRECTION, startup: 4, active: 2, recovery: 12, animation: '1H_Melee_Attack_Slice_Horizontal', next_light: 'aldric_b3',
     motions: [{ start_frame: 1, end_frame: 5, forward_speed: 3.6, stop_at_distance: 0.9 }],
     hitboxes: [{ ...slash(1.75), hit: basicHit(25) }] },
-  { id: 'aldric_b3', kind: KIND.LIGHT, aim: AIM.DIRECTION, startup: 6, active: 2, recovery: 14, animation: 'Block_Attack', next_light: 'aldric_b1',
+  { id: 'aldric_b3', kind: KIND.LIGHT, aim: AIM.DIRECTION, startup: 6, active: 2, recovery: 14, animation: 'Block_Attack',
     motions: [{ start_frame: 1, end_frame: 6, forward_speed: 3.0, stop_at_distance: 0.9 }],
-    hitboxes: [{ offset: v3(0, 1.0, 0.5), offset_end: v3(0, 1.0, 1.5), capsule: true, radius: 0.6, hit: basicHit(40, { hitstun: 16, knockback: 1.0, cue: 'hit_shield' }) }] },
+    hitboxes: [{ offset: v3(0, 1.0, 0.5), offset_end: v3(0, 1.0, 1.5), capsule: true, radius: 0.6, hit: basicHit(40, { hitstun: 10, knockback: 2.5, cue: 'hit_shield' }) }] },
   { id: 'aldric_getup', kind: KIND.GETUP_ATTACK, aim: AIM.DIRECTION, startup: 10, active: 3, recovery: 18, invuln_start: 1, invuln_end: 10, animation: '1H_Melee_Attack_Slice_Horizontal',
     hitboxes: [{ ...slash(1.8, 0.8, 0.6), hit: { damage: 40, weight: WEIGHT.LIGHT, hitstun: 18, knockback: 1.0, cue: 'hit_blade' } }] },
 

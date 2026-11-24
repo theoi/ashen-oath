@@ -31,7 +31,7 @@ super).
 | Gorrath | L L L, L L H launcher, L H sweep | H H (chargeable, wall splat), all armoured | Chain Hook (9 m chain, pulls point-blank at +14), Earthsplitter (shockwave, ground bounce), Bull Rush (2-hit armour charge that carries into walls) | Execution Chain (command grab: unblockable, beats attacks, untechable, three slams) |
 
 **Aldric (skill kit, 1500 HP, no jump, 2 dash charges at 5 s).** Basic: Oath Strikes, a
-3-hit chain that repeats while held. Skills: Q Oathfire Lunge (dash-strike to the aim,
+3-hit chain that restarts while held; the shield thrust ends it with a 2.5 m push. Skills: Q Oathfire Lunge (dash-strike to the aim,
 ⚡Counter, wall splat), E Brand Rise (launcher, chain into Brand Slam), R Flame Rend (wave
 that brands; chain Rend Ignition launches everyone it branded), F Bulwark (frontal stance;
 a hit triggers Retribution), Z Cinder Wheel (hold, steerable spin, a Tick hit every 8 f,
