@@ -34,6 +34,13 @@ var seed := 1
 var starting_soul: Array[int] = []
 ## Max HP percent per slot (handicaps, story grunts). Missing entries mean 100.
 var hp_percent: Array[int] = []
+## Story waves (SimConfig.waves): wave combatants take extra slots after `fighters` and are
+## CPU-controlled. Empty for a plain match.
+var waves: Array[WaveData] = []
+## Wave to start from (checkpoint retry).
+var start_wave := 0
+## Wave slots (-1 = fill up to Sim.MAX_SLOTS).
+var wave_slots := -1
 ## Called with the MatchResult when the match ends, instead of the versus results screen.
 var on_finished: Callable
 ## Called with the MatchScreen once it is set up (story mode adds its in-fight prompts).
@@ -79,6 +86,9 @@ func duplicate_config() -> MatchConfig:
 	copy.seed = seed
 	copy.starting_soul = starting_soul.duplicate()
 	copy.hp_percent = hp_percent.duplicate()
+	copy.waves = waves.duplicate()
+	copy.start_wave = start_wave
+	copy.wave_slots = wave_slots
 	copy.on_finished = on_finished
 	copy.on_started = on_started
 	copy.menu_stack = menu_stack.duplicate()

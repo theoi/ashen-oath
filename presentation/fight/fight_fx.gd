@@ -234,7 +234,7 @@ func _on_event(e: SimEvent) -> void:
 			flash_at(at, Color(1.0, 0.9, 0.8), 1.8, 0.3)
 			_shake(0.12, 20)
 			_overlay_pulse(Color(1.0, 1.0, 1.0), 0.3)
-			Sound.play(&"ko")
+			Sound.play(&"mob_death" if _is_wave_mob(e.target) else &"ko")
 		SimEvent.Type.EFFECT_SPAWN:
 			_spawn_effect(e)
 			_play(e.cue, &"")
@@ -348,6 +348,14 @@ func _on_channel_break(e: SimEvent) -> void:
 	if _local(e.source) or _local(e.target):
 		_rumble(MASSIVE)
 	_play(&"channel_break", &"guard_break")
+
+
+## A story-wave combatant without a stagger bar (not a boss): its KO is not a match KO.
+func _is_wave_mob(slot: int) -> bool:
+	var sim := runner.sim
+	if slot < sim.config.slots.size() or slot >= sim.slot_count():
+		return false
+	return sim.fighter(slot).stagger_max <= 0
 
 
 ## True when a BUFF event is a debuff a hit put on its victim (Sim.VICTIM_BUFF).

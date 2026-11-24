@@ -25,11 +25,14 @@ static func sim_config(config: MatchConfig) -> SimConfig:
 		slot_config.start_soul = config.starting_soul[slot] if slot < config.starting_soul.size() else 0
 		slot_config.hp_percent = config.hp_percent[slot] if slot < config.hp_percent.size() else 100
 		cfg.slots.append(slot_config)
+	cfg.waves = config.waves.duplicate()
+	cfg.start_wave = config.start_wave
+	cfg.wave_slots = config.wave_slots
 	return cfg
 
 
 ## One input source per slot: the local device for human slots, the CPU for the rest (every
-## slot in attract mode).
+## slot in attract mode). Wave slots get CPU sources that share one set of attack tokens.
 static func input_sources(config: MatchConfig, camera: Camera3D) -> Array[InputSource]:
 	var sources: Array[InputSource] = []
 	# CPU fighters on one team share attack tokens (1v2: one attacker at a time).
@@ -46,7 +49,19 @@ static func input_sources(config: MatchConfig, camera: Camera3D) -> Array[InputS
 			sources.append(cpu_source(config, slot, team_tokens.get(config.teams[slot])))
 		else:
 			sources.append(DeviceInputSource.new(camera))
+	var wave_slots := wave_slot_count(config)
+	if wave_slots > 0:
+		var tokens := AiAttackTokens.new(cpu_difficulty(config).attack_tokens) if wave_slots >= 2 else null
+		for i in wave_slots:
+			sources.append(AiInputSource.new(cpu_difficulty(config), null, tokens))
 	return sources
+
+
+## Extra sim slots for wave combatants (as SimConfig.total_slots() counts them).
+static func wave_slot_count(config: MatchConfig) -> int:
+	if config.wave_slots >= 0:
+		return config.wave_slots
+	return maxi(0, Sim.MAX_SLOTS - config.slot_count()) if not config.waves.is_empty() else 0
 
 
 ## The CPU opponent for `slot` at the match difficulty (capped by `ai_cap`), with the
