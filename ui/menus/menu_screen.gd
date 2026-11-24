@@ -10,6 +10,9 @@ extends Control
 var screen_id: StringName
 
 var _last_focus: Control
+## Hover moves focus only after the pointer has moved since the screen was shown, so a
+## button that appears under a resting cursor does not steal the default focus.
+var _pointer_moved := false
 
 
 func _init() -> void:
@@ -32,6 +35,7 @@ func on_shown() -> void:
 
 
 func focus_default() -> void:
+	_pointer_moved = false
 	var target := _last_focus
 	if not is_instance_valid(target) or not target.is_visible_in_tree() or target.focus_mode == Control.FOCUS_NONE:
 		target = default_focus()
@@ -49,6 +53,11 @@ func go_back() -> void:
 	if can_go_back():
 		Sound.play(&"ui_back")
 		GameFlow.back()
+
+
+func _input(event: InputEvent) -> void:
+	if event is InputEventMouseMotion:
+		_pointer_moved = true
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -70,7 +79,7 @@ func make_button(text: String, on_press: Callable, variation: StringName = &"") 
 		Sound.play(&"ui_confirm")
 		on_press.call())
 	button.mouse_entered.connect(func() -> void:
-		if button.focus_mode != Control.FOCUS_NONE:
+		if button.focus_mode != Control.FOCUS_NONE and _pointer_moved:
 			button.grab_focus())
 	return button
 

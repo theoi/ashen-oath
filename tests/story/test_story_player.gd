@@ -120,6 +120,8 @@ func test_loss_screen_offers_lower_difficulty_only_after_two_losses() -> void:
 	await _open_player()
 	assert_true(player.panel is StoryHollowedScreen)
 	assert_eq(_focused_name(), "Retry")
+	(player.panel.find_child("Quit", true, false) as Button).mouse_entered.emit()
+	assert_eq(_focused_name(), "Retry", "a resting cursor under Quit does not take the focus")
 	assert_null(player.panel.find_child("RetryLower", true, false))
 	assert_not_null(player.panel.find_child("Quit", true, false))
 	player.free()

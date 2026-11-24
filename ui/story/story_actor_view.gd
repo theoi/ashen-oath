@@ -12,6 +12,7 @@ var hold_time := -1.0
 var model: Node3D
 
 var _time := 0.0
+var _settle := 0
 var _stand_in: Node3D
 
 
@@ -39,6 +40,7 @@ func set_pose(pose_clip: StringName, time: float = -1.0) -> void:
 	clip = pose_clip if _has_clip(pose_clip) else &"Idle"
 	hold_time = time
 	_time = 0.0
+	_settle = 0
 	_apply()
 
 
@@ -50,8 +52,14 @@ func head_position() -> Vector3:
 
 
 func _process(delta: float) -> void:
-	if model != null and hold_time < 0.0:
+	if model == null:
+		return
+	if hold_time < 0.0:
 		_time += delta
+		_apply()
+	elif _settle < 3:
+		# The animation tree's first updates can land after the first seek; hold the pose.
+		_settle += 1
 		_apply()
 
 

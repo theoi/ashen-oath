@@ -265,8 +265,12 @@ func _press(action: StringName) -> void:
 		Input.parse_input_event(event)
 
 
+## Saves a screenshot the second time a key is seen, so the new screen has settled.
 func _shot_once(key: String) -> void:
-	if not _args.has("shots") or _seen.has(key):
+	if not _args.has("shots") or _seen.get(key, false):
+		return
+	if not _seen.has(key):
+		_seen[key] = false
 		return
 	_seen[key] = true
 	var image := get_viewport().get_texture().get_image()
