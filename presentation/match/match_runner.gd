@@ -14,13 +14,19 @@ signal match_ended(winner_team: int)
 var sim: Sim
 var sources: Array[InputSource] = []
 var replay: Replay
-## Stops stepping (pause menu). Rendering keeps going.
-var paused: bool = false
+## Stops stepping (pause menu). Rendering keeps going; ends any slow motion.
+var paused: bool = false:
+	set(value):
+		paused = value
+		if paused and _slow_ticks > 0:
+			_end_slow_motion()
 ## Record a checksum per tick in the replay (desync checks; costs ~0.05 ms/tick).
 var record_checksums: bool = false
 
 var _prev_positions: Array[Vector3i] = []
 var _ended: bool = false
+## Presentation-only slow motion: ticks left to run slowed (see slow_motion()).
+var _slow_ticks := 0
 
 
 ## Starts a match. `input_sources[slot]` drives that slot (null = neutral).
@@ -37,6 +43,30 @@ func _physics_process(_delta: float) -> void:
 		step_once()
 
 
+## Runs the next `ticks` sim ticks at `factor` of real time (0.4 = 40% speed) by slowing
+## the engine clock: the sim steps exactly the same ticks with the same inputs, so results
+## do not change. Presentation only (awakening finales, perfect dashes).
+func slow_motion(factor: float, ticks: int) -> void:
+	if factor >= 1.0 or ticks <= 0:
+		return
+	_slow_ticks = maxi(_slow_ticks, ticks)
+	Engine.time_scale = clampf(factor, 0.05, 1.0)
+
+
+func is_slowed() -> bool:
+	return _slow_ticks > 0
+
+
+func _end_slow_motion() -> void:
+	_slow_ticks = 0
+	Engine.time_scale = 1.0
+
+
+func _exit_tree() -> void:
+	if _slow_ticks > 0:
+		_end_slow_motion()
+
+
 ## Gathers inputs, steps the sim once and emits its events.
 func step_once() -> void:
 	var inputs := PackedInt64Array()
@@ -46,6 +76,10 @@ func step_once() -> void:
 		inputs[slot] = source.next_frame(sim, slot) if source != null else 0
 	_snapshot_positions()
 	var events := sim.step(inputs)
+	if _slow_ticks > 0:
+		_slow_ticks -= 1
+		if _slow_ticks == 0:
+			_end_slow_motion()
 	replay.record(inputs, sim.checksum() if record_checksums else 0, record_checksums)
 	for event in events:
 		event_emitted.emit(event)

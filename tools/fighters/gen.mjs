@@ -12,8 +12,9 @@ const TYPES = {
   BuffData: 'res://content/types/buff_data.gd',
   TeleportData: 'res://content/types/teleport_data.gd',
   FighterData: 'res://content/types/fighter_data.gd',
+  DashData: 'res://content/types/dash_data.gd',
 };
-const CHILD_TYPE = { hitboxes: 'HitboxData', hit: 'HitData', motions: 'MotionData', effects: 'EffectData', cancels: 'CancelData', buff: 'BuffData', teleport: 'TeleportData', parry_buff: 'BuffData' };
+const CHILD_TYPE = { hitboxes: 'HitboxData', hit: 'HitData', mark_hit: 'HitData', motions: 'MotionData', effects: 'EffectData', cancels: 'CancelData', buff: 'BuffData', teleport: 'TeleportData', parry_buff: 'BuffData', dash: 'DashData' };
 export const KIND = { LIGHT: 0, HEAVY: 1, AIR_LIGHT: 2, AIR_HEAVY: 3, GRAB: 4, THROW: 5, ABILITY: 6, SUPER: 7, GETUP_ATTACK: 8, BURST: 9 };
 export const REACTION = { STAGGER: 0, KNOCKDOWN: 1, LAUNCH: 2, GROUND_BOUNCE: 3, PULL: 4 };
 export const COND = { ALWAYS: 0, ON_CONTACT: 1, ON_HIT: 2 };
@@ -22,7 +23,31 @@ export const ANCHOR = { OWNER: 0, TARGET: 1 };
 export const TP = { STICK: 0, FORWARD: 1, BEHIND_TARGET: 2 };
 
 // Fields written as StringName.
-const STRING_NAMES = new Set(['id', 'next_light', 'next_heavy', 'animation', 'cue', 'throw_move', 'light', 'heavy', 'run_light', 'air_light', 'air_heavy', 'grab', 'getup_attack', 'super_move']);
+const STRING_NAMES = new Set(['id', 'next_light', 'next_heavy', 'animation', 'cue', 'throw_move', 'light', 'heavy', 'run_light', 'air_light', 'air_heavy', 'grab', 'getup_attack', 'super_move', 'follow_up', 'chain_move', 'counter_move', 'early_release_move']);
+
+let repoRoot = '.';
+const exportCache = new Map();
+export const skipped = new Set();
+
+// The @export var names of a content type, read from its script (null if unreadable).
+function exportsOf(type) {
+  if (exportCache.has(type)) return exportCache.get(type);
+  let names = null;
+  try {
+    const src = fs.readFileSync(path.join(repoRoot, TYPES[type].replace('res://', '')), 'utf8');
+    names = new Set([...src.matchAll(/@export(?:_\w+(?:\([^)]*\))?)?\s+var\s+(\w+)/g)].map((m) => m[1]));
+  } catch {
+    names = null;
+  }
+  exportCache.set(type, names);
+  return names;
+}
+
+export function setRepo(repo) { repoRoot = repo; exportCache.clear(); }
+
+process.on('exit', () => {
+  if (skipped.size) console.warn(`skipped (not exported yet): ${[...skipped].sort().join(', ')}`);
+});
 
 function num(v) { return Number.isInteger(v) ? String(v) : String(+v.toFixed(5)); }
 
@@ -61,8 +86,15 @@ class Writer {
   }
   body(type, obj) {
     const lines = [`script = ExtResource("${this.extId('Script', TYPES[type])}")`];
+    const known = exportsOf(type);
     for (const [k, v] of Object.entries(obj)) {
       if (k.startsWith('$')) continue;
+      // Specs may be written ahead of the sim: fields the type does not export yet are
+      // skipped (and reported) so the data keeps loading.
+      if (known && !known.has(k)) {
+        skipped.add(`${type}.${k}`);
+        continue;
+      }
       lines.push(`${k} = ${this.value(k, v)}`);
     }
     return lines.join('\n');
@@ -86,6 +118,7 @@ export const color = (r, g, b, a = 1) => ({ $color: [r, g, b, a] });
 export const sn = (...names) => ({ $sn: names });
 
 export function writeResource(file, type, obj) {
+  if (file.includes('/content/')) setRepo(file.slice(0, file.indexOf('/content/')) || '.');
   const w = new Writer();
   const text = w.write(type, obj);
   fs.mkdirSync(path.dirname(file), { recursive: true });

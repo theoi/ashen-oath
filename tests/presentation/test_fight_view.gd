@@ -70,43 +70,58 @@ func test_morrigan_and_gorrath_fight_without_errors() -> void:
 	assert_eq(fight.views[1].model.name, &"Gorrath")
 
 
-func test_camera_swings_around_a_fighter_backed_against_a_wall() -> void:
+func _still_fight() -> FightView:
 	var fight := FightView.new()
 	add_child_autofree(fight)
 	var sources: Array[InputSource] = [ScriptedInputSource.new(), ScriptedInputSource.new()]
 	fight.start(_config(ALDRIC, HOLLOWED), sources)
 	fight.runner.paused = true
 	SimFixtures.skip_intro(fight.runner.sim)
-	# Aldric with his back to the east wall (x = 12), the Hollowed toward the centre.
-	SimFixtures.place(fight.runner.sim, 0, 11.2, 0.0, Fx.deg(-90.0))
-	SimFixtures.place(fight.runner.sim, 1, 8.2, 0.0, Fx.deg(90.0))
-	fight.runner.step_once()
-	for _i in 240:
-		fight.camera._process(1.0 / 60.0)
-	var eye := fight.camera.global_position
-	var aldric := fight.runner.fighter_position(0)
-	assert_false(fight.camera._outside_floor(Vector2(eye.x, eye.z), 0.3), "camera is inside the arena (%s)" % eye)
-	var flat := Vector2(eye.x - aldric.x, eye.z - aldric.z).length()
-	assert_true(flat > 3.0, "camera keeps its distance from Aldric (%.2f m)" % flat)
+	return fight
 
 
-func test_camera_moves_so_a_pillar_does_not_hide_the_fighters() -> void:
-	var fight := FightView.new()
-	add_child_autofree(fight)
-	var sources: Array[InputSource] = [ScriptedInputSource.new(), ScriptedInputSource.new()]
-	fight.start(_config(ALDRIC, HOLLOWED), sources)
-	fight.runner.paused = true
-	SimFixtures.skip_intro(fight.runner.sim)
-	# The tall pillar at (5, 4.5) stands between Aldric and the Hollowed.
-	SimFixtures.place(fight.runner.sim, 0, 1.6, 4.5, Fx.deg(90.0))
-	SimFixtures.place(fight.runner.sim, 1, 8.4, 4.5, Fx.deg(-90.0))
+func _settle(fight: FightView, frames: int = 240) -> void:
 	fight.runner.step_once()
-	for _i in 240:
+	for _i in frames:
 		fight.camera._process(1.0 / 60.0)
-	var eye := fight.camera.global_position
+
+
+func test_camera_is_high_with_a_fixed_yaw() -> void:
+	var fight := _still_fight()
+	SimFixtures.place(fight.runner.sim, 0, -3.0, 0.0, Fx.deg(90.0))
+	SimFixtures.place(fight.runner.sim, 1, 3.0, 0.0, Fx.deg(-90.0))
+	_settle(fight)
+	var forward := -fight.camera.global_basis.z
+	var pitch := rad_to_deg(asin(-forward.y))
+	assert_almost_eq(pitch, 52.0, 1.0, "pitch")
+	var yaw_before := atan2(forward.x, forward.z)
+	# The fighters swap sides: the camera does not orbit after them.
+	SimFixtures.place(fight.runner.sim, 0, 3.0, 2.0, Fx.deg(-90.0))
+	SimFixtures.place(fight.runner.sim, 1, -3.0, -2.0, Fx.deg(90.0))
+	_settle(fight)
+	forward = -fight.camera.global_basis.z
+	assert_almost_eq(atan2(forward.x, forward.z), yaw_before, 0.001, "yaw stays fixed")
+	assert_almost_eq(fight.camera.fov, 40.0, 0.5, "fov")
+
+
+func test_camera_keeps_both_fighters_in_frame_and_settles_back() -> void:
+	var fight := _still_fight()
+	# The headless test viewport is square, so the split is narrower than on a 16:9 screen.
+	SimFixtures.place(fight.runner.sim, 0, -4.0, -3.0, 0)
+	SimFixtures.place(fight.runner.sim, 1, 4.0, 4.0, Fx.HALF_TURN)
+	_settle(fight, 360)
+	var rect := fight.camera.get_viewport().get_visible_rect()
 	for slot in 2:
-		var chest := fight.runner.fighter_position(slot) + Vector3.UP
-		assert_true(fight.camera._sees(eye, chest), "fighter %d is in view from %s" % [slot, eye])
+		var p := fight.runner.fighter_position(slot) + Vector3.UP
+		assert_true(fight.camera.is_position_in_frustum(p), "fighter %d on screen" % slot)
+		var s := fight.camera.unproject_position(p) / rect.size
+		assert_true(s.x > 0.08 and s.x < 0.92 and s.y > 0.08 and s.y < 0.92, "fighter %d inside the frame (%s)" % [slot, s])
+	var far := fight.camera._distance
+	assert_true(far > 15.0, "pulled back for a wide split (%.1f m)" % far)
+	SimFixtures.place(fight.runner.sim, 0, 0.0, 0.0, 0)
+	SimFixtures.place(fight.runner.sim, 1, 0.0, 2.0, Fx.HALF_TURN)
+	_settle(fight, 360)
+	assert_almost_eq(fight.camera._distance, 15.0, 0.3, "back to the resting distance")
 
 
 func test_every_fighter_move_names_an_existing_clip() -> void:
