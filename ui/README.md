@@ -34,8 +34,7 @@ The `GameFlow` autoload (`app/game_flow.gd`) owns navigation:
   `settings`, ...). `GameFlow.open_screen(id)` pushes one, `GameFlow.back()` pops one.
 - `GameFlow.return_to_menu([&"mode_select", ...])` reloads the menus with a given stack, e.g.
   after a match.
-- **Story mode entry point:** the `story` screen (`story/story_entry.tscn`) is a placeholder.
-  The story mode replaces that scene or points `SCREENS[&"story"]` at its own.
+- Story mode starts at the `story` screen (`story/story_entry.tscn`); see Story mode below.
 - Dev runs can start deeper in the menus: `godot --path . -- --menu=mode_select,settings`.
 
 Screens extend `MenuScreen` (`menus/menu_screen.gd`). Each returns the control to focus from
@@ -73,8 +72,8 @@ Fonts: Cinzel (headings, buttons) and Alegreya Sans (body).
   Story mode calls `Profile.unlock_fighter(&"morrigan")`. "Unlock all fighters" in
   Settings overrides it.
 - `app/match_config.gd` (`MatchConfig`): the menu-level match description (fighters, teams,
-  arena, difficulty, rounds, starting Soul, HP handicaps, where to return, and an optional
-  `on_finished` callback for story mode). `GameFlow.start_match(config)` opens
+  arena, difficulty, rounds, starting Soul, HP handicaps, where to return, and optional
+  `on_finished` / `on_started` callbacks for story mode). `GameFlow.start_match(config)` opens
   `match/match_screen.tscn`, which builds the sim's `SimConfig` through `MatchSetup`,
   runs the sim's `MatchRunner` with a `DeviceInputSource` for the player and
   `MatchSetup.cpu_source()` for the others, and shows the HUD, pause menu and results.
@@ -83,6 +82,56 @@ Fonts: Cinzel (headings, buttons) and Alegreya Sans (body).
   fighter presentation lands.
 - Dev runs: `godot --path . -- --match` (Aldric vs Morrigan) or `-- --match=1v2`.
 
+## Story mode
+
+Act 1, "The Bell Wakes", is data. `content/story/act1/act1.tres` (`StoryData`) lists the
+steps in play order; each step is its own `.tres` next to it, a `StoryScene` or a
+`StoryFight` (types in `content/types/story_*.gd`). To add a fight or a scene, create the
+resource and insert it into `steps`; no code changes.
+
+- `StoryScene`: the arena to dress (`arena` id), camera `shots`, `actors` (fighter id,
+  position, facing, a clip of the shared KayKit set as the pose, optional held time, and the
+  lines they are present for), extra `props`, and `lines` (`StoryLine`: dialogue with a
+  speaker fighter id, narration without one, or a full-screen `CARD`; a line can switch
+  shot and play a sound cue).
+- `StoryFight`: player and opponents (two for a 1v2), arena, `rounds_to_win`,
+  `round_seconds` (-1 = no timer), `ai_cap` (fight 1 is capped at Easy), per-opponent HP %
+  and starting Soul, seed, `unlocks`, and in-fight `prompts` (`StoryPrompt`: the fight 1
+  tutorial, ticked off from the player's fighter's sim events).
+
+Flow:
+- `story/story_entry.gd` (screen `story`): Continue, Begin / Start over, difficulty, and
+  Chapter select (`story/story_chapters.tscn`, screen `story_chapters`) once the act is
+  complete. Chapter replays do not touch the save.
+- `story/story_director.gd` (`StoryDirector`, kept in `GameFlow.story_director` across scene
+  changes) runs a `StoryRun` (`story/story_run.gd`: current step, difficulty, losses, save).
+  Scenes open `story/story_player.tscn`; fights go through `GameFlow.start_match` with
+  `MatchConfig.mode = STORY`, `on_finished` (results) and `on_started` (adds
+  `FightPrompts` through `MatchScreen.add_overlay`).
+- `StoryPlayer` shows a scene as stills (`StoryStage`: the arena scene, props, posed
+  `StoryActorView`s and a fixed camera), the dialogue box with a portrait rendered live from
+  the speaker's model (`StoryPortrait`), and title cards. Accept / Light / click advances,
+  holding Back skips. After a fight it shows `StoryResultsScreen` (unlocks, difficulty,
+  Continue) or `StoryHollowedScreen` (Retry, Retry on lower difficulty after two losses,
+  Quit) over a still of the arena.
+- Progress (`StorySave`, `user://story.cfg`) is saved after each won fight and at the end;
+  fighters unlock through `Profile.unlock_fighter`.
+- Actors and portraits use the fighter's `FighterData.scene` (a `FighterModel`, posed with
+  `pose()`); a capsule stands in while a fighter has no model yet.
+
+```sh
+# Preview a scene (or a fight's results / loss card), optionally screenshot it under Xvfb
+godot --path . res://ui/story/story_player.tscn -- --step=the_grave_witch --line=2
+godot --path . res://ui/story/story_player.tscn -- --step=fight_gorrath --view=hollowed
+# Play the whole act through the real game (menus, scenes, fights, retries, continue)
+tools/story_playthrough.sh --fast=8 --skip-scenes
+tools/story_playthrough.sh --fast=8 --force-after=20 --lose=fight_morrigan:2 --resume-after=fight_morrigan
+tools/story_playthrough.sh --render --shots=/tmp/story-shots --line-seconds=1
+tools/story_playthrough.sh --movie=/tmp/story.mp4 --quit-after-step=fight_two_hollowed
+```
+`tests/story/` covers the content, a scripted run of the whole act through `StoryDirector`
+(saves, resume, unlocks, retries), the player's input handling and the tutorial prompts on
+a real match.
 ## HUD
 
 `hud/hud.gd` (`Hud`) draws a `HudState` (health with a trailing loss bar, guard gauge,

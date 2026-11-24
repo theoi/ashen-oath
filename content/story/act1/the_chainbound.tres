@@ -1,0 +1,105 @@
+[gd_resource type="Resource" script_class="StoryScene" format=3]
+
+[ext_resource type="Script" path="res://content/types/story_actor.gd" id="1_51sja"]
+[ext_resource type="Script" path="res://content/types/story_line.gd" id="2_nainb"]
+[ext_resource type="Script" path="res://content/types/story_prop.gd" id="3_vxoke"]
+[ext_resource type="Script" path="res://content/types/story_scene.gd" id="4_bke23"]
+[ext_resource type="Script" path="res://content/types/story_shot.gd" id="5_03rar"]
+
+[sub_resource type="Resource" id="Resource_rl7li"]
+script = ExtResource("1_51sja")
+fighter = &"aldric"
+position = Vector3(-2, 0, 1.2)
+facing_degrees = 106.9
+
+[sub_resource type="Resource" id="Resource_s3est"]
+script = ExtResource("1_51sja")
+fighter = &"gorrath"
+position = Vector3(2.6, 0, -0.2)
+facing_degrees = -73.10000000000001
+pose = &"2H_Melee_Idle"
+
+[sub_resource type="Resource" id="Resource_8tt5c"]
+script = ExtResource("2_nainb")
+text = "Black water to the ankle. Somewhere in the dark, chains drag across stone."
+shot = 0
+
+[sub_resource type="Resource" id="Resource_stcif"]
+script = ExtResource("2_nainb")
+speaker = &"gorrath"
+text = "Another knight. They always send knights."
+shot = 1
+
+[sub_resource type="Resource" id="Resource_tcy56"]
+script = ExtResource("2_nainb")
+speaker = &"aldric"
+text = "No one sent me. Stand aside, champion."
+shot = 2
+
+[sub_resource type="Resource" id="Resource_crp1t"]
+script = ExtResource("2_nainb")
+speaker = &"gorrath"
+text = "I can't. The king's word holds these chains, and the chains hold me in this hole."
+shot = 1
+
+[sub_resource type="Resource" id="Resource_vipjk"]
+script = ExtResource("2_nainb")
+speaker = &"gorrath"
+text = "Forty nights I have won. Forty nights I have stayed exactly where I am."
+
+[sub_resource type="Resource" id="Resource_o825n"]
+script = ExtResource("2_nainb")
+speaker = &"gorrath"
+text = "So give me one of two things, knight. A death worth having, or chains worth breaking."
+
+[sub_resource type="Resource" id="Resource_svffx"]
+script = ExtResource("2_nainb")
+speaker = &"aldric"
+text = "I can promise you one of them."
+shot = 2
+
+[sub_resource type="Resource" id="Resource_e3vmw"]
+script = ExtResource("3_vxoke")
+model = "ribcage"
+position = Vector3(0.6, 0, 1.8)
+yaw_degrees = 40.0
+
+[sub_resource type="Resource" id="Resource_g6xdx"]
+script = ExtResource("3_vxoke")
+model = "skull"
+position = Vector3(1.2, 0, -1.4)
+yaw_degrees = 160.0
+
+[sub_resource type="Resource" id="Resource_fq5xj"]
+script = ExtResource("3_vxoke")
+model = "bone_C"
+position = Vector3(-0.4, 0, -0.8)
+yaw_degrees = 75.0
+
+[sub_resource type="Resource" id="Resource_ji7lp"]
+script = ExtResource("5_03rar")
+position = Vector3(-5.5, 2.4, 4.6)
+target = Vector3(2, 1, -0.2)
+fov = 46.0
+
+[sub_resource type="Resource" id="Resource_qsgfa"]
+script = ExtResource("5_03rar")
+position = Vector3(-1.2, 1.7, 3)
+target = Vector3(2.6, 1.6, -0.2)
+fov = 38.0
+
+[sub_resource type="Resource" id="Resource_dok63"]
+script = ExtResource("5_03rar")
+position = Vector3(3.6, 1.8, 0.6)
+target = Vector3(-2, 1.4, 1.2)
+fov = 38.0
+
+[resource]
+script = ExtResource("4_bke23")
+arena = &"drowned_crypt"
+shots = Array[ExtResource("5_03rar")]([SubResource("Resource_ji7lp"), SubResource("Resource_qsgfa"), SubResource("Resource_dok63")])
+actors = Array[ExtResource("1_51sja")]([SubResource("Resource_rl7li"), SubResource("Resource_s3est")])
+props = Array[ExtResource("3_vxoke")]([SubResource("Resource_e3vmw"), SubResource("Resource_g6xdx"), SubResource("Resource_fq5xj")])
+lines = Array[ExtResource("2_nainb")]([SubResource("Resource_8tt5c"), SubResource("Resource_stcif"), SubResource("Resource_tcy56"), SubResource("Resource_crp1t"), SubResource("Resource_vipjk"), SubResource("Resource_o825n"), SubResource("Resource_svffx")])
+id = &"the_chainbound"
+title = "The Chainbound"

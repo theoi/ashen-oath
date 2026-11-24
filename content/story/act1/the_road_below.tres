@@ -1,0 +1,87 @@
+[gd_resource type="Resource" script_class="StoryScene" format=3]
+
+[ext_resource type="Script" path="res://content/types/story_actor.gd" id="1_qy4cu"]
+[ext_resource type="Script" path="res://content/types/story_line.gd" id="2_ugsee"]
+[ext_resource type="Script" path="res://content/types/story_prop.gd" id="3_tspbt"]
+[ext_resource type="Script" path="res://content/types/story_scene.gd" id="4_kqw7u"]
+[ext_resource type="Script" path="res://content/types/story_shot.gd" id="5_lo6sk"]
+
+[sub_resource type="Resource" id="Resource_nc778"]
+script = ExtResource("1_qy4cu")
+fighter = &"aldric"
+position = Vector3(-0.6, 0, 1.4)
+facing_degrees = 120.30000000000001
+
+[sub_resource type="Resource" id="Resource_g5gwe"]
+script = ExtResource("1_qy4cu")
+fighter = &"morrigan"
+position = Vector3(1.8, 0, 0)
+facing_degrees = -59.7
+pose = &"Sit_Floor_Idle"
+
+[sub_resource type="Resource" id="Resource_ybfhr"]
+script = ExtResource("2_ugsee")
+speaker = &"morrigan"
+text = "Enough. You will last. For a while."
+shot = 1
+
+[sub_resource type="Resource" id="Resource_smmbx"]
+script = ExtResource("2_ugsee")
+speaker = &"morrigan"
+text = "The road to the throne runs under the city, through the Drowned Crypt."
+
+[sub_resource type="Resource" id="Resource_78tdr"]
+script = ExtResource("2_ugsee")
+speaker = &"aldric"
+text = "Then I go down."
+shot = 2
+
+[sub_resource type="Resource" id="Resource_exvgr"]
+script = ExtResource("2_ugsee")
+speaker = &"morrigan"
+text = "Gorrath holds the crypt. The Reckoning's champion. He has never lost a night."
+shot = 1
+
+[sub_resource type="Resource" id="Resource_c7kyr"]
+script = ExtResource("2_ugsee")
+speaker = &"morrigan"
+text = "Men walk down to him, and the water carries what is left of them back up."
+
+[sub_resource type="Resource" id="Resource_mn0ku"]
+script = ExtResource("2_ugsee")
+speaker = &"aldric"
+text = "Then he has never fought a man who cannot afford to lose."
+shot = 2
+
+[sub_resource type="Resource" id="Resource_fw2rj"]
+script = ExtResource("2_ugsee")
+speaker = &"morrigan"
+text = "Go. I will keep a candle lit for you. Do not make me tend your body."
+shot = 0
+
+[sub_resource type="Resource" id="Resource_ms53g"]
+script = ExtResource("5_lo6sk")
+position = Vector3(0.2, 1.7, 5.6)
+target = Vector3(0.6, 0.9, 0.4)
+fov = 44.0
+
+[sub_resource type="Resource" id="Resource_fox03"]
+script = ExtResource("5_lo6sk")
+position = Vector3(-1.8, 1.4, 2.6)
+target = Vector3(1.8, 0.75, 0)
+fov = 36.0
+
+[sub_resource type="Resource" id="Resource_d02wm"]
+script = ExtResource("5_lo6sk")
+position = Vector3(2.8, 1.2, 0.2)
+target = Vector3(-0.6, 1.45, 1.4)
+fov = 38.0
+
+[resource]
+script = ExtResource("4_kqw7u")
+arena = &"ashen_chapel_night"
+shots = Array[ExtResource("5_lo6sk")]([SubResource("Resource_ms53g"), SubResource("Resource_fox03"), SubResource("Resource_d02wm")])
+actors = Array[ExtResource("1_qy4cu")]([SubResource("Resource_nc778"), SubResource("Resource_g5gwe")])
+lines = Array[ExtResource("2_ugsee")]([SubResource("Resource_ybfhr"), SubResource("Resource_smmbx"), SubResource("Resource_78tdr"), SubResource("Resource_exvgr"), SubResource("Resource_c7kyr"), SubResource("Resource_mn0ku"), SubResource("Resource_fw2rj")])
+id = &"the_road_below"
+title = "The Road Below"

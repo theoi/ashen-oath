@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="StoryFight" format=3]
+
+[ext_resource type="Script" path="res://content/types/story_prompt.gd" id="1_l7n08"]
+[ext_resource type="Script" path="res://content/types/story_fight.gd" id="2_8psd3"]
+
+[resource]
+script = ExtResource("2_8psd3")
+opponents = Array[StringName]([&"morrigan"])
+opponent_name = "Morrigan"
+arena = &"ashen_chapel_night"
+seed = 303
+unlocks = Array[StringName]([&"morrigan"])
+id = &"fight_morrigan"
+title = "III · Morrigan"

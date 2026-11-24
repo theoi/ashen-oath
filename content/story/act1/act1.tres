@@ -1,0 +1,823 @@
+[gd_resource type="Resource" script_class="StoryData" format=3]
+
+[ext_resource type="Script" path="res://content/types/story_data.gd" id="1_pv5it"]
+[ext_resource type="Script" path="res://content/types/story_step.gd" id="2_2fsfa"]
+[ext_resource type="Script" path="res://content/types/story_actor.gd" id="3_b53gr"]
+[ext_resource type="Script" path="res://content/types/story_line.gd" id="4_2pj7u"]
+[ext_resource type="Script" path="res://content/types/story_prop.gd" id="5_d3off"]
+[ext_resource type="Script" path="res://content/types/story_scene.gd" id="6_o82v2"]
+[ext_resource type="Script" path="res://content/types/story_shot.gd" id="7_b4dp1"]
+[ext_resource type="Script" path="res://content/types/story_prompt.gd" id="8_5jd8r"]
+[ext_resource type="Script" path="res://content/types/story_fight.gd" id="9_me226"]
+
+[sub_resource type="Resource" id="Resource_q713n"]
+script = ExtResource("3_b53gr")
+fighter = &"aldric"
+position = Vector3(-3.4, 0, 2)
+facing_degrees = 100.0
+pose = &"Lie_Idle"
+exit_line = 5
+
+[sub_resource type="Resource" id="Resource_i5qxm"]
+script = ExtResource("3_b53gr")
+fighter = &"aldric"
+position = Vector3(-3.2, 0, 1.6)
+facing_degrees = 65.0
+enter_line = 5
+
+[sub_resource type="Resource" id="Resource_84u20"]
+script = ExtResource("4_2pj7u")
+kind = 1
+title = "Vael"
+text = "Vael was a kingdom once. Its king feared death more than he loved his people, and he swore an oath to a nameless dark to escape it. Every soul sworn to him was bound with him. It is called the Ashen Oath."
+
+[sub_resource type="Resource" id="Resource_kucjl"]
+script = ExtResource("4_2pj7u")
+kind = 1
+title = "The Reckoning"
+text = "Now he is the Hollow King. Each night his great bell tolls, and the cursed must fight in the old proving grounds. Winners keep their minds for one more night. Losers hollow into the mindless dead."
+
+[sub_resource type="Resource" id="Resource_cfo53"]
+script = ExtResource("4_2pj7u")
+kind = 1
+title = "The Oathbreaker"
+text = "One knight refused the Oath. It took him anyway."
+
+[sub_resource type="Resource" id="Resource_i0p6m"]
+script = ExtResource("4_2pj7u")
+text = "The Ashen Chapel. Ash falls through the broken roof. Somewhere above the city, a bell begins to toll."
+shot = 1
+cue = &"bell_toll"
+
+[sub_resource type="Resource" id="Resource_6fjjv"]
+script = ExtResource("4_2pj7u")
+speaker = &"aldric"
+text = "Ash in my mouth. Ash in my lungs."
+
+[sub_resource type="Resource" id="Resource_d05am"]
+script = ExtResource("4_2pj7u")
+speaker = &"aldric"
+text = "I knelt to no dark power. And still it burns in me."
+shot = 2
+
+[sub_resource type="Resource" id="Resource_slu3l"]
+script = ExtResource("4_2pj7u")
+speaker = &"aldric"
+text = "That bell. I stood guard beneath it for twenty years."
+
+[sub_resource type="Resource" id="Resource_skjsg"]
+script = ExtResource("4_2pj7u")
+speaker = &"aldric"
+text = "Then the throne is where it has always been. And so is he."
+shot = 0
+
+[sub_resource type="Resource" id="Resource_i18jj"]
+script = ExtResource("5_d3off")
+model = "coffin"
+position = Vector3(-5.2, 0, 3.4)
+yaw_degrees = 80.0
+
+[sub_resource type="Resource" id="Resource_3vvyj"]
+script = ExtResource("5_d3off")
+model = "coffin_decorated"
+position = Vector3(-1.6, 0, 0.2)
+yaw_degrees = 105.0
+
+[sub_resource type="Resource" id="Resource_g4ler"]
+script = ExtResource("5_d3off")
+model = "coffin"
+position = Vector3(-4.6, 0, -0.6)
+yaw_degrees = 95.0
+
+[sub_resource type="Resource" id="Resource_d4ex1"]
+script = ExtResource("5_d3off")
+model = "bone_A"
+position = Vector3(-2.2, 0, 2.9)
+yaw_degrees = 30.0
+
+[sub_resource type="Resource" id="Resource_7pisp"]
+script = ExtResource("5_d3off")
+model = "skull"
+position = Vector3(-4, 0, 3.6)
+yaw_degrees = -40.0
+
+[sub_resource type="Resource" id="Resource_c0bd6"]
+script = ExtResource("5_d3off")
+model = "candle_melted"
+position = Vector3(-2.4, 0, 3.6)
+
+[sub_resource type="Resource" id="Resource_hls2x"]
+script = ExtResource("7_b4dp1")
+position = Vector3(6.5, 3.6, 7.5)
+target = Vector3(-3, 0.6, 1)
+fov = 48.0
+
+[sub_resource type="Resource" id="Resource_pvqom"]
+script = ExtResource("7_b4dp1")
+position = Vector3(-1.6, 1.1, 4.6)
+target = Vector3(-3.4, 0.35, 2)
+fov = 42.0
+
+[sub_resource type="Resource" id="Resource_v8u0j"]
+script = ExtResource("7_b4dp1")
+position = Vector3(-0.6, 1.75, 4.9)
+target = Vector3(-3.2, 1.35, 1.6)
+fov = 40.0
+
+[sub_resource type="Resource" id="Resource_x4rvy"]
+script = ExtResource("6_o82v2")
+arena = &"ashen_chapel"
+shots = Array[ExtResource("7_b4dp1")]([SubResource("Resource_hls2x"), SubResource("Resource_pvqom"), SubResource("Resource_v8u0j")])
+actors = Array[ExtResource("3_b53gr")]([SubResource("Resource_q713n"), SubResource("Resource_i5qxm")])
+props = Array[ExtResource("5_d3off")]([SubResource("Resource_i18jj"), SubResource("Resource_3vvyj"), SubResource("Resource_g4ler"), SubResource("Resource_d4ex1"), SubResource("Resource_7pisp"), SubResource("Resource_c0bd6")])
+lines = Array[ExtResource("4_2pj7u")]([SubResource("Resource_84u20"), SubResource("Resource_kucjl"), SubResource("Resource_cfo53"), SubResource("Resource_i0p6m"), SubResource("Resource_6fjjv"), SubResource("Resource_d05am"), SubResource("Resource_slu3l"), SubResource("Resource_skjsg")])
+id = &"prologue"
+title = "Prologue · The Bell Tolls"
+
+[sub_resource type="Resource" id="Resource_s2ebi"]
+script = ExtResource("8_5jd8r")
+goal = 1
+amount = 4
+title = "Move"
+text = "Find your footing. Circle the squire."
+hint = "Left stick  ·  W A S D"
+
+[sub_resource type="Resource" id="Resource_64tdh"]
+script = ExtResource("8_5jd8r")
+goal = 2
+amount = 3
+title = "Light string"
+text = "Press Light three times in a row. Each blow flows into the next."
+actions = Array[StringName]([&"attack_light"])
+
+[sub_resource type="Resource" id="Resource_b12ib"]
+script = ExtResource("8_5jd8r")
+goal = 3
+amount = 60
+title = "Guard"
+text = "Hold Guard to block its blade. Blows from behind still land."
+actions = Array[StringName]([&"guard"])
+
+[sub_resource type="Resource" id="Resource_jhr7b"]
+script = ExtResource("8_5jd8r")
+goal = 4
+title = "Dodge"
+text = "Roll through an attack. Early in the roll, nothing can touch you."
+actions = Array[StringName]([&"dodge"])
+
+[sub_resource type="Resource" id="Resource_qqqn7"]
+script = ExtResource("8_5jd8r")
+goal = 5
+title = "Grab"
+text = "A guard will not stop a grab. Seize the squire."
+actions = Array[StringName]([&"grab"])
+
+[sub_resource type="Resource" id="Resource_vdd3y"]
+script = ExtResource("8_5jd8r")
+title = "Finish it"
+text = "Put the squire back in its grave."
+timeout_seconds = 5.0
+
+[sub_resource type="Resource" id="Resource_nj4sm"]
+script = ExtResource("9_me226")
+opponents = Array[StringName]([&"hollowed"])
+opponent_name = "Hollowed Squire"
+rounds_to_win = 1
+round_seconds = -1
+ai_cap = 0
+seed = 101
+prompts = Array[ExtResource("8_5jd8r")]([SubResource("Resource_s2ebi"), SubResource("Resource_64tdh"), SubResource("Resource_b12ib"), SubResource("Resource_jhr7b"), SubResource("Resource_qqqn7"), SubResource("Resource_vdd3y")])
+id = &"fight_squire"
+title = "I · The Squire"
+
+[sub_resource type="Resource" id="Resource_2a7nl"]
+script = ExtResource("3_b53gr")
+fighter = &"aldric"
+position = Vector3(-0.8, 0, 1.2)
+facing_degrees = 96.7
+
+[sub_resource type="Resource" id="Resource_arqvs"]
+script = ExtResource("3_b53gr")
+fighter = &"hollowed"
+position = Vector3(1, 0, 0.4)
+facing_degrees = 230.0
+pose = &"Death_A"
+pose_time = 99.0
+
+[sub_resource type="Resource" id="Resource_fuvc5"]
+script = ExtResource("3_b53gr")
+fighter = &"hollowed"
+position = Vector3(2.4, 0, -0.4)
+facing_degrees = -63.400000000000006
+pose = &"Idle_Combat"
+enter_line = 2
+
+[sub_resource type="Resource" id="Resource_kg3j0"]
+script = ExtResource("3_b53gr")
+fighter = &"hollowed"
+position = Vector3(2.9, 0, 2)
+facing_degrees = -102.2
+pose = &"Idle_Combat"
+enter_line = 2
+
+[sub_resource type="Resource" id="Resource_ydqv2"]
+script = ExtResource("4_2pj7u")
+text = "The squire falls and does not rise. Around it, the chapel's dead begin to stir."
+shot = 0
+
+[sub_resource type="Resource" id="Resource_u1myt"]
+script = ExtResource("4_2pj7u")
+speaker = &"aldric"
+text = "Rest. You owe the king nothing now."
+shot = 1
+
+[sub_resource type="Resource" id="Resource_nk0h5"]
+script = ExtResource("4_2pj7u")
+text = "Bones grind against stone. Two more drag themselves from their coffins, blades still in hand."
+shot = 0
+
+[sub_resource type="Resource" id="Resource_e820y"]
+script = ExtResource("4_2pj7u")
+speaker = &"hollowed"
+speaker_name = "Hollowed"
+text = "Oathbreaker."
+
+[sub_resource type="Resource" id="Resource_eenak"]
+script = ExtResource("4_2pj7u")
+speaker = &"aldric"
+text = "So the bell remembers me."
+shot = 1
+
+[sub_resource type="Resource" id="Resource_4fbdy"]
+script = ExtResource("4_2pj7u")
+speaker = &"aldric"
+text = "Come, then. Both of you."
+
+[sub_resource type="Resource" id="Resource_406jm"]
+script = ExtResource("5_d3off")
+model = "coffin"
+position = Vector3(3.6, 0, -1.6)
+yaw_degrees = 70.0
+
+[sub_resource type="Resource" id="Resource_h3w66"]
+script = ExtResource("5_d3off")
+model = "coffin"
+position = Vector3(4.2, 0, 2.6)
+yaw_degrees = 115.0
+
+[sub_resource type="Resource" id="Resource_muyne"]
+script = ExtResource("5_d3off")
+model = "bone_B"
+position = Vector3(1.6, 0, 1.4)
+yaw_degrees = 20.0
+
+[sub_resource type="Resource" id="Resource_lo8jy"]
+script = ExtResource("7_b4dp1")
+position = Vector3(-3.6, 2, 3.4)
+target = Vector3(2.4, 0.9, 0.6)
+fov = 46.0
+
+[sub_resource type="Resource" id="Resource_1s5j5"]
+script = ExtResource("7_b4dp1")
+position = Vector3(1, 1.65, 2.3)
+target = Vector3(-0.8, 1.35, 1.2)
+fov = 40.0
+
+[sub_resource type="Resource" id="Resource_lpfgv"]
+script = ExtResource("6_o82v2")
+arena = &"ashen_chapel"
+shots = Array[ExtResource("7_b4dp1")]([SubResource("Resource_lo8jy"), SubResource("Resource_1s5j5")])
+actors = Array[ExtResource("3_b53gr")]([SubResource("Resource_2a7nl"), SubResource("Resource_arqvs"), SubResource("Resource_fuvc5"), SubResource("Resource_kg3j0")])
+props = Array[ExtResource("5_d3off")]([SubResource("Resource_406jm"), SubResource("Resource_h3w66"), SubResource("Resource_muyne")])
+lines = Array[ExtResource("4_2pj7u")]([SubResource("Resource_ydqv2"), SubResource("Resource_u1myt"), SubResource("Resource_nk0h5"), SubResource("Resource_e820y"), SubResource("Resource_eenak"), SubResource("Resource_4fbdy")])
+id = &"the_dead_stir"
+title = "The Dead Stir"
+
+[sub_resource type="Resource" id="Resource_5ubsl"]
+script = ExtResource("8_5jd8r")
+goal = 7
+title = "Two at once"
+text = "Keep both in sight. Switch your target to the other one."
+actions = Array[StringName]([&"lock_on"])
+timeout_seconds = 10.0
+
+[sub_resource type="Resource" id="Resource_30wrq"]
+script = ExtResource("8_5jd8r")
+goal = 6
+title = "Oathfire"
+text = "Your abilities cut through a crowd. Each has its own cooldown."
+actions = Array[StringName]([&"ability_1", &"ability_2", &"ability_3"])
+timeout_seconds = 12.0
+
+[sub_resource type="Resource" id="Resource_3syio"]
+script = ExtResource("8_5jd8r")
+goal = 8
+title = "Soul Burst"
+text = "Caught in a combo with 50 Soul or more? Press Super to burst free."
+actions = Array[StringName]([&"super"])
+timeout_seconds = 12.0
+
+[sub_resource type="Resource" id="Resource_t66s6"]
+script = ExtResource("9_me226")
+opponents = Array[StringName]([&"hollowed", &"hollowed"])
+opponent_name = "Two Hollowed"
+rounds_to_win = 1
+opponent_hp_percent = Array[int]([70, 70])
+seed = 202
+prompts = Array[ExtResource("8_5jd8r")]([SubResource("Resource_5ubsl"), SubResource("Resource_30wrq"), SubResource("Resource_3syio")])
+id = &"fight_two_hollowed"
+title = "II · Two Hollowed"
+
+[sub_resource type="Resource" id="Resource_tibef"]
+script = ExtResource("3_b53gr")
+fighter = &"aldric"
+position = Vector3(-1.2, 0, 1)
+facing_degrees = 109.30000000000001
+
+[sub_resource type="Resource" id="Resource_j6l86"]
+script = ExtResource("3_b53gr")
+fighter = &"morrigan"
+position = Vector3(2.8, 0, -0.4)
+facing_degrees = -70.7
+
+[sub_resource type="Resource" id="Resource_kt71x"]
+script = ExtResource("3_b53gr")
+fighter = &"hollowed"
+position = Vector3(0.6, 0, 1.9)
+facing_degrees = 160.0
+pose = &"Death_A"
+pose_time = 99.0
+
+[sub_resource type="Resource" id="Resource_jjyvv"]
+script = ExtResource("3_b53gr")
+fighter = &"hollowed"
+position = Vector3(1.4, 0, -1.6)
+facing_degrees = 20.0
+pose = &"Death_B"
+pose_time = 99.0
+
+[sub_resource type="Resource" id="Resource_hm46y"]
+script = ExtResource("4_2pj7u")
+text = "The candles gutter. Someone has been tending them."
+shot = 0
+
+[sub_resource type="Resource" id="Resource_6eo41"]
+script = ExtResource("4_2pj7u")
+speaker = &"morrigan"
+text = "You broke my dead, knight. I had only just laid them out."
+shot = 1
+
+[sub_resource type="Resource" id="Resource_heok1"]
+script = ExtResource("4_2pj7u")
+speaker = &"aldric"
+text = "They came for me. I sent them back."
+shot = 2
+
+[sub_resource type="Resource" id="Resource_846e7"]
+script = ExtResource("4_2pj7u")
+speaker = &"morrigan"
+text = "Back where? There is nowhere left to send them."
+shot = 1
+
+[sub_resource type="Resource" id="Resource_88p88"]
+script = ExtResource("4_2pj7u")
+speaker = &"morrigan"
+text = "I see it in you. The fire under the skin. The Oath is eating you from the inside."
+
+[sub_resource type="Resource" id="Resource_qg6sr"]
+script = ExtResource("4_2pj7u")
+speaker = &"aldric"
+text = "Then I will reach the throne before it finishes. Show me the way."
+shot = 2
+
+[sub_resource type="Resource" id="Resource_pfugr"]
+script = ExtResource("4_2pj7u")
+speaker = &"morrigan"
+text = "I do not guide men who hollow halfway down the road. Show me you will last the night."
+shot = 1
+
+[sub_resource type="Resource" id="Resource_fuwsk"]
+script = ExtResource("7_b4dp1")
+position = Vector3(0.6, 1.9, 6)
+target = Vector3(0.8, 1.2, 0.2)
+fov = 46.0
+
+[sub_resource type="Resource" id="Resource_aowxq"]
+script = ExtResource("7_b4dp1")
+position = Vector3(-2.9, 1.75, 2.2)
+target = Vector3(2.8, 1.45, -0.4)
+fov = 36.0
+
+[sub_resource type="Resource" id="Resource_rytkt"]
+script = ExtResource("7_b4dp1")
+position = Vector3(4.4, 1.75, -1.4)
+target = Vector3(-1.2, 1.45, 1)
+fov = 36.0
+
+[sub_resource type="Resource" id="Resource_4a7lm"]
+script = ExtResource("6_o82v2")
+arena = &"ashen_chapel_night"
+shots = Array[ExtResource("7_b4dp1")]([SubResource("Resource_fuwsk"), SubResource("Resource_aowxq"), SubResource("Resource_rytkt")])
+actors = Array[ExtResource("3_b53gr")]([SubResource("Resource_tibef"), SubResource("Resource_j6l86"), SubResource("Resource_kt71x"), SubResource("Resource_jjyvv")])
+lines = Array[ExtResource("4_2pj7u")]([SubResource("Resource_hm46y"), SubResource("Resource_6eo41"), SubResource("Resource_heok1"), SubResource("Resource_846e7"), SubResource("Resource_88p88"), SubResource("Resource_qg6sr"), SubResource("Resource_pfugr")])
+id = &"the_grave_witch"
+title = "The Grave-Witch"
+
+[sub_resource type="Resource" id="Resource_yk3ys"]
+script = ExtResource("9_me226")
+opponents = Array[StringName]([&"morrigan"])
+opponent_name = "Morrigan"
+arena = &"ashen_chapel_night"
+seed = 303
+unlocks = Array[StringName]([&"morrigan"])
+id = &"fight_morrigan"
+title = "III · Morrigan"
+
+[sub_resource type="Resource" id="Resource_nc778"]
+script = ExtResource("3_b53gr")
+fighter = &"aldric"
+position = Vector3(-0.6, 0, 1.4)
+facing_degrees = 120.30000000000001
+
+[sub_resource type="Resource" id="Resource_g5gwe"]
+script = ExtResource("3_b53gr")
+fighter = &"morrigan"
+position = Vector3(1.8, 0, 0)
+facing_degrees = -59.7
+pose = &"Sit_Floor_Idle"
+
+[sub_resource type="Resource" id="Resource_ybfhr"]
+script = ExtResource("4_2pj7u")
+speaker = &"morrigan"
+text = "Enough. You will last. For a while."
+shot = 1
+
+[sub_resource type="Resource" id="Resource_smmbx"]
+script = ExtResource("4_2pj7u")
+speaker = &"morrigan"
+text = "The road to the throne runs under the city, through the Drowned Crypt."
+
+[sub_resource type="Resource" id="Resource_78tdr"]
+script = ExtResource("4_2pj7u")
+speaker = &"aldric"
+text = "Then I go down."
+shot = 2
+
+[sub_resource type="Resource" id="Resource_exvgr"]
+script = ExtResource("4_2pj7u")
+speaker = &"morrigan"
+text = "Gorrath holds the crypt. The Reckoning's champion. He has never lost a night."
+shot = 1
+
+[sub_resource type="Resource" id="Resource_c7kyr"]
+script = ExtResource("4_2pj7u")
+speaker = &"morrigan"
+text = "Men walk down to him, and the water carries what is left of them back up."
+
+[sub_resource type="Resource" id="Resource_mn0ku"]
+script = ExtResource("4_2pj7u")
+speaker = &"aldric"
+text = "Then he has never fought a man who cannot afford to lose."
+shot = 2
+
+[sub_resource type="Resource" id="Resource_fw2rj"]
+script = ExtResource("4_2pj7u")
+speaker = &"morrigan"
+text = "Go. I will keep a candle lit for you. Do not make me tend your body."
+shot = 0
+
+[sub_resource type="Resource" id="Resource_ms53g"]
+script = ExtResource("7_b4dp1")
+position = Vector3(0.2, 1.7, 5.6)
+target = Vector3(0.6, 0.9, 0.4)
+fov = 44.0
+
+[sub_resource type="Resource" id="Resource_fox03"]
+script = ExtResource("7_b4dp1")
+position = Vector3(-1.8, 1.4, 2.6)
+target = Vector3(1.8, 0.75, 0)
+fov = 36.0
+
+[sub_resource type="Resource" id="Resource_d02wm"]
+script = ExtResource("7_b4dp1")
+position = Vector3(2.8, 1.2, 0.2)
+target = Vector3(-0.6, 1.45, 1.4)
+fov = 38.0
+
+[sub_resource type="Resource" id="Resource_bc24k"]
+script = ExtResource("6_o82v2")
+arena = &"ashen_chapel_night"
+shots = Array[ExtResource("7_b4dp1")]([SubResource("Resource_ms53g"), SubResource("Resource_fox03"), SubResource("Resource_d02wm")])
+actors = Array[ExtResource("3_b53gr")]([SubResource("Resource_nc778"), SubResource("Resource_g5gwe")])
+lines = Array[ExtResource("4_2pj7u")]([SubResource("Resource_ybfhr"), SubResource("Resource_smmbx"), SubResource("Resource_78tdr"), SubResource("Resource_exvgr"), SubResource("Resource_c7kyr"), SubResource("Resource_mn0ku"), SubResource("Resource_fw2rj")])
+id = &"the_road_below"
+title = "The Road Below"
+
+[sub_resource type="Resource" id="Resource_rl7li"]
+script = ExtResource("3_b53gr")
+fighter = &"aldric"
+position = Vector3(-2, 0, 1.2)
+facing_degrees = 106.9
+
+[sub_resource type="Resource" id="Resource_s3est"]
+script = ExtResource("3_b53gr")
+fighter = &"gorrath"
+position = Vector3(2.6, 0, -0.2)
+facing_degrees = -73.10000000000001
+pose = &"2H_Melee_Idle"
+
+[sub_resource type="Resource" id="Resource_8tt5c"]
+script = ExtResource("4_2pj7u")
+text = "Black water to the ankle. Somewhere in the dark, chains drag across stone."
+shot = 0
+
+[sub_resource type="Resource" id="Resource_stcif"]
+script = ExtResource("4_2pj7u")
+speaker = &"gorrath"
+text = "Another knight. They always send knights."
+shot = 1
+
+[sub_resource type="Resource" id="Resource_tcy56"]
+script = ExtResource("4_2pj7u")
+speaker = &"aldric"
+text = "No one sent me. Stand aside, champion."
+shot = 2
+
+[sub_resource type="Resource" id="Resource_crp1t"]
+script = ExtResource("4_2pj7u")
+speaker = &"gorrath"
+text = "I can't. The king's word holds these chains, and the chains hold me in this hole."
+shot = 1
+
+[sub_resource type="Resource" id="Resource_vipjk"]
+script = ExtResource("4_2pj7u")
+speaker = &"gorrath"
+text = "Forty nights I have won. Forty nights I have stayed exactly where I am."
+
+[sub_resource type="Resource" id="Resource_o825n"]
+script = ExtResource("4_2pj7u")
+speaker = &"gorrath"
+text = "So give me one of two things, knight. A death worth having, or chains worth breaking."
+
+[sub_resource type="Resource" id="Resource_svffx"]
+script = ExtResource("4_2pj7u")
+speaker = &"aldric"
+text = "I can promise you one of them."
+shot = 2
+
+[sub_resource type="Resource" id="Resource_e3vmw"]
+script = ExtResource("5_d3off")
+model = "ribcage"
+position = Vector3(0.6, 0, 1.8)
+yaw_degrees = 40.0
+
+[sub_resource type="Resource" id="Resource_g6xdx"]
+script = ExtResource("5_d3off")
+model = "skull"
+position = Vector3(1.2, 0, -1.4)
+yaw_degrees = 160.0
+
+[sub_resource type="Resource" id="Resource_fq5xj"]
+script = ExtResource("5_d3off")
+model = "bone_C"
+position = Vector3(-0.4, 0, -0.8)
+yaw_degrees = 75.0
+
+[sub_resource type="Resource" id="Resource_ji7lp"]
+script = ExtResource("7_b4dp1")
+position = Vector3(-5.5, 2.4, 4.6)
+target = Vector3(2, 1, -0.2)
+fov = 46.0
+
+[sub_resource type="Resource" id="Resource_qsgfa"]
+script = ExtResource("7_b4dp1")
+position = Vector3(-1.2, 1.7, 3)
+target = Vector3(2.6, 1.6, -0.2)
+fov = 38.0
+
+[sub_resource type="Resource" id="Resource_dok63"]
+script = ExtResource("7_b4dp1")
+position = Vector3(3.6, 1.8, 0.6)
+target = Vector3(-2, 1.4, 1.2)
+fov = 38.0
+
+[sub_resource type="Resource" id="Resource_4rlet"]
+script = ExtResource("6_o82v2")
+arena = &"drowned_crypt"
+shots = Array[ExtResource("7_b4dp1")]([SubResource("Resource_ji7lp"), SubResource("Resource_qsgfa"), SubResource("Resource_dok63")])
+actors = Array[ExtResource("3_b53gr")]([SubResource("Resource_rl7li"), SubResource("Resource_s3est")])
+props = Array[ExtResource("5_d3off")]([SubResource("Resource_e3vmw"), SubResource("Resource_g6xdx"), SubResource("Resource_fq5xj")])
+lines = Array[ExtResource("4_2pj7u")]([SubResource("Resource_8tt5c"), SubResource("Resource_stcif"), SubResource("Resource_tcy56"), SubResource("Resource_crp1t"), SubResource("Resource_vipjk"), SubResource("Resource_o825n"), SubResource("Resource_svffx")])
+id = &"the_chainbound"
+title = "The Chainbound"
+
+[sub_resource type="Resource" id="Resource_6vig8"]
+script = ExtResource("9_me226")
+opponents = Array[StringName]([&"gorrath"])
+opponent_name = "Gorrath"
+arena = &"drowned_crypt"
+seed = 404
+unlocks = Array[StringName]([&"gorrath"])
+id = &"fight_gorrath"
+title = "IV · Gorrath"
+
+[sub_resource type="Resource" id="Resource_cerkj"]
+script = ExtResource("3_b53gr")
+fighter = &"aldric"
+position = Vector3(0.2, 0, 1)
+facing_degrees = -114.80000000000001
+exit_line = 3
+
+[sub_resource type="Resource" id="Resource_iyct8"]
+script = ExtResource("3_b53gr")
+fighter = &"gorrath"
+position = Vector3(-2.4, 0, -0.2)
+facing_degrees = 65.2
+pose = &"Sit_Floor_Idle"
+exit_line = 3
+
+[sub_resource type="Resource" id="Resource_2y3jq"]
+script = ExtResource("3_b53gr")
+fighter = &"aldric"
+position = Vector3(0.2, 0, 1)
+facing_degrees = 200.0
+pose = &"Hit_B"
+pose_time = 0.25
+enter_line = 3
+
+[sub_resource type="Resource" id="Resource_dgcpi"]
+script = ExtResource("3_b53gr")
+fighter = &"oath_shade"
+position = Vector3(3.2, 0, -0.4)
+facing_degrees = -65.0
+pose = &"Idle_Combat"
+enter_line = 5
+
+[sub_resource type="Resource" id="Resource_4wuat"]
+script = ExtResource("4_2pj7u")
+speaker = &"gorrath"
+text = "Hold. I have had my answer."
+shot = 0
+
+[sub_resource type="Resource" id="Resource_fpma6"]
+script = ExtResource("4_2pj7u")
+speaker = &"gorrath"
+text = "Kill the king, and the chains fall. Mine too."
+
+[sub_resource type="Resource" id="Resource_35tyy"]
+script = ExtResource("4_2pj7u")
+speaker = &"aldric"
+text = "Then wait for me."
+
+[sub_resource type="Resource" id="Resource_emnxu"]
+script = ExtResource("4_2pj7u")
+text = "Aldric goes deeper. The fire in his chest flares, and keeps flaring."
+shot = 1
+
+[sub_resource type="Resource" id="Resource_pvnrt"]
+script = ExtResource("4_2pj7u")
+speaker = &"aldric"
+text = "No. Not here. Not yet."
+shot = 3
+
+[sub_resource type="Resource" id="Resource_met17"]
+script = ExtResource("4_2pj7u")
+text = "The Oathfire tears loose from him. It rises out of the black water wearing his face."
+shot = 1
+
+[sub_resource type="Resource" id="Resource_q21k8"]
+script = ExtResource("4_2pj7u")
+speaker = &"oath_shade"
+speaker_name = "The Oath-Shade"
+text = "You refused the Oath, Aldric. I am what it left in you instead."
+shot = 2
+
+[sub_resource type="Resource" id="Resource_f7ss1"]
+script = ExtResource("4_2pj7u")
+speaker = &"oath_shade"
+speaker_name = "The Oath-Shade"
+text = "Kneel. It is easier than what comes next."
+
+[sub_resource type="Resource" id="Resource_jgvvv"]
+script = ExtResource("7_b4dp1")
+position = Vector3(-1, 1.6, 4.4)
+target = Vector3(-1.2, 0.9, 0.3)
+fov = 42.0
+
+[sub_resource type="Resource" id="Resource_35rjb"]
+script = ExtResource("7_b4dp1")
+position = Vector3(-2.6, 1.9, 4.2)
+target = Vector3(0.6, 1.3, 0.6)
+fov = 44.0
+
+[sub_resource type="Resource" id="Resource_cysai"]
+script = ExtResource("7_b4dp1")
+position = Vector3(-1.6, 1.8, 3)
+target = Vector3(3.2, 1.5, -0.4)
+fov = 36.0
+
+[sub_resource type="Resource" id="Resource_qvc4n"]
+script = ExtResource("7_b4dp1")
+position = Vector3(1, 1.6, 2.4)
+target = Vector3(0.2, 1.4, 1)
+fov = 40.0
+
+[sub_resource type="Resource" id="Resource_q7ot7"]
+script = ExtResource("6_o82v2")
+arena = &"drowned_crypt_depths"
+shots = Array[ExtResource("7_b4dp1")]([SubResource("Resource_jgvvv"), SubResource("Resource_35rjb"), SubResource("Resource_cysai"), SubResource("Resource_qvc4n")])
+actors = Array[ExtResource("3_b53gr")]([SubResource("Resource_cerkj"), SubResource("Resource_iyct8"), SubResource("Resource_2y3jq"), SubResource("Resource_dgcpi")])
+lines = Array[ExtResource("4_2pj7u")]([SubResource("Resource_4wuat"), SubResource("Resource_fpma6"), SubResource("Resource_35tyy"), SubResource("Resource_emnxu"), SubResource("Resource_pvnrt"), SubResource("Resource_met17"), SubResource("Resource_q21k8"), SubResource("Resource_f7ss1")])
+id = &"what_the_fire_left"
+title = "What the Fire Left"
+
+[sub_resource type="Resource" id="Resource_5ca4r"]
+script = ExtResource("9_me226")
+opponents = Array[StringName]([&"oath_shade"])
+opponent_name = "The Oath-Shade"
+arena = &"drowned_crypt_depths"
+opponent_soul = Array[int]([50])
+seed = 505
+id = &"fight_oath_shade"
+title = "V · The Oath-Shade"
+
+[sub_resource type="Resource" id="Resource_nwnna"]
+script = ExtResource("3_b53gr")
+fighter = &"aldric"
+position = Vector3(0, 0, 1)
+facing_degrees = 111.80000000000001
+
+[sub_resource type="Resource" id="Resource_5rlrq"]
+script = ExtResource("3_b53gr")
+fighter = &"oath_shade"
+position = Vector3(2, 0, 0.2)
+facing_degrees = -68.2
+pose = &"Sit_Floor_Idle"
+exit_line = 3
+
+[sub_resource type="Resource" id="Resource_wn64k"]
+script = ExtResource("4_2pj7u")
+speaker = &"oath_shade"
+speaker_name = "The Oath-Shade"
+text = "You cannot put me out. I am the fire. I am what you are becoming."
+shot = 0
+
+[sub_resource type="Resource" id="Resource_eh37x"]
+script = ExtResource("4_2pj7u")
+speaker = &"aldric"
+text = "Then burn for me, not against me. We have a king to reach."
+
+[sub_resource type="Resource" id="Resource_vgbdc"]
+script = ExtResource("4_2pj7u")
+text = "The shadow folds back into him. The fire settles. For now."
+shot = 1
+
+[sub_resource type="Resource" id="Resource_qjvcc"]
+script = ExtResource("4_2pj7u")
+text = "Far above, the bell tolls. In its tower, something vast and made of bone turns from the window."
+cue = &"bell_toll"
+
+[sub_resource type="Resource" id="Resource_u2wsw"]
+script = ExtResource("4_2pj7u")
+text = "And in the dark of the crypt, a porcelain mask shaped like a bird watches him go."
+shot = 2
+
+[sub_resource type="Resource" id="Resource_uosvx"]
+script = ExtResource("4_2pj7u")
+kind = 1
+title = "End of Act 1"
+text = "The Bell Wakes"
+
+[sub_resource type="Resource" id="Resource_bhqnr"]
+script = ExtResource("7_b4dp1")
+position = Vector3(-1.4, 1.7, 4)
+target = Vector3(1, 1, 0.6)
+fov = 42.0
+
+[sub_resource type="Resource" id="Resource_kw7wu"]
+script = ExtResource("7_b4dp1")
+position = Vector3(-0.4, 2.6, 6.5)
+target = Vector3(0.6, 2.8, -6)
+
+[sub_resource type="Resource" id="Resource_vxsqf"]
+script = ExtResource("7_b4dp1")
+position = Vector3(-6, 1.4, 6)
+target = Vector3(-9, 1.6, -4)
+fov = 34.0
+
+[sub_resource type="Resource" id="Resource_b1xfl"]
+script = ExtResource("6_o82v2")
+arena = &"drowned_crypt_depths"
+shots = Array[ExtResource("7_b4dp1")]([SubResource("Resource_bhqnr"), SubResource("Resource_kw7wu"), SubResource("Resource_vxsqf")])
+actors = Array[ExtResource("3_b53gr")]([SubResource("Resource_nwnna"), SubResource("Resource_5rlrq")])
+lines = Array[ExtResource("4_2pj7u")]([SubResource("Resource_wn64k"), SubResource("Resource_eh37x"), SubResource("Resource_vgbdc"), SubResource("Resource_qjvcc"), SubResource("Resource_u2wsw"), SubResource("Resource_uosvx")])
+id = &"epilogue"
+title = "Epilogue · The Bell Tolls On"
+
+[resource]
+script = ExtResource("1_pv5it")
+id = &"act1"
+title = "Act 1"
+subtitle = "The Bell Wakes"
+blurb = "Sir Aldric Vane wakes in a burned chapel as the Hollow King's bell tolls. Fight through the Reckoning toward the throne before the Oathfire turns him to ash."
+steps = Array[ExtResource("2_2fsfa")]([SubResource("Resource_x4rvy"), SubResource("Resource_nj4sm"), SubResource("Resource_lpfgv"), SubResource("Resource_t66s6"), SubResource("Resource_4a7lm"), SubResource("Resource_yk3ys"), SubResource("Resource_bc24k"), SubResource("Resource_4rlet"), SubResource("Resource_6vig8"), SubResource("Resource_q7ot7"), SubResource("Resource_5ca4r"), SubResource("Resource_b1xfl")])

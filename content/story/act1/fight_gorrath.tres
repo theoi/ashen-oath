@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="StoryFight" format=3]
+
+[ext_resource type="Script" path="res://content/types/story_prompt.gd" id="1_ipwit"]
+[ext_resource type="Script" path="res://content/types/story_fight.gd" id="2_rsaec"]
+
+[resource]
+script = ExtResource("2_rsaec")
+opponents = Array[StringName]([&"gorrath"])
+opponent_name = "Gorrath"
+arena = &"drowned_crypt"
+seed = 404
+unlocks = Array[StringName]([&"gorrath"])
+id = &"fight_gorrath"
+title = "IV · Gorrath"

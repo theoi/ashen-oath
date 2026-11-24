@@ -1,0 +1,60 @@
+[gd_resource type="Resource" script_class="StoryFight" format=3]
+
+[ext_resource type="Script" path="res://content/types/story_prompt.gd" id="1_pbwqa"]
+[ext_resource type="Script" path="res://content/types/story_fight.gd" id="2_dgjdy"]
+
+[sub_resource type="Resource" id="Resource_s2ebi"]
+script = ExtResource("1_pbwqa")
+goal = 1
+amount = 4
+title = "Move"
+text = "Find your footing. Circle the squire."
+hint = "Left stick  ·  W A S D"
+
+[sub_resource type="Resource" id="Resource_64tdh"]
+script = ExtResource("1_pbwqa")
+goal = 2
+amount = 3
+title = "Light string"
+text = "Press Light three times in a row. Each blow flows into the next."
+actions = Array[StringName]([&"attack_light"])
+
+[sub_resource type="Resource" id="Resource_b12ib"]
+script = ExtResource("1_pbwqa")
+goal = 3
+amount = 60
+title = "Guard"
+text = "Hold Guard to block its blade. Blows from behind still land."
+actions = Array[StringName]([&"guard"])
+
+[sub_resource type="Resource" id="Resource_jhr7b"]
+script = ExtResource("1_pbwqa")
+goal = 4
+title = "Dodge"
+text = "Roll through an attack. Early in the roll, nothing can touch you."
+actions = Array[StringName]([&"dodge"])
+
+[sub_resource type="Resource" id="Resource_qqqn7"]
+script = ExtResource("1_pbwqa")
+goal = 5
+title = "Grab"
+text = "A guard will not stop a grab. Seize the squire."
+actions = Array[StringName]([&"grab"])
+
+[sub_resource type="Resource" id="Resource_vdd3y"]
+script = ExtResource("1_pbwqa")
+title = "Finish it"
+text = "Put the squire back in its grave."
+timeout_seconds = 5.0
+
+[resource]
+script = ExtResource("2_dgjdy")
+opponents = Array[StringName]([&"hollowed"])
+opponent_name = "Hollowed Squire"
+rounds_to_win = 1
+round_seconds = -1
+ai_cap = 0
+seed = 101
+prompts = Array[ExtResource("1_pbwqa")]([SubResource("Resource_s2ebi"), SubResource("Resource_64tdh"), SubResource("Resource_b12ib"), SubResource("Resource_jhr7b"), SubResource("Resource_qqqn7"), SubResource("Resource_vdd3y")])
+id = &"fight_squire"
+title = "I · The Squire"
