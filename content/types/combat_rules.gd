@@ -80,7 +80,6 @@ extends Resource
 @export var grab_tech_window: int = 10
 @export var grab_tech_push: float = 1.5
 @export var grab_tech_stun: int = 16
-@export var grab_whiff_recovery: int = 30
 
 @export_group("Scaling")
 ## Hits before scaling starts (hits 1-2 at 100%).
@@ -105,10 +104,11 @@ extends Resource
 @export var burst_invuln: int = 20
 @export var burst_radius: float = 4.0
 @export var burst_knockback: float = 4.0
+## Frames pushed enemies cannot act after a burst.
+@export var burst_push_stun: int = 24
 
 @export_group("Rounds")
 @export var round_seconds: int = 99
 @export var rounds_to_win: int = 2
 @export var round_intro_frames: int = 90
 @export var round_end_frames: int = 150
-@export var ko_slowdown_frames: int = 0

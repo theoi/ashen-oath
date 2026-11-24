@@ -1,0 +1,683 @@
+[gd_resource type="Resource" script_class="FighterData" format=3]
+
+[ext_resource type="Script" path="res://content/types/move_data.gd" id="1_3aoqk"]
+[ext_resource type="Script" path="res://content/types/cancel_data.gd" id="2_4x2xt"]
+[ext_resource type="Script" path="res://content/types/effect_data.gd" id="3_o3xgw"]
+[ext_resource type="Script" path="res://content/types/hitbox_data.gd" id="4_r0qq4"]
+[ext_resource type="Script" path="res://content/types/hit_data.gd" id="5_rj3uu"]
+[ext_resource type="Script" path="res://content/types/motion_data.gd" id="6_1edu0"]
+[ext_resource type="Script" path="res://content/types/teleport_data.gd" id="7_mn1nx"]
+[ext_resource type="Script" path="res://content/types/buff_data.gd" id="8_i3q1k"]
+[ext_resource type="Script" path="res://content/types/fighter_data.gd" id="9_8g4kl"]
+
+[sub_resource type="Resource" id="Resource_x5tlc"]
+script = ExtResource("5_rj3uu")
+damage = 35
+blockstun = 11
+knockback = 0.3
+
+[sub_resource type="Resource" id="Resource_dcpqv"]
+script = ExtResource("4_r0qq4")
+radius = 0.5
+hit = SubResource("Resource_x5tlc")
+
+[sub_resource type="Resource" id="Resource_rnnmr"]
+script = ExtResource("1_3aoqk")
+id = &"light_1"
+active = 2
+hitboxes = Array[ExtResource("4_r0qq4")]([SubResource("Resource_dcpqv")])
+next_light = &"light_2"
+next_heavy = &"sweep"
+animation = &"light_1"
+
+[sub_resource type="Resource" id="Resource_hqqsf"]
+script = ExtResource("5_rj3uu")
+damage = 35
+blockstun = 11
+knockback = 0.3
+
+[sub_resource type="Resource" id="Resource_xmvac"]
+script = ExtResource("4_r0qq4")
+radius = 0.5
+hit = SubResource("Resource_hqqsf")
+
+[sub_resource type="Resource" id="Resource_6u2cp"]
+script = ExtResource("1_3aoqk")
+id = &"light_2"
+active = 2
+hitboxes = Array[ExtResource("4_r0qq4")]([SubResource("Resource_xmvac")])
+next_light = &"light_3"
+next_heavy = &"launcher"
+animation = &"light_2"
+
+[sub_resource type="Resource" id="Resource_uwtir"]
+script = ExtResource("5_rj3uu")
+damage = 50
+hitstun = 20
+blockstun = 14
+knockback = 1.5
+
+[sub_resource type="Resource" id="Resource_nc0h0"]
+script = ExtResource("4_r0qq4")
+offset = Vector3(0, 1, 0.9)
+radius = 0.55
+hit = SubResource("Resource_uwtir")
+
+[sub_resource type="Resource" id="Resource_darnf"]
+script = ExtResource("1_3aoqk")
+id = &"light_3"
+startup = 13
+recovery = 18
+hitboxes = Array[ExtResource("4_r0qq4")]([SubResource("Resource_nc0h0")])
+animation = &"light_3"
+
+[sub_resource type="Resource" id="Resource_7mrbc"]
+script = ExtResource("5_rj3uu")
+damage = 70
+hitstun = 0
+blockstun = 14
+reaction = 1
+knockback = 1.0
+
+[sub_resource type="Resource" id="Resource_fja4t"]
+script = ExtResource("4_r0qq4")
+offset = Vector3(0, 1.1, 0.4)
+radius = 0.6
+hit = SubResource("Resource_7mrbc")
+
+[sub_resource type="Resource" id="Resource_1rxwr"]
+script = ExtResource("1_3aoqk")
+id = &"sweep"
+kind = 1
+startup = 14
+recovery = 22
+hitboxes = Array[ExtResource("4_r0qq4")]([SubResource("Resource_fja4t")])
+animation = &"sweep"
+
+[sub_resource type="Resource" id="Resource_n6642"]
+script = ExtResource("2_4x2xt")
+start_frame = 14
+end_frame = 30
+condition = 2
+into = 4
+
+[sub_resource type="Resource" id="Resource_rvdav"]
+script = ExtResource("5_rj3uu")
+damage = 60
+hitstun = 45
+blockstun = 13
+reaction = 2
+knockback = 0.3
+launch_height = 2.7
+
+[sub_resource type="Resource" id="Resource_ptgwn"]
+script = ExtResource("4_r0qq4")
+radius = 0.6
+hit = SubResource("Resource_rvdav")
+
+[sub_resource type="Resource" id="Resource_acgjd"]
+script = ExtResource("1_3aoqk")
+id = &"launcher"
+kind = 1
+startup = 14
+recovery = 24
+hitboxes = Array[ExtResource("4_r0qq4")]([SubResource("Resource_ptgwn")])
+cancels = Array[ExtResource("2_4x2xt")]([SubResource("Resource_n6642")])
+animation = &"launcher"
+
+[sub_resource type="Resource" id="Resource_ngtoe"]
+script = ExtResource("5_rj3uu")
+damage = 100
+hitstun = 26
+blockstun = 15
+knockback = 0.8
+
+[sub_resource type="Resource" id="Resource_kgaih"]
+script = ExtResource("4_r0qq4")
+offset = Vector3(0, 1.2, 0.9)
+radius = 0.6
+hit = SubResource("Resource_ngtoe")
+
+[sub_resource type="Resource" id="Resource_8fiea"]
+script = ExtResource("1_3aoqk")
+id = &"heavy_1"
+kind = 1
+startup = 18
+active = 4
+recovery = 24
+hitboxes = Array[ExtResource("4_r0qq4")]([SubResource("Resource_kgaih")])
+next_heavy = &"heavy_2"
+chargeable = true
+charge_frame = 10
+animation = &"heavy_1"
+
+[sub_resource type="Resource" id="Resource_xxqrg"]
+script = ExtResource("5_rj3uu")
+damage = 110
+hitstun = 0
+blockstun = 14
+reaction = 1
+knockback = 3.0
+wall_splat = true
+
+[sub_resource type="Resource" id="Resource_lj71f"]
+script = ExtResource("4_r0qq4")
+offset = Vector3(0, 1.2, 0.9)
+radius = 0.65
+hit = SubResource("Resource_xxqrg")
+
+[sub_resource type="Resource" id="Resource_ei82q"]
+script = ExtResource("1_3aoqk")
+id = &"heavy_2"
+kind = 1
+startup = 22
+active = 4
+recovery = 26
+hitboxes = Array[ExtResource("4_r0qq4")]([SubResource("Resource_lj71f")])
+animation = &"heavy_2"
+
+[sub_resource type="Resource" id="Resource_1606c"]
+script = ExtResource("5_rj3uu")
+damage = 50
+hitstun = 0
+blockstun = 13
+reaction = 1
+knockback = 1.2
+
+[sub_resource type="Resource" id="Resource_d3hqs"]
+script = ExtResource("4_r0qq4")
+radius = 0.55
+hit = SubResource("Resource_1606c")
+
+[sub_resource type="Resource" id="Resource_lxp38"]
+script = ExtResource("6_1edu0")
+end_frame = 10
+forward_speed = 15.0
+
+[sub_resource type="Resource" id="Resource_3mta6"]
+script = ExtResource("1_3aoqk")
+id = &"run_light"
+startup = 8
+active = 4
+recovery = 18
+hitboxes = Array[ExtResource("4_r0qq4")]([SubResource("Resource_d3hqs")])
+motions = Array[ExtResource("6_1edu0")]([SubResource("Resource_lxp38")])
+animation = &"run_light"
+
+[sub_resource type="Resource" id="Resource_a62ao"]
+script = ExtResource("5_rj3uu")
+damage = 30
+hitstun = 18
+knockback = 0.2
+
+[sub_resource type="Resource" id="Resource_4qeq4"]
+script = ExtResource("4_r0qq4")
+radius = 0.5
+hit = SubResource("Resource_a62ao")
+
+[sub_resource type="Resource" id="Resource_3t3xq"]
+script = ExtResource("1_3aoqk")
+id = &"air_light_1"
+kind = 2
+startup = 5
+hitboxes = Array[ExtResource("4_r0qq4")]([SubResource("Resource_4qeq4")])
+next_light = &"air_light_2"
+aerial = true
+animation = &"air_light_1"
+
+[sub_resource type="Resource" id="Resource_tamas"]
+script = ExtResource("5_rj3uu")
+damage = 30
+hitstun = 18
+knockback = 0.3
+
+[sub_resource type="Resource" id="Resource_qkvts"]
+script = ExtResource("4_r0qq4")
+radius = 0.5
+hit = SubResource("Resource_tamas")
+
+[sub_resource type="Resource" id="Resource_aand8"]
+script = ExtResource("1_3aoqk")
+id = &"air_light_2"
+kind = 2
+startup = 5
+hitboxes = Array[ExtResource("4_r0qq4")]([SubResource("Resource_qkvts")])
+aerial = true
+animation = &"air_light_2"
+
+[sub_resource type="Resource" id="Resource_0nau6"]
+script = ExtResource("5_rj3uu")
+damage = 80
+hitstun = 20
+blockstun = 12
+reaction = 3
+knockback = 0.3
+juggle_cost = 2
+
+[sub_resource type="Resource" id="Resource_0tetb"]
+script = ExtResource("4_r0qq4")
+offset = Vector3(0, 0.8, 0.5)
+radius = 0.6
+hit = SubResource("Resource_0nau6")
+
+[sub_resource type="Resource" id="Resource_lexft"]
+script = ExtResource("1_3aoqk")
+id = &"air_heavy"
+kind = 3
+startup = 12
+active = 4
+recovery = 20
+hitboxes = Array[ExtResource("4_r0qq4")]([SubResource("Resource_0tetb")])
+aerial = true
+landing_recovery = 16
+animation = &"air_heavy"
+
+[sub_resource type="Resource" id="Resource_4viyd"]
+script = ExtResource("5_rj3uu")
+damage = 0
+hitstun = 0
+blockstun = 0
+knockback = 0.0
+throw = true
+
+[sub_resource type="Resource" id="Resource_dvarl"]
+script = ExtResource("4_r0qq4")
+offset = Vector3(0, 1, 0.8)
+radius = 0.5
+hit = SubResource("Resource_4viyd")
+
+[sub_resource type="Resource" id="Resource_eyuc0"]
+script = ExtResource("1_3aoqk")
+id = &"grab"
+kind = 4
+recovery = 30
+hitboxes = Array[ExtResource("4_r0qq4")]([SubResource("Resource_dvarl")])
+throw_move = &"throw"
+animation = &"grab"
+
+[sub_resource type="Resource" id="Resource_33867"]
+script = ExtResource("5_rj3uu")
+damage = 90
+hitstun = 0
+blockstun = 0
+reaction = 1
+knockback = 2.0
+unblockable = true
+parryable = false
+
+[sub_resource type="Resource" id="Resource_nhl4i"]
+script = ExtResource("4_r0qq4")
+radius = 0.5
+hit = SubResource("Resource_33867")
+
+[sub_resource type="Resource" id="Resource_75dw4"]
+script = ExtResource("1_3aoqk")
+id = &"throw"
+kind = 5
+startup = 14
+active = 1
+recovery = 20
+hitboxes = Array[ExtResource("4_r0qq4")]([SubResource("Resource_nhl4i")])
+animation = &"throw"
+
+[sub_resource type="Resource" id="Resource_d3seb"]
+script = ExtResource("5_rj3uu")
+damage = 50
+hitstun = 18
+blockstun = 14
+knockback = 1.0
+
+[sub_resource type="Resource" id="Resource_pfva5"]
+script = ExtResource("4_r0qq4")
+radius = 0.6
+hit = SubResource("Resource_d3seb")
+
+[sub_resource type="Resource" id="Resource_vda65"]
+script = ExtResource("1_3aoqk")
+id = &"getup_attack"
+kind = 8
+startup = 14
+recovery = 22
+hitboxes = Array[ExtResource("4_r0qq4")]([SubResource("Resource_pfva5")])
+invuln_start = 1
+invuln_end = 10
+animation = &"getup_attack"
+
+[sub_resource type="Resource" id="Resource_bfits"]
+script = ExtResource("5_rj3uu")
+damage = 90
+hitstun = 24
+blockstun = 14
+knockback = 2.5
+wall_splat = true
+
+[sub_resource type="Resource" id="Resource_5r8r4"]
+script = ExtResource("4_r0qq4")
+radius = 0.6
+hit = SubResource("Resource_bfits")
+
+[sub_resource type="Resource" id="Resource_jaefn"]
+script = ExtResource("6_1edu0")
+end_frame = 14
+forward_speed = 25.0
+stop_at_distance = 1.4
+
+[sub_resource type="Resource" id="Resource_7sf5f"]
+script = ExtResource("1_3aoqk")
+id = &"dash_strike"
+kind = 6
+startup = 12
+active = 4
+recovery = 24
+hitboxes = Array[ExtResource("4_r0qq4")]([SubResource("Resource_5r8r4")])
+motions = Array[ExtResource("6_1edu0")]([SubResource("Resource_jaefn")])
+armor_start = 4
+armor_end = 12
+armor_hits = 1
+cooldown = 300
+animation = &"dash_strike"
+
+[sub_resource type="Resource" id="Resource_670xb"]
+script = ExtResource("2_4x2xt")
+start_frame = 8
+end_frame = 30
+condition = 2
+into = 4
+
+[sub_resource type="Resource" id="Resource_do5yn"]
+script = ExtResource("5_rj3uu")
+damage = 70
+hitstun = 45
+blockstun = 13
+reaction = 2
+knockback = 0.3
+launch_height = 2.7
+
+[sub_resource type="Resource" id="Resource_bkiuf"]
+script = ExtResource("4_r0qq4")
+radius = 0.6
+hit = SubResource("Resource_do5yn")
+
+[sub_resource type="Resource" id="Resource_dp1aa"]
+script = ExtResource("1_3aoqk")
+id = &"rising_slash"
+kind = 6
+startup = 8
+active = 4
+recovery = 26
+hitboxes = Array[ExtResource("4_r0qq4")]([SubResource("Resource_bkiuf")])
+cancels = Array[ExtResource("2_4x2xt")]([SubResource("Resource_670xb")])
+cooldown = 240
+animation = &"rising_slash"
+
+[sub_resource type="Resource" id="Resource_sl2dy"]
+script = ExtResource("5_rj3uu")
+damage = 60
+hitstun = 18
+blockstun = 12
+
+[sub_resource type="Resource" id="Resource_dwcbg"]
+script = ExtResource("3_o3xgw")
+id = &"bolt"
+spawn_frame = 16
+offset = Vector3(0, 1.1, 0.8)
+speed = 18.0
+lifetime = 90
+travel = 20.0
+hit = SubResource("Resource_sl2dy")
+
+[sub_resource type="Resource" id="Resource_qji8y"]
+script = ExtResource("1_3aoqk")
+id = &"bolt"
+kind = 6
+startup = 16
+active = 1
+recovery = 20
+effects = Array[ExtResource("3_o3xgw")]([SubResource("Resource_dwcbg")])
+cooldown = 150
+animation = &"bolt"
+
+[sub_resource type="Resource" id="Resource_hbndy"]
+script = ExtResource("5_rj3uu")
+damage = 90
+hitstun = 40
+blockstun = 12
+reaction = 2
+knockback = 0.0
+launch_height = 2.4
+
+[sub_resource type="Resource" id="Resource_l7y7k"]
+script = ExtResource("3_o3xgw")
+id = &"eruption"
+spawn_frame = 14
+anchor = 1
+offset = Vector3(0, 0, 0)
+radius = 1.2
+height = 2.0
+delay = 30
+lifetime = 12
+hit = SubResource("Resource_hbndy")
+destroyable = false
+blocked_by_walls = false
+projectile = false
+
+[sub_resource type="Resource" id="Resource_3e8ga"]
+script = ExtResource("1_3aoqk")
+id = &"eruption"
+kind = 6
+startup = 14
+active = 1
+recovery = 20
+effects = Array[ExtResource("3_o3xgw")]([SubResource("Resource_l7y7k")])
+cooldown = 420
+animation = &"eruption"
+
+[sub_resource type="Resource" id="Resource_51lk6"]
+script = ExtResource("7_mn1nx")
+frame = 2
+
+[sub_resource type="Resource" id="Resource_8vrob"]
+script = ExtResource("1_3aoqk")
+id = &"blink"
+kind = 6
+startup = 2
+active = 1
+recovery = 10
+teleport = SubResource("Resource_51lk6")
+invuln_start = 1
+invuln_end = 14
+air_ok = true
+cooldown = 300
+animation = &"blink"
+
+[sub_resource type="Resource" id="Resource_22mol"]
+script = ExtResource("5_rj3uu")
+hitstun = 30
+blockstun = 14
+guard_damage = 35
+reaction = 4
+knockback = 0.0
+
+[sub_resource type="Resource" id="Resource_0cnjn"]
+script = ExtResource("4_r0qq4")
+offset = Vector3(0, 1.2, 0.8)
+offset_end = Vector3(0, 1.2, 9)
+capsule = true
+radius = 0.35
+hit = SubResource("Resource_22mol")
+
+[sub_resource type="Resource" id="Resource_iarlt"]
+script = ExtResource("1_3aoqk")
+id = &"chain_hook"
+kind = 6
+startup = 14
+recovery = 26
+hitboxes = Array[ExtResource("4_r0qq4")]([SubResource("Resource_0cnjn")])
+cooldown = 360
+animation = &"chain_hook"
+
+[sub_resource type="Resource" id="Resource_03edp"]
+script = ExtResource("5_rj3uu")
+damage = 0
+hitstun = 0
+blockstun = 0
+knockback = 0.0
+throw = true
+throw_beats_attacks = true
+
+[sub_resource type="Resource" id="Resource_iiwak"]
+script = ExtResource("4_r0qq4")
+offset = Vector3(0, 1, 1)
+radius = 0.6
+hit = SubResource("Resource_03edp")
+
+[sub_resource type="Resource" id="Resource_p6dbh"]
+script = ExtResource("1_3aoqk")
+id = &"command_grab"
+kind = 7
+startup = 5
+recovery = 40
+hitboxes = Array[ExtResource("4_r0qq4")]([SubResource("Resource_iiwak")])
+invuln_start = 1
+invuln_end = 4
+soul_cost = 100
+flash_frames = 20
+throw_move = &"execution"
+techable = false
+animation = &"command_grab"
+
+[sub_resource type="Resource" id="Resource_ygx7u"]
+script = ExtResource("5_rj3uu")
+damage = 100
+hitstun = 30
+blockstun = 0
+knockback = 0.0
+unblockable = true
+parryable = false
+
+[sub_resource type="Resource" id="Resource_61i4x"]
+script = ExtResource("4_r0qq4")
+start_frame = 10
+end_frame = 10
+radius = 0.5
+hit = SubResource("Resource_ygx7u")
+
+[sub_resource type="Resource" id="Resource_xeskg"]
+script = ExtResource("4_r0qq4")
+start_frame = 20
+end_frame = 20
+radius = 0.5
+hit = SubResource("Resource_ygx7u")
+group = 1
+
+[sub_resource type="Resource" id="Resource_ogj58"]
+script = ExtResource("5_rj3uu")
+damage = 150
+hitstun = 0
+blockstun = 0
+hitstop = 16
+reaction = 1
+knockback = 2.5
+unblockable = true
+parryable = false
+
+[sub_resource type="Resource" id="Resource_s3ti0"]
+script = ExtResource("4_r0qq4")
+start_frame = 30
+end_frame = 30
+radius = 0.5
+hit = SubResource("Resource_ogj58")
+group = 2
+
+[sub_resource type="Resource" id="Resource_jlj28"]
+script = ExtResource("1_3aoqk")
+id = &"execution"
+kind = 5
+startup = 10
+active = 1
+recovery = 20
+hitboxes = Array[ExtResource("4_r0qq4")]([SubResource("Resource_61i4x"), SubResource("Resource_xeskg"), SubResource("Resource_s3ti0")])
+animation = &"execution"
+
+[sub_resource type="Resource" id="Resource_tpioi"]
+script = ExtResource("8_i3q1k")
+id = &"war_cry"
+damage_bonus_percent = 30
+uses = 1
+
+[sub_resource type="Resource" id="Resource_yc3cf"]
+script = ExtResource("1_3aoqk")
+id = &"war_cry"
+kind = 6
+startup = 10
+active = 1
+recovery = 14
+cooldown = 600
+buff_frame = 10
+buff = SubResource("Resource_tpioi")
+animation = &"war_cry"
+
+[sub_resource type="Resource" id="Resource_lowif"]
+script = ExtResource("5_rj3uu")
+damage = 120
+hitstun = 40
+blockstun = 14
+reaction = 2
+knockback = 0.3
+launch_height = 3.0
+
+[sub_resource type="Resource" id="Resource_teyai"]
+script = ExtResource("4_r0qq4")
+start_frame = 8
+end_frame = 9
+offset = Vector3(0, 1, 1.2)
+radius = 1.0
+hit = SubResource("Resource_lowif")
+
+[sub_resource type="Resource" id="Resource_pcelo"]
+script = ExtResource("5_rj3uu")
+damage = 180
+hitstun = 0
+blockstun = 16
+hitstop = 16
+reaction = 1
+knockback = 3.5
+wall_splat = true
+
+[sub_resource type="Resource" id="Resource_ffnqw"]
+script = ExtResource("4_r0qq4")
+start_frame = 12
+end_frame = 13
+offset = Vector3(0, 1.2, 1.5)
+radius = 1.5
+hit = SubResource("Resource_pcelo")
+group = 1
+
+[sub_resource type="Resource" id="Resource_c2yk3"]
+script = ExtResource("1_3aoqk")
+id = &"super"
+kind = 7
+startup = 8
+active = 6
+recovery = 30
+hitboxes = Array[ExtResource("4_r0qq4")]([SubResource("Resource_teyai"), SubResource("Resource_ffnqw")])
+invuln_start = 1
+invuln_end = 14
+soul_cost = 100
+flash_frames = 20
+animation = &"super"
+
+[resource]
+script = ExtResource("9_8g4kl")
+id = &"test_fighter"
+display_name = "Test Fighter"
+moves = Array[ExtResource("1_3aoqk")]([SubResource("Resource_rnnmr"), SubResource("Resource_6u2cp"), SubResource("Resource_darnf"), SubResource("Resource_1rxwr"), SubResource("Resource_acgjd"), SubResource("Resource_8fiea"), SubResource("Resource_ei82q"), SubResource("Resource_3mta6"), SubResource("Resource_3t3xq"), SubResource("Resource_aand8"), SubResource("Resource_lexft"), SubResource("Resource_eyuc0"), SubResource("Resource_75dw4"), SubResource("Resource_vda65"), SubResource("Resource_7sf5f"), SubResource("Resource_dp1aa"), SubResource("Resource_qji8y"), SubResource("Resource_3e8ga"), SubResource("Resource_8vrob"), SubResource("Resource_iarlt"), SubResource("Resource_p6dbh"), SubResource("Resource_jlj28"), SubResource("Resource_yc3cf"), SubResource("Resource_c2yk3")])
+light = &"light_1"
+heavy = &"heavy_1"
+run_light = &"run_light"
+air_light = &"air_light_1"
+air_heavy = &"air_heavy"
+grab = &"grab"
+getup_attack = &"getup_attack"
+abilities = Array[StringName]([&"dash_strike", &"rising_slash", &"bolt"])
+super_move = &"super"

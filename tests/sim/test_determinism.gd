@@ -7,8 +7,9 @@ const TICKS := 900
 
 
 func _config() -> SimConfig:
-	var cfg := F.config(3)
+	var cfg := F.config(3, F.test_fighter())
 	cfg.round_seconds = 10
+	cfg.slots[1].start_soul = 100
 	return cfg
 
 
@@ -102,3 +103,24 @@ func test_replay_input_source_drives_a_new_sim() -> void:
 			inputs.append(sources[slot].next_frame(replayed, slot))
 		replayed.step(inputs)
 	assert_eq(replayed.checksum(), sim.checksum())
+
+
+func test_random_brawls_stay_valid_and_exercise_combat() -> void:
+	var hits := 0
+	for seed_value: int in [1, 2, 3]:
+		var cfg := _config()
+		cfg.round_seconds = 20
+		var sim := Sim.new(cfg)
+		var frames := F.random_frames(3000, 3, seed_value)
+		for t in 3000:
+			for e in sim.step(frames[t]):
+				if e.type == SimEvent.Type.HIT:
+					hits += 1
+			for f in sim.state.fighters:
+				if f.hp < 0 or f.hp > f.max_hp or f.soul < 0 or f.soul > 10000 or f.guard < -10000:
+					fail("invalid resources at tick %d: %s" % [sim.state.tick, [f.hp, f.soul, f.guard]])
+					return
+				if f.pos.y < 0 or not sim.arena.inside_floor(f.pos):
+					fail("fighter %d left the arena at tick %d: %s" % [f.slot, sim.state.tick, f.pos])
+					return
+	assert_true(hits > 50, "random play lands hits (%d)" % hits)
