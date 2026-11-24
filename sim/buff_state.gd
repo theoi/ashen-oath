@@ -5,6 +5,8 @@ extends SimRecord
 ## Where it came from: a move index of the owner, or -1 for FighterData.parry_buff,
 ## -2 for a FighterTrait.
 var source: int = -1
+## Hash of BuffData.id for victim buffs (they replace by id), else 0.
+var key: int = 0
 var ticks_left: int = 0
 var uses_left: int = 0
 ## Buffs with uses apply to casts with a FighterState.move_cast above this (not the one

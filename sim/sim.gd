@@ -11,6 +11,8 @@ extends RefCounted
 ## Iterate fighters in slot order and effects in spawn order.
 
 const MAX_SLOTS := 4
+## BuffState.source of buffs applied by HitData.victim_buff.
+const VICTIM_BUFF := -3
 ## Stick magnitude (of SimInput.STICK_MAX) below which the stick counts as neutral.
 const STICK_DEADZONE := 24
 ## Buttons that are buffered, in priority order when pressed on the same tick.
@@ -875,6 +877,8 @@ func _try_action(f: FighterState, airborne: bool) -> bool:
 				return _try_move(f, data.find_move(data.run_light), bit)
 			return _try_move(f, data.find_move(data.light), bit)
 		SimInput.DODGE:
+			if f.rooted > 0:
+				return false
 			if data.dash != null:
 				if airborne or f.dash_charges <= 0:
 					return false
@@ -890,6 +894,8 @@ func _try_action(f: FighterState, airborne: bool) -> bool:
 			_start_dodge(f)
 			return true
 		SimInput.JUMP:
+			if f.rooted > 0:
+				return false
 			if airborne:
 				if f.jumps_used >= data.jumps:
 					return false
@@ -1336,14 +1342,18 @@ func _spawn_move_effect(f: FighterState, move: MoveData, effect_index: int) -> v
 		hook.on_effects_spawned(self, f, move, effect_index, spawned)
 
 
-## Adds a buff from `data` (source: owner move index, -1 parry buff, -2 trait).
+## Adds a buff from `data` (source: owner move index, -1 parry buff, -2 trait,
+## VICTIM_BUFF for HitData.victim_buff). Replaces the buff with the same source (victim
+## buffs: the same BuffData.id).
 func apply_buff(f: FighterState, data: BuffData, source: int) -> void:
+	var key := String(data.id).hash() if source == VICTIM_BUFF else 0
 	for existing in f.buffs:
-		if existing.source == source:
+		if existing.source == source and existing.key == key:
 			f.buffs.erase(existing)
 			break
 	var buff := BuffState.new()
 	buff.source = source
+	buff.key = key
 	buff.ticks_left = data.duration
 	buff.uses_left = data.uses
 	buff.after_cast = f.move_cast
@@ -1356,10 +1366,10 @@ func apply_buff(f: FighterState, data: BuffData, source: int) -> void:
 func _run(f: FighterState, speed_percent: int) -> void:
 	var data := fighter_data[f.slot]
 	var full := Fx.mps(data.run_speed)
-	var top := full * speed_percent / 100 * (100 + _buff_speed(f)) / 100
+	var top := full * speed_percent / 100 * maxi(0, 100 + _buff_speed(f)) / 100
 	var desired := Vector3i.ZERO
 	var active := _stick_active(f)
-	if active:
+	if active and f.rooted == 0:
 		var mag := Fx.isqrt(f.stick_x * f.stick_x + f.stick_z * f.stick_z)
 		var den := maxi(mag, SimInput.STICK_MAX)
 		desired = Vector3i(f.stick_x * top / den, 0, f.stick_z * top / den)
@@ -1658,6 +1668,7 @@ func _air_tech(f: FighterState) -> void:
 
 func _knockdown(f: FighterState) -> void:
 	_set_action(f, Action.KNOCKDOWN)
+	f.rooted = 0
 	f.vel = Vector3i.ZERO
 	f.knock_ticks = 0
 	_emit(EventType.KNOCKDOWN, f.last_attacker, f.slot, &"", f.pos, 0)
@@ -2588,6 +2599,8 @@ func _try_super_armor(c: Contact) -> bool:
 		e.flags |= SimEvent.FLAG_PROJECTILE
 	_drain_stagger(v, c.attacker, _stagger_of(c))
 	_on_connect(c)
+	_apply_victim_buff(c)
+	_hit_taken(c, damage, true)
 	if v.hp <= 0:
 		_ko(v)
 	return true
@@ -2759,12 +2772,28 @@ func _land_hit(c: Contact) -> void:
 		_emit(EventType.COUNTER_STUN, a.slot, v.slot, id, v.pos, v.stun)
 	_drain_stagger(v, a, _stagger_of(c) + (rules.counter_stagger if c.counter_attack else 0))
 	_on_connect(c)
+	if hit.root_frames > 0 and v.grounded and v.action != Action.KNOCKDOWN and v.action != Action.TECH:
+		v.rooted = maxi(v.rooted, hit.root_frames)
+		_emit(EventType.ROOT, a.slot if a != null else -1, v.slot, id, v.pos, hit.root_frames)
+	_apply_victim_buff(c)
 	if a != null:
 		var hook := traits[a.slot]
 		if hook != null:
 			hook.on_hit_dealt(self, a, v, c.move, hit, false)
+	_hit_taken(c, damage, false)
 	if v.hp <= 0:
 		_ko(v)
+
+
+func _apply_victim_buff(c: Contact) -> void:
+	if c.hit.victim_buff != null and c.victim.hp > 0:
+		apply_buff(c.victim, c.hit.victim_buff, VICTIM_BUFF)
+
+
+func _hit_taken(c: Contact, damage: int, armored: bool) -> void:
+	var hook := traits[c.victim.slot]
+	if hook != null:
+		hook.on_hit_taken(self, c.victim, c.attacker, c.move, c.hit, damage, armored)
 
 
 ## A ⚡Counter: the victim's move is interrupted into COUNTER_STUN; the attacker gains Soul
@@ -2861,6 +2890,7 @@ func _flip_out(v: FighterState, a: FighterState) -> void:
 	_set_action(v, Action.TECH)
 	v.action_variant = 3
 	v.invuln = UNTIL_LANDING
+	v.rooted = 0
 	v.stun = 0
 	v.knock_ticks = 0
 	v.carried_ticks = 0
@@ -2872,6 +2902,7 @@ func _flip_out(v: FighterState, a: FighterState) -> void:
 ## Sends `f` up so its apex is `height` units above the current position.
 func _launch(f: FighterState, height: int, stun: int) -> void:
 	_set_action(f, Action.AIR_HITSTUN)
+	f.rooted = 0
 	f.stun = stun
 	f.grounded = false
 	f.vel.y = Fx.isqrt(2 * _juggle_gravity * maxi(height, 0))
@@ -2978,6 +3009,8 @@ func _post_tick(f: FighterState) -> void:
 	for s in f.marks.size():
 		if f.marks[s] > 0:
 			f.marks[s] -= 1
+	if f.rooted > 0 and f.hitstop == 0:
+		f.rooted -= 1
 	if f.dash_recharge > 0:
 		f.dash_recharge -= 1
 		if f.dash_recharge == 0:

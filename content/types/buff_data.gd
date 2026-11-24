@@ -7,7 +7,7 @@ extends Resource
 @export var duration: int = 180
 ## Extra outgoing damage in percent (30 = +30%).
 @export var damage_bonus_percent: int = 0
-## Run speed change in percent.
+## Run speed change in percent; negative slows (the total is floored at -100).
 @export var speed_bonus_percent: int = 0
 ## Lasts for this many casts that deal damage (0 = the full duration). A cast is one move
 ## started after the buff, with every hit of it and of its effects; the move running when
