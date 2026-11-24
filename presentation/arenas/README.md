@@ -56,6 +56,6 @@ only from the key light and large props, CPU particles under 700, about 300 draw
 ```sh
 tools/arena_shot.sh /tmp/crypt.png --arena=res://content/arenas/drowned_crypt.tres --view=fight
 tools/arena_shot.sh /tmp/top.png --arena=res://content/arenas/drowned_crypt.tres --view=top --debug --fighters=4
-tools/arena_shot.sh /tmp/vents.png --arena=res://content/arenas/drowned_crypt.tres --tick=318   # vents erupting
+tools/arena_shot.sh /tmp/vents.png --arena=res://content/arenas/drowned_crypt.tres --tick=318 --hold   # vents erupting
 tools/capture_clip.sh res://presentation/arenas/arena_preview.tscn /tmp/crypt.mp4 900 -- --arena=res://content/arenas/drowned_crypt.tres --orbit
 ```

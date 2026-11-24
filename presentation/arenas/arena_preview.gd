@@ -9,8 +9,8 @@ extends Node3D
 ##   --view=NAME             camera preset: overview, fight, low, east, west, top
 ##   --cam=px,py,pz,tx,ty,tz custom camera position and look target
 ##   --orbit                 slowly orbit the arena (clips)
-##   --tick=N                fast-forward N ticks into the fight and hold there (shots of a
-##                           hazard phase); without it the sim keeps running
+##   --tick=N                fast-forward N ticks into the fight before showing it
+##   --hold                  stop the sim there (shots of one hazard phase)
 ##   --fighters=N            stand-in fighters on spawn points 0..N-1, 1-4 (default 2)
 ##   --debug                 draw floor walls, obstacles, hazards, spawns and camera bounds
 ##   --shot=PATH             save a PNG after --frames rendered frames, then quit
@@ -51,7 +51,7 @@ func _ready() -> void:
 	_shot_path = args.get("shot", "")
 	_shot_frame = int(args.get("frames", "45"))
 	_orbit = args.has("orbit")
-	_hold = args.has("tick")
+	_hold = args.has("hold")
 	_start_sim(data, clampi(int(args.get("fighters", "2")), 1, 4), int(args.get("tick", "0")))
 	if args.has("debug"):
 		add_child(ArenaDebugDraw.build(data))
