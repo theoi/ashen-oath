@@ -17,6 +17,7 @@ extends Node3D
 ##   --tick=N                fast-forward N ticks into the fight before showing it
 ##   --hold                  stop the sim there (shots of one hazard phase; capsules only)
 ##   --fighters=N            capsule stand-ins on spawn points 0..N-1, 1-4 (default 2)
+##   --brightness=F          preview the player brightness setting (read by Settings)
 ##   --debug                 draw floor walls, obstacles, hazards, spawns and camera bounds
 ##   --shot=PATH             save a PNG after --frames rendered frames, then quit
 ##   --frames=N              frames to wait before the shot (default 45)

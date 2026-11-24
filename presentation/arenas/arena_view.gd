@@ -66,7 +66,6 @@ var _flicker_base: Array[float] = []
 var _time := 0.0
 
 
-
 func _ready() -> void:
 	if look == null:
 		look = ArenaLook.new()

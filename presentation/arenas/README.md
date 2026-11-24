@@ -47,6 +47,16 @@ two lights on render layer 1 only (fighters; arena geometry is on layer 2) keep 
 separated from the dark: the rim light from behind and `FighterFill` from the camera side.
 Grave vents keep a faint border while dormant and a bright border plus fill while warning.
 Murky water: `water_opacity`, `water_murk` (drifting scum and silt).
+
+Floors, walls and pillars should still read at a glance from the gameplay camera: keep
+`grime_amount` and `breakup` moderate and `grime_color` off pure black, and lift the floor
+with `prop_brightness` rather than `ambient_energy` (ambient barely shows on the grim
+material).
+
+The player Brightness setting (`Settings.brightness`) multiplies each arena's tonemap
+exposure, so `look.exposure` is the base at brightness 1. Tune the looks at 1; preview
+other values with `arena_preview --brightness=1.4`.
+
 ## Using an arena in a match
 
 ```gdscript
