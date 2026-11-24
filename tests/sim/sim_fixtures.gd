@@ -58,7 +58,7 @@ static func skip_intro(sim: Sim) -> void:
 
 ## Steps once with `frame` for slot 0 and neutral for the others.
 static func step(sim: Sim, frame: int = 0, other: int = 0) -> Array[SimEvent]:
-	var inputs := PackedInt32Array()
+	var inputs := PackedInt64Array()
 	inputs.resize(sim.slot_count())
 	inputs[0] = frame
 	for i in range(1, sim.slot_count()):

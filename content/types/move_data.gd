@@ -8,6 +8,22 @@ extends Resource
 
 enum Kind { LIGHT, HEAVY, AIR_LIGHT, AIR_HEAVY, GRAB, THROW, ABILITY, SUPER, GETUP_ATTACK, BURST }
 
+## How the move picks its direction (see Sim.aim_point for how the aim is resolved).
+enum Aim {
+	## Face the lock-on / soft-lock target, else the stick; track the target during startup.
+	AUTO,
+	## Snap to face the aim on frame 1, then track the current aim during startup at
+	## `tracking` degrees per frame.
+	DIRECTION,
+	## Face the aim point (clamped to `max_range`) on frame 1 and keep it in move_point for
+	## TARGET-anchored effects, AIM_POINT teleports and aim_travel motions (leaps). No tracking.
+	GROUND_TARGET,
+	## Centered on the caster; snaps to face the aim like DIRECTION.
+	SELF,
+	## Like GROUND_TARGET, for moves that travel to the point (MotionData.aim_travel STOP_AT).
+	DASH_TO,
+}
+
 @export var id: StringName = &""
 @export var kind: Kind = Kind.LIGHT
 @export var startup: int = 6
@@ -21,6 +37,11 @@ enum Kind { LIGHT, HEAVY, AIR_LIGHT, AIR_HEAVY, GRAB, THROW, ABILITY, SUPER, GET
 @export var tracking: float = -1.0
 ## Maximum targets one hitbox group can hit per frame (0 = any number).
 @export var max_targets: int = 0
+
+@export_group("Aim")
+@export var aim: Aim = Aim.AUTO
+## GROUND_TARGET / DASH_TO: farthest aim point from the caster, meters.
+@export var max_range: float = 8.0
 
 @export_group("Strings and cancels")
 ## Move id started by pressing light/heavy from the end of the active frames on.
@@ -102,6 +123,15 @@ func last_active_frame() -> int:
 
 func is_ability() -> bool:
 	return kind == Kind.ABILITY
+
+
+func is_aimed() -> bool:
+	return aim != Aim.AUTO
+
+
+## The aim point is fixed on frame 1 (ground targets and dash-to moves).
+func aims_at_point() -> bool:
+	return aim == Aim.GROUND_TARGET or aim == Aim.DASH_TO
 
 
 func is_basic() -> bool:

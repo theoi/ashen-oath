@@ -6,13 +6,14 @@ extends Resource
 ##
 ## Save with ResourceSaver (.res or .tres); the config references content by path.
 
-const FORMAT_VERSION := 1
+## 2: 64-bit frames with aim (SimInput).
+const FORMAT_VERSION := 2
 
 @export var format_version: int = FORMAT_VERSION
 @export var config: SimConfig
 @export var slot_count: int = 2
 ## Tick-major: frames[tick * slot_count + slot].
-@export var frames: PackedInt32Array = PackedInt32Array()
+@export var frames: PackedInt64Array = PackedInt64Array()
 ## Checksum after each recorded tick (empty when not recorded).
 @export var checksums: PackedInt64Array = PackedInt64Array()
 
@@ -28,16 +29,19 @@ func tick_count() -> int:
 	return frames.size() / maxi(1, slot_count)
 
 
-## Appends one tick of inputs (and optionally the checksum after stepping it).
-func record(inputs: PackedInt32Array, checksum: int = 0, with_checksum: bool = false) -> void:
+## Appends one tick of inputs (PackedInt64Array or PackedInt32Array, as for Sim.step) and
+## optionally the checksum after stepping it.
+func record(inputs: Variant, checksum: int = 0, with_checksum: bool = false) -> void:
+	var count: int = inputs.size()
 	for slot in slot_count:
-		frames.append(inputs[slot] if slot < inputs.size() else 0)
+		var frame: int = inputs[slot] if slot < count else 0
+		frames.append(SimInput.normalized(frame))
 	if with_checksum:
 		checksums.append(checksum)
 
 
 ## Inputs of tick `index` (0-based: the inputs passed to the index-th step).
-func inputs_at(index: int) -> PackedInt32Array:
+func inputs_at(index: int) -> PackedInt64Array:
 	var start := index * slot_count
 	return frames.slice(start, start + slot_count)
 

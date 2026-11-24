@@ -4,7 +4,7 @@ extends Resource
 ## content/rules/default_rules.tres holds the tuned values.
 
 @export_group("Input")
-@export var buffer_frames: int = 8
+@export var buffer_frames: int = 10
 
 ## Frames after the last active frame in which lights/heavies can be cancelled into
 ## abilities on contact (and abilities into supers on hit).
@@ -26,6 +26,12 @@ extends Resource
 @export var soft_lock_cone: float = 60.0
 ## ...or the nearest enemy overall within this range.
 @export var soft_lock_range: float = 12.0
+## Stick (direction) aim snaps to the nearest enemy within this half-angle...
+@export var aim_assist_degrees: float = 25.0
+## ...and range. Also the reach of DIRECTION aim without a max_range.
+@export var aim_assist_range: float = 12.0
+## Stick-aimed ground targets with no enemy in the cone land at least this far out.
+@export var aim_min_ground_range: float = 3.0
 
 @export_group("Guard")
 @export var guard_arc: float = 200.0

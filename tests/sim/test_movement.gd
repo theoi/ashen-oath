@@ -176,16 +176,18 @@ func test_hard_lock_strafes_facing_the_target() -> void:
 	assert_true(absi(Fx.angle_diff(me.facing, Fx.angle_of(to_target.x, to_target.z))) <= Fx.deg(3.0))
 
 
-func test_input_buffer_is_8_frames() -> void:
+func test_input_buffer_lasts_buffer_frames() -> void:
+	var n := CombatRules.new().buffer_frames
+	assert_eq(n, 10)
 	F.step(sim, F.D)
-	F.hold(sim, 15)
+	F.hold(sim, 23 - n)
 	F.step(sim, F.J)
-	F.hold(sim, 8)
-	assert_eq(me.action, Action.JUMP_SQUAT, "jump pressed 9 frames before the roll ended is kept")
+	F.hold(sim, n)
+	assert_eq(me.action, Action.JUMP_SQUAT, "jump pressed %d frames before the roll ended is kept" % (n + 1))
 	sim = F.fighting_sim(F.config(2))
 	me = sim.fighter(0)
 	F.step(sim, F.D)
-	F.hold(sim, 14)
+	F.hold(sim, 22 - n)
 	F.step(sim, F.J)
-	F.hold(sim, 9)
-	assert_eq(me.action, Action.IDLE, "a press older than 8 frames is dropped")
+	F.hold(sim, n + 1)
+	assert_eq(me.action, Action.IDLE, "a press older than %d frames is dropped" % n)
