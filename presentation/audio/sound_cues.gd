@@ -38,5 +38,6 @@ const TABLE: Dictionary[StringName, Array] = {
 	&"ability": [[_RPG + "knifeSlice.ogg"], SFX, -5.0, 0.8, 0.08],
 	&"super_flash": [[_IMPACT + "impactBell_heavy_002.ogg"], SFX, 0.0, 0.8, 0.0],
 	&"soul_burst": [[_IMPACT + "impactSoft_heavy_000.ogg"], SFX, 2.0, 0.55, 0.0],
+	&"grave_vent": [[_IMPACT + "impactSoft_heavy_000.ogg"], SFX, 1.0, 0.38, 0.05],
 	&"wall_splat": [[_IMPACT + "impactWood_heavy_000.ogg"], SFX, 0.0, 0.7, 0.05],
 }

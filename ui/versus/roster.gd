@@ -3,7 +3,8 @@ extends RefCounted
 ## Display data for the versus select screens: fighters and arenas by content id.
 ##
 ## Gameplay data (stats, moves) lives in content/; this table holds what the menus show and
-## where each fighter's FighterData and each arena's ArenaData / scene live ("data", "scene").
+## where each fighter's FighterData and each arena's ArenaData live ("data"; the arena's
+## presentation scene comes from ArenaData.scene).
 ## MatchSetup falls back to stand-ins while those files do not exist yet.
 
 const FIGHTERS: Array[Dictionary] = [
@@ -43,10 +44,10 @@ const FIGHTERS: Array[Dictionary] = [
 ]
 
 const ARENAS: Array[Dictionary] = [
-	{"id": &"ashen_chapel", "data": "res://content/arenas/ashen_chapel.tres", "scene": "res://presentation/arenas/ashen_chapel/ashen_chapel.tscn", "name": "Ashen Chapel", "blurb": "A burned cathedral nave under falling ash. No hazards."},
-	{"id": &"ashen_chapel_night", "data": "res://content/arenas/ashen_chapel.tres", "scene": "res://presentation/arenas/ashen_chapel/ashen_chapel_night.tscn", "name": "Ashen Chapel · Night", "blurb": "The chapel after dark, thick with embers. No hazards."},
-	{"id": &"drowned_crypt", "data": "res://content/arenas/drowned_crypt.tres", "scene": "res://presentation/arenas/drowned_crypt/drowned_crypt.tscn", "name": "Drowned Crypt", "blurb": "Black water and iron grates. Grave vents erupt in spectral fire every 12 s."},
-	{"id": &"drowned_crypt_depths", "data": "res://content/arenas/drowned_crypt_depths.tres", "scene": "res://presentation/arenas/drowned_crypt/drowned_crypt_depths.tscn", "name": "Drowned Crypt · Depths", "blurb": "The crypt's deepest hall, lit by drowned souls. Grave vents."},
+	{"id": &"ashen_chapel", "data": "res://content/arenas/ashen_chapel.tres", "name": "Ashen Chapel", "blurb": "A burned cathedral nave under falling ash. No hazards."},
+	{"id": &"ashen_chapel_night", "data": "res://content/arenas/ashen_chapel_night.tres", "name": "Ashen Chapel · Night", "blurb": "The chapel after dark, thick with embers. No hazards."},
+	{"id": &"drowned_crypt", "data": "res://content/arenas/drowned_crypt.tres", "name": "Drowned Crypt", "blurb": "Black water and iron grates. Grave vents erupt in spectral fire every 12 s."},
+	{"id": &"drowned_crypt_depths", "data": "res://content/arenas/drowned_crypt_depths.tres", "name": "Drowned Crypt · Depths", "blurb": "The crypt's deepest hall, lit by drowned souls. Grave vents."},
 ]
 
 

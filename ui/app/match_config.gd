@@ -17,6 +17,8 @@ var fighters: Array[StringName] = []
 var teams: Array[int] = []
 ## Which slots a local player controls; the rest are CPU.
 var human_slots: Array[int] = [0]
+## Demo / capture: every slot plays itself with AttractInputSource (the HUD still follows slot 0).
+var attract := false
 var arena: StringName = &"ashen_chapel"
 var difficulty := Difficulty.NORMAL
 ## Rounds a team needs to win the match (2 = best of 3).
@@ -61,6 +63,7 @@ func duplicate_config() -> MatchConfig:
 	copy.fighters = fighters.duplicate()
 	copy.teams = teams.duplicate()
 	copy.human_slots = human_slots.duplicate()
+	copy.attract = attract
 	copy.arena = arena
 	copy.difficulty = difficulty
 	copy.rounds_to_win = rounds_to_win

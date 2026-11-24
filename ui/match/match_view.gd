@@ -26,12 +26,8 @@ func setup(p_runner: MatchRunner, arena_scene: PackedScene, player_slot: int) ->
 	camera.fov = 60.0
 	add_child(camera)
 	camera.make_current()
-	runner.stepped.connect(_on_stepped)
-
-
-func _on_stepped(_events: Array[SimEvent]) -> void:
 	if _arena is ArenaView:
-		(_arena as ArenaView).set_sim_tick(runner.sim.state.tick)
+		(_arena as ArenaView).attach(runner)
 
 
 func _process(delta: float) -> void:

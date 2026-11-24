@@ -8,7 +8,7 @@ extends RefCounted
 
 const RULES := "res://content/rules/default_rules.tres"
 const FALLBACK_ARENA := "res://content/arenas/training_arena.tres"
-const FALLBACK_FIGHTER := "res://content/fighters/test/test_fighter.tres"
+const FALLBACK_FIGHTER := "res://content/test_fighter/test_fighter.tres"
 
 
 static func sim_config(config: MatchConfig) -> SimConfig:
@@ -32,7 +32,10 @@ static func sim_config(config: MatchConfig) -> SimConfig:
 static func input_sources(config: MatchConfig, camera: Camera3D) -> Array[InputSource]:
 	var sources: Array[InputSource] = []
 	for slot in config.slot_count():
-		sources.append(DeviceInputSource.new(camera) if config.is_human(slot) else cpu_source(config, slot))
+		if config.attract:
+			sources.append(AttractInputSource.new())
+		else:
+			sources.append(DeviceInputSource.new(camera) if config.is_human(slot) else cpu_source(config, slot))
 	return sources
 
 
@@ -43,11 +46,13 @@ static func cpu_source(_config: MatchConfig, _slot: int) -> InputSource:
 
 static func fighter_data(id: StringName) -> FighterData:
 	var path: String = Roster.fighter(id).get("data", "")
-	for candidate: String in [path, FALLBACK_FIGHTER]:
-		if not candidate.is_empty() and ResourceLoader.exists(candidate):
-			var data := load(candidate) as FighterData
-			if data != null:
-				return data
+	if not path.is_empty() and ResourceLoader.exists(path):
+		return load(path) as FighterData
+	if ResourceLoader.exists(FALLBACK_FIGHTER):
+		# Stand-in moves under the roster fighter's name until their data lands.
+		var fallback := (load(FALLBACK_FIGHTER) as FighterData).duplicate() as FighterData
+		fallback.display_name = Roster.fighter_name(id)
+		return fallback
 	var stand_in := FighterData.new()
 	stand_in.id = id
 	stand_in.display_name = Roster.fighter_name(id)
@@ -63,9 +68,7 @@ static func arena_data(id: StringName) -> ArenaData:
 
 ## The arena's presentation scene, or null when it has none yet.
 static func arena_scene(id: StringName, data: ArenaData) -> PackedScene:
-	var path: String = Roster.arena(id).get("scene", "")
-	if data != null and not data.scene.is_empty():
-		path = data.scene
+	var path := data.scene if data != null else ""
 	if not path.is_empty() and ResourceLoader.exists(path):
 		return load(path)
 	return null

@@ -49,13 +49,15 @@ func _ready() -> void:
 
 
 ## Dev / capture matches: "" (Aldric vs Morrigan) or "1v2" (vs Morrigan and Gorrath).
+## An "-attract" suffix ("attract", "1v2-attract") makes every slot play itself.
 func _dev_match(kind: String) -> MatchConfig:
 	var config := MatchConfig.versus(&"aldric", &"morrigan", &"ashen_chapel", Settings.default_difficulty)
 	match kind:
-		"1v2":
+		"1v2", "1v2-attract":
 			config.fighters = [&"aldric", &"morrigan", &"gorrath"]
 			config.teams = [0, 1, 1]
 			config.starting_soul = [100, 0, 50]
+	config.attract = kind.ends_with("attract")
 	return config
 
 
