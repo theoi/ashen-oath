@@ -5,7 +5,8 @@ extends Node3D
 ## place their geometry in _build_layout().
 ##
 ## Arena scenes only show the arena. Collision, spawns and hazards live in the arena's
-## ArenaData; presentation follows the sim through set_sim_tick() and never writes to it.
+## ArenaData (content/arenas/); presentation follows the sim through show_sim() and never
+## writes to it.
 ## Fight floor is y = 0, centred on the origin, x along the arena's long side.
 
 const DUNGEON := "res://assets/kaykit-dungeon-remastered/%s.glb"
@@ -15,6 +16,7 @@ const HALLOWEEN_ATLAS := "res://assets/kaykit-halloween-bits/halloweenbits_textu
 const GRIM_SHADER := preload("res://presentation/arenas/shaders/grim_prop.gdshader")
 const FLAME_SHADER := preload("res://presentation/arenas/shaders/flame.gdshader")
 const SHAFT_SHADER := preload("res://presentation/arenas/shaders/light_shaft.gdshader")
+const WATER_SHADER := preload("res://presentation/arenas/shaders/water.gdshader")
 ## Atlas cells (bit row * 8 + column) that glow: the dungeon candle flame cell, and the
 ## Halloween lantern glass cell.
 const DUNGEON_GLOW_CELLS := 1 << (2 * 8 + 7)
@@ -33,6 +35,7 @@ var _flicker_base: Array[float] = []
 var _time := 0.0
 
 static var _grime_texture: ImageTexture
+static var _ripple_textures: Array[ImageTexture] = []
 
 
 func _ready() -> void:
@@ -54,9 +57,14 @@ func _process(delta: float) -> void:
 		_flicker_lights[i].light_energy = _flicker_base[i] * (1.0 + 0.12 * sin(_time * 9.0 + phase) + 0.07 * sin(_time * 17.0 + phase * 2.3))
 
 
-## Called by the match presentation with the current sim tick (60 Hz). Hazard visuals
-## derive their phase from it so they stay in step with the sim, hitstop and replays.
-func set_sim_tick(_tick: int) -> void:
+## Follows a running match: show_sim() runs after every sim step.
+func attach(runner: MatchRunner) -> void:
+	runner.stepped.connect(func(_events: Array[SimEvent]) -> void: show_sim(runner.sim))
+
+
+## Shows the sim state the arena reacts to (hazard phases). Call after every sim step;
+## visuals derive from sim state only, so they stay in step through hitstop and replays.
+func show_sim(_sim: Sim) -> void:
 	pass
 
 
@@ -203,7 +211,42 @@ func _build_flames() -> void:
 	add_child(instance)
 
 
+## Water surface at look.water_level covering a rectangle (centre x/z, size x/z).
+func water(center: Vector2, size: Vector2) -> MeshInstance3D:
+	var plane := PlaneMesh.new()
+	plane.size = size
+	var material := ShaderMaterial.new()
+	material.shader = WATER_SHADER
+	material.set_shader_parameter("water_color", look.water_color)
+	material.set_shader_parameter("sheen_color", look.water_sheen)
+	material.set_shader_parameter("ripple_a", _ripples(0))
+	material.set_shader_parameter("ripple_b", _ripples(1))
+	var instance := MeshInstance3D.new()
+	instance.name = "Water"
+	instance.mesh = plane
+	instance.material_override = material
+	instance.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	instance.position = Vector3(center.x, look.water_level, center.y)
+	add_child(instance)
+	return instance
+
+
 # --- Particles ---------------------------------------------------------------------------
+
+## Soul motes drifting up out of a box.
+func soul_motes(center: Vector3, extents: Vector3, amount: int) -> CPUParticles3D:
+	var particles := _particles(amount, 6.0, look.soul_color, Vector2(0.05, 0.05), true)
+	particles.position = center
+	particles.emission_shape = CPUParticles3D.EMISSION_SHAPE_BOX
+	particles.emission_box_extents = extents
+	particles.direction = Vector3.UP
+	particles.spread = 15.0
+	particles.gravity = Vector3(0.0, 0.08, 0.0)
+	particles.initial_velocity_min = 0.1
+	particles.initial_velocity_max = 0.35
+	particles.preprocess = 6.0
+	return particles
+
 
 ## Ash flakes drifting down through a box (centre, half extents).
 func ash(center: Vector3, extents: Vector3, amount: int) -> CPUParticles3D:
@@ -340,6 +383,26 @@ func _grim_material(atlas: Texture2D, glow_cells: int, glow_color: Color) -> Sha
 	material.set_shader_parameter("glow_cells", glow_cells)
 	material.set_shader_parameter("glow_color", glow_color)
 	return material
+
+
+## Tileable ripple normal maps, generated synchronously (the web build has no threads).
+static func _ripples(index: int) -> ImageTexture:
+	if _ripple_textures.is_empty():
+		for i in 2:
+			var noise := FastNoiseLite.new()
+			noise.seed = 77 + i * 31
+			noise.frequency = 0.05 + 0.03 * float(i)
+			noise.fractal_octaves = 3
+			var image := noise.get_seamless_image(128, 128)
+			image.bump_map_to_normal_map(6.0)
+			image.generate_mipmaps()
+			_ripple_textures.append(ImageTexture.create_from_image(image))
+	return _ripple_textures[index]
+
+
+## Greyscale tileable noise (grime, fire tongues).
+static func noise_texture() -> ImageTexture:
+	return _grime()
 
 
 static func _grime() -> ImageTexture:

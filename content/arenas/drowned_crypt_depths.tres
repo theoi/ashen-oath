@@ -1,0 +1,111 @@
+[gd_resource type="Resource" script_class="ArenaData" format=3]
+
+[ext_resource type="Script" path="res://content/types/arena_data.gd" id="1_arena"]
+[ext_resource type="Script" path="res://content/types/arena_obstacle.gd" id="2_obstacle"]
+[ext_resource type="Script" path="res://content/types/hazard_data.gd" id="3_hazard"]
+[ext_resource type="Script" path="res://content/types/hit_data.gd" id="4_hit"]
+
+[sub_resource type="Resource" id="Resource_vent_hit"]
+script = ExtResource("4_hit")
+damage = 60
+chip_percent = 0
+hitstop = 6
+reaction = 2
+knockback = 0.6
+launch_height = 1.2
+juggle_cost = 2
+unblockable = true
+parryable = false
+cue = &"grave_vent"
+
+[sub_resource type="Resource" id="Resource_obstacle_0"]
+script = ExtResource("2_obstacle")
+a = Vector2(-9, 0)
+b = Vector2(-9, 0)
+radius = 0.85
+height = 8
+
+[sub_resource type="Resource" id="Resource_obstacle_1"]
+script = ExtResource("2_obstacle")
+a = Vector2(9, 0)
+b = Vector2(9, 0)
+radius = 0.85
+height = 8
+
+[sub_resource type="Resource" id="Resource_obstacle_2"]
+script = ExtResource("2_obstacle")
+a = Vector2(0, -6.5)
+b = Vector2(0, -6.5)
+radius = 0.85
+height = 8
+
+[sub_resource type="Resource" id="Resource_obstacle_3"]
+script = ExtResource("2_obstacle")
+a = Vector2(0, 6.5)
+b = Vector2(0, 6.5)
+radius = 0.85
+height = 8
+
+[sub_resource type="Resource" id="Resource_vent_0"]
+script = ExtResource("3_hazard")
+id = &"vent_nw"
+center = Vector2(-6, -4)
+radius = 1.5
+height = 3.0
+period = 720
+offset = 240
+warn = 60
+active = 45
+hit = SubResource("Resource_vent_hit")
+cue = &"grave_vent"
+
+[sub_resource type="Resource" id="Resource_vent_1"]
+script = ExtResource("3_hazard")
+id = &"vent_se"
+center = Vector2(6, 4)
+radius = 1.5
+height = 3.0
+period = 720
+offset = 240
+warn = 60
+active = 45
+hit = SubResource("Resource_vent_hit")
+cue = &"grave_vent"
+
+[sub_resource type="Resource" id="Resource_vent_2"]
+script = ExtResource("3_hazard")
+id = &"vent_ne"
+center = Vector2(6, -4)
+radius = 1.5
+height = 3.0
+period = 720
+offset = 600
+warn = 60
+active = 45
+hit = SubResource("Resource_vent_hit")
+cue = &"grave_vent"
+
+[sub_resource type="Resource" id="Resource_vent_3"]
+script = ExtResource("3_hazard")
+id = &"vent_sw"
+center = Vector2(-6, 4)
+radius = 1.5
+height = 3.0
+period = 720
+offset = 600
+warn = 60
+active = 45
+hit = SubResource("Resource_vent_hit")
+cue = &"grave_vent"
+
+[resource]
+script = ExtResource("1_arena")
+id = &"drowned_crypt_depths"
+display_name = "Drowned Crypt (Depths)"
+floor_polygon = PackedVector2Array(-10.5, -10, 10.5, -10, 12, -8.5, 12, 8.5, 10.5, 10, -10.5, 10, -12, 8.5, -12, -8.5)
+wall_height = 8.0
+obstacles = Array[ExtResource("2_obstacle")]([SubResource("Resource_obstacle_0"), SubResource("Resource_obstacle_1"), SubResource("Resource_obstacle_2"), SubResource("Resource_obstacle_3")])
+hazards = Array[ExtResource("3_hazard")]([SubResource("Resource_vent_0"), SubResource("Resource_vent_1"), SubResource("Resource_vent_2"), SubResource("Resource_vent_3")])
+spawn_points = PackedVector2Array(-4, 0, 4, 0, 4, -6.5, -4, 6.5)
+scene = "res://presentation/arenas/drowned_crypt/drowned_crypt_depths.tscn"
+camera_bounds = Rect2(-11, -9, 22, 18)
