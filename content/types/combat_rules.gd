@@ -6,6 +6,25 @@ extends Resource
 @export_group("Input")
 @export var buffer_frames: int = 10
 
+@export_group("Weight classes")
+## Hitstop per HitData.Weight BASIC..MASSIVE.
+@export var weight_hitstop: PackedInt32Array = PackedInt32Array([3, 5, 7, 10, 14])
+## Boss stagger drain per HitData.Weight BASIC..MASSIVE.
+@export var weight_stagger: PackedInt32Array = PackedInt32Array([5, 15, 30, 50, 80])
+
+@export_group("Counters and stagger")
+@export var counter_stun_frames: int = 60
+## Counter stun on fighters with a stagger bar (bosses).
+@export var counter_stun_boss_frames: int = 90
+@export var counter_soul: int = 10
+## Extra stagger drain of a ⚡Counter.
+@export var counter_stagger: int = 60
+@export var stagger_frames: int = 150
+@export var stagger_damage_percent: int = 125
+@export var stagger_soul: int = 20
+## The stagger bar's maximum after each break, percent of the previous maximum.
+@export var stagger_growth_percent: int = 120
+
 ## Frames after the last active frame in which lights/heavies can be cancelled into
 ## abilities on contact (and abilities into supers on hit).
 @export var cancel_window_frames: int = 12
@@ -89,10 +108,10 @@ extends Resource
 
 @export_group("Scaling")
 ## Hits before scaling starts (hits 1-2 at 100%).
-@export var scaling_free_hits: int = 2
-@export var scaling_step_percent: int = 10
-@export var scaling_floor_percent: int = 40
-@export var super_scaling_floor_percent: int = 60
+@export var scaling_free_hits: int = 3
+@export var scaling_step_percent: int = 8
+@export var scaling_floor_percent: int = 50
+@export var super_scaling_floor_percent: int = 70
 @export var combo_decay_frames: int = 240
 @export var combo_decay_hitstun_percent: int = 50
 
@@ -100,6 +119,8 @@ extends Resource
 @export var soul_max: int = 100
 @export var soul_per_100_dealt: int = 8
 @export var soul_per_100_taken: int = 6
+## Soul dealt by basic attacks, percent of the normal rate.
+@export var basic_soul_percent: int = 150
 @export var perfect_dodge_soul: int = 5
 ## Perfect dodge: hit connects within this many frames of the first invincible frame.
 @export var perfect_dodge_frames: int = 4

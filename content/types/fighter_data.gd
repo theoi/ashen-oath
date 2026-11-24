@@ -40,6 +40,10 @@ extends Resource
 @export var air_dodge_invuln_end: int = 12
 @export var air_dodge_distance: float = 2.0
 
+@export_group("Dash")
+## Skill-kit dash. Null = the dodge roll above (fighters not yet converted to skills).
+@export var dash: DashData
+
 @export_group("Defense")
 ## Frames after a guard press in which a hit is parried (CombatRules default is 6).
 @export var parry_window: int = 6
@@ -55,8 +59,9 @@ extends Resource
 @export var air_heavy: StringName = &""
 @export var grab: StringName = &""
 @export var getup_attack: StringName = &""
-## Ability slots 1-3 (approach, launch/control, utility).
+## Skill slots 1-6 (SimInput.SKILLS[i]); old kits use 3.
 @export var abilities: Array[StringName] = []
+## The awakening (old kits: the super).
 @export var super_move: StringName = &""
 ## Optional FighterTrait script for unusual traits (stored charges, custom reactions).
 @export var trait_script: Script
@@ -69,6 +74,11 @@ extends Resource
 @export var ai_profile: Resource
 
 var _index: Dictionary[StringName, int] = {}
+
+
+## Uses the skill-kit rules (dash, Burst on dash, quick rise, hold-to-repeat basic).
+func is_skill_kit() -> bool:
+	return dash != null
 
 
 ## Index of the move with `move_id` in `moves`, or -1.

@@ -192,7 +192,7 @@ func test_light_string_chains_when_active_frames_end() -> void:
 	assert_eq(starts[1], 6 + 2 + 5, "2nd light starts the frame after active ends (+hitstop)")
 	assert_eq(events[0].amount, 35)
 	assert_eq(events[1].amount, 35)
-	assert_eq(events[2].amount, 45, "3rd hit scaled to 90%")
+	assert_eq(events[2].amount, 50, "hits 1-3 are unscaled")
 
 
 func test_buffer_expires_after_8_frames_in_a_string() -> void:
@@ -207,7 +207,7 @@ func test_damage_scaling_floor_and_long_combo_decay() -> void:
 	foe.stun = 100
 	foe.combo_hits = 20
 	var ticks := F.play(sim, [F.L], [], 6)
-	assert_eq(F.first(ticks, T.HIT).amount, 35 * 40 / 100, "40% floor")
+	assert_eq(F.first(ticks, T.HIT).amount, 35 * 50 / 100, "50% floor")
 	sim = F.duel()
 	foe = sim.fighter(1)
 	foe.action = Action.HITSTUN
@@ -273,5 +273,5 @@ func test_one_swing_hits_every_overlapping_enemy_with_separate_scaling() -> void
 	sim.fighter(1).combo_hits = 5
 	var ticks := F.play(sim, [F.L], [], 6)
 	assert_eq(F.count_of(ticks, T.HIT), 2)
-	assert_eq(sim.fighter(1).hp, sim.fighter(1).max_hp - 35 * 60 / 100)
+	assert_eq(sim.fighter(1).hp, sim.fighter(1).max_hp - 35 * 76 / 100, "6th hit: 100% - 3 x 8%")
 	assert_eq(sim.fighter(2).hp, sim.fighter(2).max_hp - 35)

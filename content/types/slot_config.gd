@@ -11,3 +11,5 @@ extends Resource
 @export var hp_percent: int = 100
 ## Spawn point index in ArenaData.spawn_points (-1 = slot index).
 @export var spawn: int = -1
+## Boss stagger bar size (0 = none).
+@export var stagger_max: int = 0

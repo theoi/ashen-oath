@@ -44,6 +44,14 @@ enum Type {
 	TIME_UP,
 	ROUND_END,
 	MATCH_END,
+	## Skill-kit dash started (amount = direction).
+	DASH,
+	## A move's counter window opened (blue flash).
+	COUNTER_WINDOW,
+	## A ⚡Counter interrupted the target (amount = stun frames).
+	COUNTER_STUN,
+	## The target's stagger bar broke (amount = new bar maximum).
+	STAGGER_BREAK,
 }
 
 const FLAG_COUNTER := 1
@@ -54,6 +62,10 @@ const FLAG_SUPER := 16
 const FLAG_HAZARD := 32
 const FLAG_FULL_CHARGE := 64
 const FLAG_THROW := 128
+## The hit was a ⚡Counter landing inside a counter window.
+const FLAG_COUNTER_ATTACK := 256
+## The victim was staggered (boss stagger bar broken) when hit.
+const FLAG_STAGGERED := 512
 
 var type: Type
 var tick: int = 0
@@ -72,6 +84,8 @@ var flags: int = 0
 var hitstop: int = 0
 ## Presentation cue from HitData/EffectData/MoveData, if any.
 var cue: StringName = &""
+## HitData.Weight of hits and armored hits (AUTO resolved by move kind).
+var weight: int = 0
 
 
 func _to_string() -> String:

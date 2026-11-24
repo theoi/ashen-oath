@@ -12,6 +12,14 @@ extends Resource
 ## Round length in seconds. 0 = rules.round_seconds, -1 = no timer.
 @export var round_seconds: int = 0
 
+@export_group("Tuning overrides")
+## Scales every hitstop (percent).
+@export var hitstop_percent: int = 100
+## Dash distance in meters for every skill-kit fighter (-1 = fighter data).
+@export var dash_distance: float = -1.0
+## Dash charges for every skill-kit fighter (-1 = fighter data).
+@export var dash_charges: int = -1
+
 
 func effective_rounds_to_win() -> int:
 	return rounds_to_win if rounds_to_win > 0 else rules.rounds_to_win
