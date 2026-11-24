@@ -111,6 +111,8 @@ var parry_lockout: int = 0
 ## Skill cooldowns in frames left, one per skill slot, and their length when they started.
 var cooldowns: PackedInt32Array = PackedInt32Array([0, 0, 0, 0, 0, 0])
 var cooldown_totals: PackedInt32Array = PackedInt32Array([0, 0, 0, 0, 0, 0])
+## Charges left per skill slot for charged skills (MoveData.charges ≥ 2), else 0.
+var skill_charges: PackedInt32Array = PackedInt32Array([0, 0, 0, 0, 0, 0])
 ## Skill slot (0-5) that started the current move, -1 for other moves.
 var move_slot: int = -1
 ## Per skill slot: the move index the slot casts now (combo/chain part, -1 = its skill),

@@ -448,6 +448,9 @@ func _start_round() -> void:
 		var skills := maxi(SimInput.SKILLS.size(), fighter_data[f.slot].abilities.size())
 		f.cooldowns.resize(skills)
 		f.cooldown_totals.resize(skills)
+		f.skill_charges.resize(skills)
+		for s in fighter_data[f.slot].abilities.size():
+			f.skill_charges[s] = skill_max_charges(f, s)
 		f.dash_charges = dash_max_charges(f)
 		f.stagger_max = config.slots[f.slot].stagger_max
 		f.stagger = f.stagger_max
@@ -860,7 +863,7 @@ func _try_action(f: FighterState, airborne: bool) -> bool:
 			return false
 		if f.skill_next[skill] >= 0:
 			return _try_move(f, f.skill_next[skill], bit)
-		if f.cooldowns[skill] == 0 and f.skill_window[skill] == 0:
+		if _slot_off_cooldown(f, skill) and f.skill_window[skill] == 0:
 			return _try_move(f, data.find_move(data.abilities[skill]), bit)
 		return false
 	match bit:
@@ -979,12 +982,20 @@ func _skill_cast(f: FighterState, s: int, move_index: int, move: MoveData) -> vo
 	f.skill_next[s] = -1
 	f.skill_window[s] = 0
 	var sequence := move.follow_up != &"" or move.chain_move != &""
+	var cooldown := move.cooldown
+	var charged := skill_max_charges(f, s) > 0
+	if charged and move.recharge_frames > 0:
+		cooldown = move.recharge_frames
+	if charged and cooldown > 0 and not follow:
+		f.skill_charges[s] -= 1
+		if f.cooldowns[s] > 0:
+			cooldown = 0
 	if not follow and not sequence:
-		if move.cooldown > 0:
-			_start_cooldown(f, s, move.cooldown)
+		if cooldown > 0:
+			_start_cooldown(f, s, cooldown)
 		return
 	if not follow:
-		f.skill_pending[s] = move.cooldown
+		f.skill_pending[s] = cooldown
 	if sequence:
 		f.skill_part[s] = move_index
 		f.skill_window[s] = _arming_frames(move)
@@ -1009,7 +1020,7 @@ func _end_skill_sequence(f: FighterState, s: int) -> void:
 	f.skill_next[s] = -1
 	f.skill_window[s] = 0
 	f.skill_part[s] = -1
-	if f.skill_pending[s] > 0:
+	if f.skill_pending[s] > 0 and f.cooldowns[s] == 0:
 		_start_cooldown(f, s, f.skill_pending[s])
 	f.skill_pending[s] = 0
 
@@ -1038,11 +1049,41 @@ func skill_move(f: FighterState, s: int) -> MoveData:
 	return data.move_by_id(data.abilities[s]) if s < data.abilities.size() else null
 
 
-## Whether skill slot `s` can be cast as far as cooldowns and sequences go.
+## Whether skill slot `s` can be cast as far as cooldowns, charges and sequences go.
 func skill_ready(f: FighterState, s: int) -> bool:
 	if s >= fighter_data[f.slot].abilities.size():
 		return false
-	return f.skill_next[s] >= 0 or (f.cooldowns[s] == 0 and f.skill_window[s] == 0)
+	return f.skill_next[s] >= 0 or (_slot_off_cooldown(f, s) and f.skill_window[s] == 0)
+
+
+## Charges of skill slot `s` when full (0 = not a charged skill). See also
+## FighterState.skill_charges (charges left) and cooldowns (frames to the next charge).
+func skill_max_charges(f: FighterState, s: int) -> int:
+	var data := fighter_data[f.slot]
+	if s >= data.abilities.size():
+		return 0
+	var move := data.move_by_id(data.abilities[s])
+	return move.charges if move != null and move.charges >= 2 else 0
+
+
+## A slot's cooldown ran out: charged skills regain a charge and keep recharging while not
+## full. Returns true (a charge or the skill is ready).
+func _recharge_skill(f: FighterState, s: int) -> bool:
+	var max_charges := skill_max_charges(f, s)
+	if max_charges == 0:
+		return true
+	f.skill_charges[s] = mini(max_charges, f.skill_charges[s] + 1)
+	if f.skill_charges[s] < max_charges:
+		var data := fighter_data[f.slot]
+		var move := data.move_by_id(data.abilities[s])
+		_start_cooldown(f, s, move.recharge_frames if move.recharge_frames > 0 else move.cooldown)
+	return true
+
+
+func _slot_off_cooldown(f: FighterState, s: int) -> bool:
+	if skill_max_charges(f, s) > 0:
+		return f.skill_charges[s] > 0
+	return f.cooldowns[s] == 0
 
 
 ## Snaps an aimed move toward the aim and stores its aim point.
@@ -3020,7 +3061,7 @@ func _post_tick(f: FighterState) -> void:
 	for i in f.cooldowns.size():
 		if f.cooldowns[i] > 0:
 			f.cooldowns[i] -= 1
-			if f.cooldowns[i] == 0:
+			if f.cooldowns[i] == 0 and _recharge_skill(f, i):
 				_emit(EventType.COOLDOWN_READY, f.slot, -1, &"", f.pos, i)
 	if f.parry_timer > 0:
 		f.parry_timer -= 1

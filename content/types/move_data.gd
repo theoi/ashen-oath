@@ -158,6 +158,11 @@ enum Aim {
 @export_group("Resources")
 ## Ability cooldown in frames (abilities only).
 @export var cooldown: int = 0
+## Skill charges (2+ = a charged skill, e.g. Wraithstep). Each cast spends one; spent
+## charges come back one at a time, `recharge_frames` each (0 = `cooldown`). The slot's
+## cooldowns[] entry counts down to the next charge.
+@export var charges: int = 0
+@export var recharge_frames: int = 0
 ## Soul cost in whole points (supers 100, burst 50).
 @export var soul_cost: int = 0
 ## Super flash freeze frames before the move runs (supers).
