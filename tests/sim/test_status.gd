@@ -111,3 +111,39 @@ func test_on_hit_taken_sees_hits_and_armored_hits() -> void:
 	ticks = F.play(sim, [0, QUICK], [ARMORED], 6)
 	assert_eq(foe.vars[0], F.first(ticks, T.ARMOR).amount)
 	assert_eq(foe.vars[1], 1)
+
+
+static func _iron_hide(armor: BuffData.Armor, taken: int = 0) -> BuffData:
+	var hide := BuffData.new()
+	hide.id = &"iron_hide"
+	hide.duration = 300
+	hide.armor = armor
+	hide.damage_taken_percent = taken
+	return hide
+
+
+func test_push_immune_buff_armors_every_hit_in_any_action() -> void:
+	_duel(K.kit())
+	sim.apply_buff(foe, _iron_hide(BuffData.Armor.PUSH_IMMUNE, -30), -2)
+	var ticks := F.play(sim, [QUICK], [], 6)
+	var armor := F.first(ticks, T.ARMOR)
+	assert_not_null(armor, "idle, still armored")
+	assert_eq(armor.amount, 50 * 70 / 100, "takes 30% less")
+	assert_eq(F.tick_of(ticks, T.HIT), -1)
+	assert_eq(foe.action, Action.IDLE)
+	F.until_action(sim, me, Action.IDLE)
+	ticks = F.play(sim, [SWEEP], [], 8)
+	assert_not_null(F.first(ticks, T.ARMOR), "knockdowns too")
+	assert_eq(foe.action, Action.IDLE)
+
+
+func test_flinch_immune_buff_still_falls_to_knockdowns() -> void:
+	_duel(K.kit())
+	sim.apply_buff(foe, _iron_hide(BuffData.Armor.FLINCH_IMMUNE), -2)
+	var ticks := F.play(sim, [QUICK], [], 6)
+	assert_not_null(F.first(ticks, T.ARMOR))
+	assert_eq(F.first(ticks, T.ARMOR).amount, 50)
+	F.until_action(sim, me, Action.IDLE)
+	ticks = F.play(sim, [SWEEP], [], 8)
+	assert_not_null(F.first(ticks, T.HIT))
+	assert_ne(foe.action, Action.IDLE)

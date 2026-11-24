@@ -13,4 +13,10 @@ extends Resource
 ## started after the buff, with every hit of it and of its effects; the move running when
 ## the buff is applied does not use it.
 @export var uses: int = 0
+## Armor while active, in any action (Iron Hide): flinch immune or push immune, as the
+## MoveData windows (no reaction, full damage, half hitstop, ARMOR event).
+enum Armor { NONE, FLINCH_IMMUNE, PUSH_IMMUNE }
+@export var armor: Armor = Armor.NONE
+## Damage taken change in percent (-30 = takes 30% less); the total is floored at -100.
+@export var damage_taken_percent: int = 0
 @export var cue: StringName = &""
