@@ -110,7 +110,8 @@ func _drive_menu(app: MenuApp) -> void:
 		&"mode_select":
 			_choose(screen, "Story")
 		&"story":
-			_shot_once("story_entry_%d" % int(_resumed))
+			if not _shot_once("story_entry_%d" % int(_resumed)):
+				return
 			if StorySave.load_from().completed:
 				_choose(screen, "Chapters")
 			elif screen.find_child("Continue", true, false) != null:
@@ -121,7 +122,8 @@ func _drive_menu(app: MenuApp) -> void:
 				_set_difficulty(screen)
 				_choose(screen, "New")
 		&"story_chapters":
-			_shot_once("chapter_select")
+			if not _shot_once("chapter_select"):
+				return
 			_log("chapter select open with %d chapters" % int(screen.call("chapter_count")))
 			_finish(0, "act complete")
 
@@ -151,14 +153,16 @@ func _drive_player(player: StoryPlayer, _delta: float) -> void:
 			if _args.has("skip-scenes"):
 				Input.action_press(&"ui_cancel")
 				return
-			_shot_once("scene_%s_%d" % [step_id, player.line_index])
+			if not _shot_once("scene_%s_%d" % [step_id, player.line_index]):
+				return
 			_line_timer += ACT_EVERY
 			if _line_timer >= float(_args.get("line-seconds", "0.5")):
 				_line_timer = 0.0
 				_press(&"ui_accept")
 		StoryDirector.View.RESULTS:
 			Input.action_release(&"ui_cancel")
-			_shot_once("results_%s" % step_id)
+			if not _shot_once("results_%s" % step_id):
+				return
 			if _resume_pending and String(_args.get("resume-after", "")) == String(step_id):
 				_resume_pending = false
 				_log("quit to menu after %s (save next_step=%d)" % [step_id, StorySave.load_from().next_step])
@@ -166,7 +170,8 @@ func _drive_player(player: StoryPlayer, _delta: float) -> void:
 			else:
 				_choose(player.panel, "Continue")
 		StoryDirector.View.HOLLOWED:
-			_shot_once("hollowed_%s_%d" % [step_id, run.losses])
+			if not _shot_once("hollowed_%s_%d" % [step_id, run.losses]):
+				return
 			var lower := player.panel.find_child("RetryLower", true, false)
 			if lower != null:
 				_log("retry %s on lower difficulty" % step_id)
@@ -268,19 +273,21 @@ func _press(action: StringName) -> void:
 
 
 ## Saves a screenshot the second time a key is seen, so the new screen has settled.
-func _shot_once(key: String) -> void:
+## Returns true once the shot is taken (always true without --shots): screens wait for it.
+func _shot_once(key: String) -> bool:
 	if not _args.has("shots") or _seen.get(key, false):
-		return
+		return true
 	if not _seen.has(key):
 		_seen[key] = false
-		return
+		return false
 	_seen[key] = true
 	var image := get_viewport().get_texture().get_image()
 	if image == null or image.is_empty():
-		return
+		return true
 	_shot_index += 1
 	var path := "%s/%02d_%s.png" % [_args["shots"], _shot_index, key]
 	image.save_png(path)
+	return true
 
 
 func _log(text: String) -> void:
