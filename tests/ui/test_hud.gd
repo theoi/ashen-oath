@@ -32,35 +32,36 @@ func test_bars_follow_health_soul_and_guard() -> void:
 
 func test_cooldowns_show_seconds_until_ready() -> void:
 	var state := _state(2)
-	state.fighters[0].cooldown_left = [0.0, 3.2, 0.4]
+	state.fighters[0].skills[1].cooldown_left = 3.2
+	state.fighters[0].skills[2].cooldown_left = 0.4
 	hud.apply(state)
-	var bar := hud.ability_bar()
+	var bar := hud.skill_bar()
 	assert_true(bar.visible)
 	assert_true(bar.slot_ready(0))
 	assert_false(bar.slot_ready(1))
-	assert_eq(bar._counts[1].text, "4", "whole seconds, rounded up")
-	assert_eq(bar._counts[2].text, "0.4", "tenths under a second")
+	assert_eq(bar.slot(1)._count.text, "4", "whole seconds, rounded up")
+	assert_eq(bar.slot(2)._count.text, "0.4", "tenths under a second")
 
 
 func test_super_lights_at_100_soul_and_burst_at_50_in_hitstun() -> void:
 	var state := _state(2)
-	var bar := hud.ability_bar()
+	var bar := hud.skill_bar()
 	state.fighters[0].soul = 55.0
 	hud.apply(state)
-	assert_eq(bar.super_text(), "SUPER")
-	assert_false(bar.super_ready(), "55 Soul is not enough for the super")
+	assert_eq(bar.awakening_text(), "")
+	assert_false(bar.awakening_ready(), "55 Soul is not enough for the super")
 	state.fighters[0].burst_window = true
 	hud.apply(state)
-	assert_eq(bar.super_text(), "BURST", "in hitstun the button means Soul Burst")
-	assert_true(bar.super_ready(), "50+ Soul in hitstun lights Burst")
+	assert_eq(bar.awakening_text(), "BURST", "in hitstun the button means Soul Burst")
+	assert_true(bar.awakening_ready(), "50+ Soul in hitstun lights Burst")
 	state.fighters[0].soul = 40.0
 	hud.apply(state)
-	assert_false(bar.super_ready())
+	assert_false(bar.awakening_ready())
 	state.fighters[0].burst_window = false
 	state.fighters[0].soul = 100.0
 	hud.apply(state)
-	assert_eq(bar.super_text(), "SUPER")
-	assert_true(bar.super_ready())
+	assert_eq(bar.awakening_text(), "READY")
+	assert_true(bar.awakening_ready())
 
 
 func test_round_events_queue_announcements() -> void:
@@ -81,7 +82,12 @@ func _state(count: int) -> HudState:
 		fighter.name = names[slot]
 		fighter.team = 0 if slot == 0 else 1
 		fighter.is_player = slot == 0
-		fighter.cooldown_total = [5.0, 4.0, 6.0]
-		fighter.ability_names = ["Oathfire Lunge", "Brand Rise", "Bulwark Charge"]
+		fighter.awakening_action = DefaultBindings.SUPER
+		for i in 3:
+			var skill := HudState.Skill.new()
+			skill.name = ["Oathfire Lunge", "Brand Rise", "Bulwark Charge"][i]
+			skill.action = DefaultBindings.ability_action(i)
+			skill.cooldown_total = [5.0, 4.0, 6.0][i]
+			fighter.skills.append(skill)
 		state.fighters.append(fighter)
 	return state

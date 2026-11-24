@@ -1,42 +1,55 @@
 class_name DefaultBindings
 extends RefCounted
-## Default control bindings from design §7: gamepad, keyboard + mouse, and keyboard only.
+## Default control bindings (design-lost-ark §2, no chords): gamepad, keyboard + mouse, and
+## keyboard only.
 ##
 ## This table is the source of truth. tools/gen_input_map.gd writes it into the [input]
 ## section of project.godot, the controls screen shows it, and a test checks that the
 ## project's InputMap matches it. All three schemes are active at the same time.
 ##
 ## Not in the InputMap, so input capture handles them itself:
-## - Mouse camera: read InputEventMouseMotion while the mouse is captured.
-## - Right-stick flick to switch target: watch camera_* axis strength.
-## - Gamepad chords (Binding.gamepad_chord, e.g. LT + X for ability 1); use
-##   held_ability_chord() and is_chord_consumed() rather than the ability_* actions alone.
+## - Mouse aim: the cursor ray-cast onto the floor (DeviceInputSource).
+## - Gamepad chords (Binding.gamepad_chord; none by default); use held_ability_chord() and
+##   is_chord_consumed() rather than the actions alone.
 ##
-## Ability slots are the actions ability_1, ability_2, ... in the table; prompts, the HUD and
+## Skill slots are the actions ability_1, ability_2, ... in the table; prompts, the HUD and
 ## the move list read them through ability_actions(), so adding a slot is a table change.
+## Action ids predate the skill kit and are kept so content and other code stay valid: the
+## basic attack is attack_light, the dash is dodge, the awakening is super, aim is camera_*.
 
 const MOVE_LEFT := &"move_left"
 const MOVE_RIGHT := &"move_right"
 const MOVE_FORWARD := &"move_forward"
 const MOVE_BACK := &"move_back"
-const CAMERA_LEFT := &"camera_left"
-const CAMERA_RIGHT := &"camera_right"
-const CAMERA_UP := &"camera_up"
-const CAMERA_DOWN := &"camera_down"
-const LIGHT := &"attack_light"
-const HEAVY := &"attack_heavy"
-const JUMP := &"jump"
-const DODGE := &"dodge"
-const GUARD := &"guard"
-const GRAB := &"grab"
-const ABILITY_1 := &"ability_1"
-const ABILITY_2 := &"ability_2"
-const ABILITY_3 := &"ability_3"
-## Held on a gamepad (LT / L2) as the first half of the ability chords.
-const ABILITY_MODIFIER := &"ability_modifier"
-const SUPER := &"super"
+## Right stick (gamepad) or arrow keys (keyboard only); the mouse cursor aims otherwise.
+const AIM_LEFT := &"camera_left"
+const AIM_RIGHT := &"camera_right"
+const AIM_UP := &"camera_up"
+const AIM_DOWN := &"camera_down"
+const BASIC := &"attack_light"
+const DASH := &"dodge"
+const SKILL_1 := &"ability_1"
+const SKILL_2 := &"ability_2"
+const SKILL_3 := &"ability_3"
+const SKILL_4 := &"ability_4"
+const SKILL_5 := &"ability_5"
+const SKILL_6 := &"ability_6"
+const AWAKEN := &"super"
 const LOCK_ON := &"lock_on"
+const TARGET_NEXT := &"target_next"
 const PAUSE := &"pause"
+
+## Older names for the same actions (fight prompts and the debug view use them).
+const LIGHT := BASIC
+const DODGE := DASH
+const SUPER := AWAKEN
+const ABILITY_1 := SKILL_1
+const ABILITY_2 := SKILL_2
+const ABILITY_3 := SKILL_3
+const CAMERA_LEFT := AIM_LEFT
+const CAMERA_RIGHT := AIM_RIGHT
+const CAMERA_UP := AIM_UP
+const CAMERA_DOWN := AIM_DOWN
 
 const STICK_DEADZONE := 0.2
 const TRIGGER_DEADZONE := 0.3
@@ -89,32 +102,31 @@ class Binding:
 		return result
 
 
-## Gameplay actions in display order.
+## Gameplay actions in display order. Skill slots follow the slot convention of §2: 1 gap
+## closer, 2 launcher, 3 ranged, 4 defensive, 5 hold / big damage, 6 longest cooldown.
 static func gameplay() -> Array[Binding]:
 	return [
-		Binding.new(MOVE_LEFT, "Move left", STICK_DEADZONE).pad([axis(JOY_AXIS_LEFT_X, -1.0), button(JOY_BUTTON_DPAD_LEFT)]).kbm([key(KEY_A)]).kb([key(KEY_A)]),
-		Binding.new(MOVE_RIGHT, "Move right", STICK_DEADZONE).pad([axis(JOY_AXIS_LEFT_X, 1.0), button(JOY_BUTTON_DPAD_RIGHT)]).kbm([key(KEY_D)]).kb([key(KEY_D)]),
-		Binding.new(MOVE_FORWARD, "Move forward", STICK_DEADZONE).pad([axis(JOY_AXIS_LEFT_Y, -1.0), button(JOY_BUTTON_DPAD_UP)]).kbm([key(KEY_W)]).kb([key(KEY_W)]),
-		Binding.new(MOVE_BACK, "Move back", STICK_DEADZONE).pad([axis(JOY_AXIS_LEFT_Y, 1.0), button(JOY_BUTTON_DPAD_DOWN)]).kbm([key(KEY_S)]).kb([key(KEY_S)]),
-		Binding.new(CAMERA_LEFT, "Camera left", STICK_DEADZONE).pad([axis(JOY_AXIS_RIGHT_X, -1.0)]).kb([key(KEY_LEFT)]),
-		Binding.new(CAMERA_RIGHT, "Camera right", STICK_DEADZONE).pad([axis(JOY_AXIS_RIGHT_X, 1.0)]).kb([key(KEY_RIGHT)]),
-		Binding.new(CAMERA_UP, "Camera up", STICK_DEADZONE).pad([axis(JOY_AXIS_RIGHT_Y, -1.0)]).kb([key(KEY_UP)]),
-		Binding.new(CAMERA_DOWN, "Camera down", STICK_DEADZONE).pad([axis(JOY_AXIS_RIGHT_Y, 1.0)]).kb([key(KEY_DOWN)]),
-		Binding.new(LIGHT, "Light attack").pad([button(JOY_BUTTON_X)]).kbm([mouse(MOUSE_BUTTON_LEFT)]).kb([key(KEY_J)]),
-		Binding.new(HEAVY, "Heavy attack (hold to charge)").pad([button(JOY_BUTTON_Y)]).kbm([mouse(MOUSE_BUTTON_RIGHT)]).kb([key(KEY_K)]),
-		Binding.new(JUMP, "Jump").pad([button(JOY_BUTTON_A)]).kbm([key(KEY_SPACE)]).kb([key(KEY_SPACE)]),
-		Binding.new(DODGE, "Dodge / tech / air tech").pad([button(JOY_BUTTON_B)]).kbm([key(KEY_SHIFT)]).kb([key(KEY_L)]),
-		Binding.new(GUARD, "Guard (hold) / Parry (tap)").pad([button(JOY_BUTTON_RIGHT_SHOULDER)]).kbm([key(KEY_Q)]).kb([key(KEY_SEMICOLON)]),
-		Binding.new(GRAB, "Grab / grab tech").pad([button(JOY_BUTTON_LEFT_SHOULDER)]).kbm([key(KEY_E)]).kb([key(KEY_H)]),
-		Binding.new(ABILITY_1, "Ability 1").pad_chord([axis(JOY_AXIS_TRIGGER_LEFT, 1.0), button(JOY_BUTTON_X)]).kbm([key(KEY_1)]).kb([key(KEY_U)]),
-		Binding.new(ABILITY_2, "Ability 2").pad_chord([axis(JOY_AXIS_TRIGGER_LEFT, 1.0), button(JOY_BUTTON_Y)]).kbm([key(KEY_2)]).kb([key(KEY_I)]),
-		Binding.new(ABILITY_3, "Ability 3").pad_chord([axis(JOY_AXIS_TRIGGER_LEFT, 1.0), button(JOY_BUTTON_B)]).kbm([key(KEY_3)]).kb([key(KEY_O)]),
-		Binding.new(ABILITY_MODIFIER, "Ability modifier", TRIGGER_DEADZONE).pad([axis(JOY_AXIS_TRIGGER_LEFT, 1.0)]),
-		Binding.new(SUPER, "Super (Soul Burst in hitstun)", TRIGGER_DEADZONE).pad([axis(JOY_AXIS_TRIGGER_RIGHT, 1.0)]).kbm([key(KEY_R)]).kb([key(KEY_P)]),
-		Binding.new(LOCK_ON, "Lock-on / switch target").pad([button(JOY_BUTTON_RIGHT_STICK)]).kbm([mouse(MOUSE_BUTTON_MIDDLE), key(KEY_TAB)]).kb([key(KEY_TAB)]),
+		Binding.new(MOVE_LEFT, "Move left", STICK_DEADZONE).pad([axis(JOY_AXIS_LEFT_X, -1.0)]).kbm([key(KEY_A)]).kb([key(KEY_A)]),
+		Binding.new(MOVE_RIGHT, "Move right", STICK_DEADZONE).pad([axis(JOY_AXIS_LEFT_X, 1.0)]).kbm([key(KEY_D)]).kb([key(KEY_D)]),
+		Binding.new(MOVE_FORWARD, "Move forward", STICK_DEADZONE).pad([axis(JOY_AXIS_LEFT_Y, -1.0)]).kbm([key(KEY_W)]).kb([key(KEY_W)]),
+		Binding.new(MOVE_BACK, "Move back", STICK_DEADZONE).pad([axis(JOY_AXIS_LEFT_Y, 1.0)]).kbm([key(KEY_S)]).kb([key(KEY_S)]),
+		Binding.new(AIM_LEFT, "Aim left", STICK_DEADZONE).pad([axis(JOY_AXIS_RIGHT_X, -1.0)]).kb([key(KEY_LEFT)]),
+		Binding.new(AIM_RIGHT, "Aim right", STICK_DEADZONE).pad([axis(JOY_AXIS_RIGHT_X, 1.0)]).kb([key(KEY_RIGHT)]),
+		Binding.new(AIM_UP, "Aim up", STICK_DEADZONE).pad([axis(JOY_AXIS_RIGHT_Y, -1.0)]).kb([key(KEY_UP)]),
+		Binding.new(AIM_DOWN, "Aim down", STICK_DEADZONE).pad([axis(JOY_AXIS_RIGHT_Y, 1.0)]).kb([key(KEY_DOWN)]),
+		Binding.new(BASIC, "Basic attack (hold to repeat)").pad([button(JOY_BUTTON_X)]).kbm([mouse(MOUSE_BUTTON_LEFT)]).kb([key(KEY_J)]),
+		Binding.new(DASH, "Dash (Soul Burst in hitstun, quick rise when down)").pad([button(JOY_BUTTON_B)]).kbm([key(KEY_SPACE)]).kb([key(KEY_SPACE)]),
+		Binding.new(SKILL_1, "Skill 1").pad([button(JOY_BUTTON_A)]).kbm([key(KEY_Q)]).kb([key(KEY_Q)]),
+		Binding.new(SKILL_2, "Skill 2").pad([button(JOY_BUTTON_Y)]).kbm([key(KEY_E)]).kb([key(KEY_E)]),
+		Binding.new(SKILL_3, "Skill 3").pad([button(JOY_BUTTON_RIGHT_SHOULDER)]).kbm([key(KEY_R)]).kb([key(KEY_R)]),
+		Binding.new(SKILL_4, "Skill 4").pad([button(JOY_BUTTON_LEFT_SHOULDER)]).kbm([key(KEY_F)]).kb([key(KEY_F)]),
+		Binding.new(SKILL_5, "Skill 5", TRIGGER_DEADZONE).pad([axis(JOY_AXIS_TRIGGER_RIGHT, 1.0)]).kbm([key(KEY_Z), mouse(MOUSE_BUTTON_RIGHT)]).kb([key(KEY_Z)]),
+		Binding.new(SKILL_6, "Skill 6", TRIGGER_DEADZONE).pad([axis(JOY_AXIS_TRIGGER_LEFT, 1.0)]).kbm([key(KEY_X), mouse(MOUSE_BUTTON_XBUTTON1)]).kb([key(KEY_X)]),
+		Binding.new(AWAKEN, "Awakening").pad([button(JOY_BUTTON_RIGHT_STICK), button(JOY_BUTTON_DPAD_UP)]).kbm([key(KEY_V)]).kb([key(KEY_V)]),
+		Binding.new(LOCK_ON, "Lock-on / next target").pad([button(JOY_BUTTON_DPAD_DOWN)]).kbm([key(KEY_TAB)]).kb([key(KEY_TAB)]),
+		Binding.new(TARGET_NEXT, "Next target (stay locked)").pad([button(JOY_BUTTON_DPAD_RIGHT)]),
 		Binding.new(PAUSE, "Pause").pad([button(JOY_BUTTON_START)]).kbm([key(KEY_ESCAPE)]).kb([key(KEY_ESCAPE)]),
 	]
-
 
 ## Gamepad events added to Godot's built-in ui_* actions so menus work with a pad.
 ## Their keyboard defaults (and d-pad / left stick for directions) stay in place.
@@ -198,7 +210,7 @@ static func gamepad_hint(action: StringName) -> String:
 
 ## Keyboard + mouse text for actions that are not plain events.
 static func keyboard_mouse_hint(action: StringName) -> String:
-	if action in [CAMERA_LEFT, CAMERA_RIGHT, CAMERA_UP, CAMERA_DOWN]:
+	if action in [AIM_LEFT, AIM_RIGHT, AIM_UP, AIM_DOWN]:
 		return "Mouse"
 	return ""
 
@@ -257,6 +269,8 @@ static func describe(event: InputEvent) -> String:
 				return "Right mouse"
 			MOUSE_BUTTON_MIDDLE:
 				return "Middle mouse"
+			MOUSE_BUTTON_XBUTTON1:
+				return "Mouse 4"
 		return "Mouse %d" % (event as InputEventMouseButton).button_index
 	if event is InputEventJoypadButton:
 		return _JOY_BUTTON_NAMES.get((event as InputEventJoypadButton).button_index, "Button")

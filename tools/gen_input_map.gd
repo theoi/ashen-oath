@@ -13,6 +13,14 @@ const SCRATCH_FILE := "user://gen_input_map.godot"
 
 func _init() -> void:
 	var bindings: GDScript = load("res://ui/input/default_bindings.gd")
+	var wanted: Array[String] = []
+	for binding: RefCounted in bindings.gameplay():
+		wanted.append("input/%s" % binding.action)
+	# Gameplay actions dropped from the table leave the InputMap too; Godot's ui_* stay.
+	for property in ProjectSettings.get_property_list():
+		var setting: String = property["name"]
+		if setting.begins_with("input/") and not setting.begins_with("input/ui_") and not setting in wanted:
+			ProjectSettings.set_setting(setting, null)
 	for binding: RefCounted in bindings.gameplay():
 		var setting := "input/%s" % binding.action
 		var events: Array = []

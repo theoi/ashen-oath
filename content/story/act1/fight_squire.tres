@@ -15,45 +15,36 @@ actions = Array[StringName]([&"move"])
 script = ExtResource("1_pbwqa")
 goal = 2
 amount = 3
-title = "Light string"
-text = "Press Light three times. Each blow flows into the next."
+title = "Basic attack"
+text = "Strike three times. Each blow flows into the next."
 actions = Array[StringName]([&"attack_light"])
 
 [sub_resource type="Resource" id="Resource_b12ib"]
 script = ExtResource("1_pbwqa")
-goal = 3
-amount = 60
-title = "Guard"
-text = "Hold Guard to block. Blows from behind still land."
-actions = Array[StringName]([&"guard"])
+goal = 6
+ability_slot = 0
+text = "Aim at the squire and close the distance in a burst of flame."
+timeout_seconds = 15.0
 
 [sub_resource type="Resource" id="Resource_jhr7b"]
 script = ExtResource("1_pbwqa")
-goal = 9
-title = "Parry"
-text = "Tap Guard just as a blow lands. The attacker staggers."
-actions = Array[StringName]([&"guard"])
-timeout_seconds = 25.0
+goal = 6
+ability_slot = 1
+text = "A rising slash that throws them into the air."
+timeout_seconds = 15.0
 
 [sub_resource type="Resource" id="Resource_qqqn7"]
 script = ExtResource("1_pbwqa")
 goal = 4
-title = "Dodge"
-text = "Roll through an attack. Early in the roll, nothing touches you."
+title = "Dash"
+text = "Dash through an attack. Early in the dash, nothing touches you."
 actions = Array[StringName]([&"dodge"])
-
-[sub_resource type="Resource" id="Resource_vdd3y"]
-script = ExtResource("1_pbwqa")
-goal = 5
-title = "Grab"
-text = "A grab breaks a guard. Seize the squire."
-actions = Array[StringName]([&"grab"])
 
 [sub_resource type="Resource" id="Resource_ty5ip"]
 script = ExtResource("1_pbwqa")
 goal = 10
 title = "Lock on"
-text = "Lock on to keep the squire in front of you."
+text = "Lock on to aim every blow at the squire."
 actions = Array[StringName]([&"lock_on"])
 
 [sub_resource type="Resource" id="Resource_5jrof"]
@@ -70,6 +61,6 @@ rounds_to_win = 1
 round_seconds = -1
 ai_cap = 0
 seed = 101
-prompts = Array[ExtResource("1_pbwqa")]([SubResource("Resource_s2ebi"), SubResource("Resource_64tdh"), SubResource("Resource_b12ib"), SubResource("Resource_jhr7b"), SubResource("Resource_qqqn7"), SubResource("Resource_vdd3y"), SubResource("Resource_ty5ip"), SubResource("Resource_5jrof")])
+prompts = Array[ExtResource("1_pbwqa")]([SubResource("Resource_s2ebi"), SubResource("Resource_64tdh"), SubResource("Resource_b12ib"), SubResource("Resource_jhr7b"), SubResource("Resource_qqqn7"), SubResource("Resource_ty5ip"), SubResource("Resource_5jrof")])
 id = &"fight_squire"
 title = "I · The Squire"

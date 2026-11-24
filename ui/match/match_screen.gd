@@ -32,6 +32,7 @@ func _ready() -> void:
 		GameFlow.current_match = config
 
 	var sim_config := MatchSetup.sim_config(config)
+	FeelTuning.apply_to(sim_config)
 	runner = MatchRunner.new()
 	runner.process_mode = Node.PROCESS_MODE_PAUSABLE
 	add_child(runner)

@@ -147,9 +147,8 @@ static func actions_for(prompt: StoryPrompt) -> Array[StringName]:
 		return prompt.actions
 	match prompt.goal:
 		Goal.ABILITY:
-			var slots: Array[StringName] = [DefaultBindings.ABILITY_1, DefaultBindings.ABILITY_2, DefaultBindings.ABILITY_3]
-			if prompt.ability_slot >= 0 and prompt.ability_slot < slots.size():
-				return [slots[prompt.ability_slot]]
+			if prompt.ability_slot >= 0 and prompt.ability_slot < DefaultBindings.ability_actions().size():
+				return [DefaultBindings.ability_action(prompt.ability_slot)]
 		Goal.SUPER, Goal.BURST:
 			return [DefaultBindings.SUPER]
 	return []

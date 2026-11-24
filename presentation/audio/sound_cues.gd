@@ -25,6 +25,8 @@ const TABLE: Dictionary[StringName, Array] = {
 	&"ui_denied": [[_IFACE + "error_004.ogg"], UI, -6.0, 0.75, 0.0],
 	&"ui_start": [[_IFACE + "confirmation_002.ogg"], UI, -6.0, 0.7, 0.0],
 	&"bell_toll": [[_IMPACT + "impactBell_heavy_000.ogg"], SFX, -2.0, 0.55, 0.0],
+	&"skill_ready": [[_IFACE + "tick_004.ogg"], UI, -10.0, 1.6, 0.0],
+	&"awakening_ready": [[_IMPACT + "impactBell_heavy_000.ogg"], SFX, -9.0, 1.3, 0.0],
 
 	# Generic combat cues (MatchSounds maps match events to these).
 	&"fight_call": [[_RPG + "drawKnife1.ogg"], SFX, 0.0, 0.75, 0.0],

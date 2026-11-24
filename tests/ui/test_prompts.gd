@@ -41,15 +41,23 @@ func test_input_events_switch_the_scheme() -> void:
 func test_prompts_update_when_the_device_changes() -> void:
 	var prompt: InputPrompt = add_child_autofree(InputPrompt.new(B.ABILITY_1))
 	await wait_frames(1)
-	assert_eq(prompt.describe(), "1")
+	assert_eq(prompt.describe(), "Q")
 	assert_true(prompt.get_child(0) is TextureRect, "drawn as a glyph")
 	ActiveDevice.set_scheme(ActiveDevice.Scheme.GAMEPAD, ActiveDevice.PadFamily.XBOX)
-	assert_eq(prompt.describe(), "LT + X")
-	assert_eq(prompt.get_child_count(), 3, "trigger glyph, plus, button glyph")
+	assert_eq(prompt.describe(), "A")
+	assert_eq(prompt.get_child_count(), 1, "one button, no chord")
 	ActiveDevice.set_scheme(ActiveDevice.Scheme.GAMEPAD, ActiveDevice.PadFamily.PLAYSTATION)
-	assert_eq(prompt.describe(), "L2 + Square")
+	assert_eq(prompt.describe(), "Cross")
 	ActiveDevice.set_scheme(ActiveDevice.Scheme.KEYBOARD_ONLY)
-	assert_eq(prompt.describe(), "U")
+	assert_eq(prompt.describe(), "Q")
+
+
+func test_primary_only_drops_alternatives() -> void:
+	ActiveDevice.set_scheme(ActiveDevice.Scheme.GAMEPAD, ActiveDevice.PadFamily.XBOX)
+	assert_eq(InputGlyphs.text(B.AWAKEN, ActiveDevice.scheme, ActiveDevice.pad_family), "RS / D-pad up")
+	assert_eq(InputGlyphs.text(B.AWAKEN, ActiveDevice.scheme, ActiveDevice.pad_family, true), "RS")
+	ActiveDevice.set_scheme(ActiveDevice.Scheme.KEYBOARD_MOUSE)
+	assert_eq(InputGlyphs.text(B.SKILL_5, ActiveDevice.scheme, ActiveDevice.pad_family), "Z / Right mouse")
 
 
 func test_hud_ability_bar_prompts_follow_the_device() -> void:
@@ -58,21 +66,21 @@ func test_hud_ability_bar_prompts_follow_the_device() -> void:
 	hud.apply(_state(["Oathfire Lunge", "Brand Rise", "Bulwark Charge"]))
 	var texts := func() -> PackedStringArray:
 		var out := PackedStringArray()
-		for prompt in hud.ability_bar().prompts():
+		for prompt in hud.skill_bar().prompts():
 			out.append(prompt.describe())
 		return out
-	assert_eq(texts.call(), PackedStringArray(["1", "2", "3", "R"]))
+	assert_eq(texts.call(), PackedStringArray(["Q", "E", "R", "V"]))
 	ActiveDevice.set_scheme(ActiveDevice.Scheme.GAMEPAD, ActiveDevice.PadFamily.XBOX)
-	assert_eq(texts.call(), PackedStringArray(["LT + X", "LT + Y", "LT + B", "RT"]))
-	ActiveDevice.set_scheme(ActiveDevice.Scheme.KEYBOARD_ONLY)
-	assert_eq(texts.call(), PackedStringArray(["U", "I", "O", "P"]))
+	assert_eq(texts.call(), PackedStringArray(["A", "Y", "RB", "RS"]))
+	ActiveDevice.set_scheme(ActiveDevice.Scheme.GAMEPAD, ActiveDevice.PadFamily.PLAYSTATION)
+	assert_eq(texts.call(), PackedStringArray(["Cross", "Triangle", "R1", "R3"]))
 
 
 func test_ability_bar_follows_the_fighters_slot_count() -> void:
 	var hud: Hud = add_child_autofree(Hud.new())
 	await wait_frames(1)
 	hud.apply(_state(["A", "B", "C", "D", "E", "F"]))
-	var bar := hud.ability_bar()
+	var bar := hud.skill_bar()
 	assert_eq(bar.slot_count(), 6)
 	assert_eq(bar.prompts().size(), 7, "six slots and the super")
 	assert_eq(bar.prompts()[3].action, B.ability_action(3), "slot 4 asks for ability_4")
@@ -82,18 +90,30 @@ func test_ability_bar_follows_the_fighters_slot_count() -> void:
 
 
 func test_every_bound_action_has_glyphs_in_every_scheme() -> void:
-	var actions: Array[StringName] = [InputGlyphs.MOVE, InputGlyphs.CAMERA]
+	var actions: Array[StringName] = [InputGlyphs.MOVE, InputGlyphs.AIM]
 	for binding in B.gameplay():
-		if binding.action != B.ABILITY_MODIFIER and not String(binding.action).begins_with("move_") and not String(binding.action).begins_with("camera_"):
+		if not String(binding.action).begins_with("move_") and not String(binding.action).begins_with("camera_"):
 			actions.append(binding.action)
 	for scheme in 3:
 		for family in 2:
 			for action in actions:
+				var binding := B.find(action)
+				if binding != null and _events_for(binding, scheme).is_empty():
+					continue
 				var parts := InputGlyphs.parts(action, scheme, family)
 				assert_false(parts.is_empty(), "%s has a prompt in scheme %d" % [action, scheme])
 				for part: Variant in parts:
 					if part is String and part != "+" and part != "/":
 						fail("%s in scheme %d/%d falls back to text '%s' (missing glyph)" % [action, scheme, family, part])
+
+
+func _events_for(binding: DefaultBindings.Binding, scheme: int) -> Array[InputEvent]:
+	match scheme:
+		ActiveDevice.Scheme.GAMEPAD:
+			return binding.gamepad + binding.gamepad_chord
+		ActiveDevice.Scheme.KEYBOARD_MOUSE:
+			return binding.keyboard_mouse
+	return binding.keyboard_only
 
 
 func _state(ability_names: PackedStringArray) -> HudState:
@@ -104,7 +124,12 @@ func _state(ability_names: PackedStringArray) -> HudState:
 		fighter.name = "Fighter %d" % slot
 		fighter.team = slot
 		fighter.is_player = slot == 0
-		fighter.ability_names = ability_names
+		fighter.awakening_action = B.SUPER
+		for i in ability_names.size():
+			var skill := HudState.Skill.new()
+			skill.name = ability_names[i]
+			skill.action = B.ability_action(i)
+			fighter.skills.append(skill)
 		state.fighters.append(fighter)
 	return state
 
