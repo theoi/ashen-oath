@@ -21,9 +21,35 @@ Gameplay actions: `move_left/right/forward/back`, `camera_left/right/up/down`, `
 
 Things input capture handles itself, because they are not plain actions:
 - **Mouse camera:** `InputEventMouseMotion` while the mouse is captured.
-- **Gamepad abilities** are chords: LT + X / Y / B. Use `DefaultBindings.held_ability_chord()`
-  and skip light / heavy / dodge when `DefaultBindings.is_chord_consumed(action)` is true.
+- **Gamepad abilities** are chords (`Binding.gamepad_chord`, LT + X / Y / B by default). Use
+  `DefaultBindings.held_ability_chord()` and skip light / heavy / dodge when
+  `DefaultBindings.is_chord_consumed(action)` is true.
 - **Right-stick flick** to switch target: watch the `camera_*` axis strength.
+
+Ability slots are the table's `ability_1`, `ability_2`, ... actions
+(`DefaultBindings.ability_actions()` / `ability_action(slot)`). The controls screen, HUD,
+move list and prompts all read slots from there and from the fighter's `abilities`, so a
+different slot count or different chords is a table change, not a UI change.
+
+### Prompts
+
+- `input/active_device.gd` (autoload `ActiveDevice`): the scheme the player last used
+  (keyboard + mouse, keyboard only, gamepad) and the pad family (Xbox / PlayStation, from the
+  joypad name). Emits `changed`. Force it for captures with `-- --device=gamepad|playstation|keyboard`.
+- `input/input_glyphs.gd` (`InputGlyphs`): glyphs (Kenney Input Prompts) and plain text for an
+  action in a scheme, derived from the bindings table, plus `MOVE` / `CAMERA` groups.
+- `input/input_prompt.gd` (`InputPrompt`): a widget that draws an action's glyphs and redraws
+  when the device changes.
+
+## Move list
+
+`movelist/move_list.gd` (`MoveList.build(data, rules)`) generates a fighter's move list from
+its `FighterData` / `MoveData`: strings by following `next_light` / `next_heavy`, special
+attacks, every ability slot, trait, super and Burst costs, defense with the fighter's own
+parry and dodge frames. Traits such as "launches", "armor (1 hit)" or "4 s cooldown" come
+from the move data; only names and one-line descriptions come from `Roster`. The screen
+(`movelist/move_list_screen.tscn`, `GameFlow.open_move_list(id)`) is reachable from the pause
+menu and from versus select, and redraws its inputs when the device changes.
 
 ## Screens and flow
 
@@ -139,5 +165,7 @@ Soul with the Burst mark, ability cooldowns, timer, round pips) and announcement
 callouts from `MatchEvents`. `hud/sim_hud.gd` (`SimHud`) fills the HudState from the sim
 and translates `SimEvent`s into `MatchEvents`, which also drive sounds
 (`presentation/audio/match_sounds.gd`). Team 0 is on the left; extra fighters on a side get
-compact plates (1v2). Preview a mid-fight HUD:
+compact plates (1v2). The ability bar (`hud/ability_bar.gd`) shows one slot per ability with
+its button for the active device, lit when ready (cooldown over; super at 100 Soul; Soul
+Burst at 50 Soul while in hitstun). Preview a mid-fight HUD:
 `SCENE=res://tests/ui/hud_preview.tscn tools/capture_screenshot.sh /tmp/hud.png 40`.

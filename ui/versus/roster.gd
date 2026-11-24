@@ -17,6 +17,8 @@ const FIGHTERS: Array[Dictionary] = [
 		"abilities": ["Oathfire Lunge", "Brand Rise", "Bulwark Charge"],
 		"super": "Pyre of the Forsworn",
 		"trait": "Oathkeeper: wider parry; a parry ignites his blade.",
+		"ability_details": ["Dashing thrust. Absorbs one hit; unsafe if blocked.", "Rising flame slash. Jump on hit to chase in the air.", "Shield bash that staggers, crushes guard and eats projectiles."],
+		"super_detail": "Plants the sword: a flame pillar, then a fire wave 10 m forward.",
 		"color": Color(0.93, 0.5, 0.2),
 	},
 	{
@@ -28,6 +30,8 @@ const FIGHTERS: Array[Dictionary] = [
 		"abilities": ["Soul Lance", "Grave Grasp", "Wraithstep"],
 		"super": "Requiem of the Drowned",
 		"trait": "Lantern of Souls: ability hits store souls for her next Soul Lance.",
+		"ability_details": ["Spectral bolt. Any attack destroys it; stored souls fire as a spread.", "A rune marks the target's spot, then grasping hands erupt.", "Blink 5 m along the stick, invincible. Escapes pressure."],
+		"super_detail": "A ring of spectral hands erupts 8 m around her.",
 		"color": Color(0.52, 0.9, 0.78),
 	},
 	{
@@ -39,6 +43,8 @@ const FIGHTERS: Array[Dictionary] = [
 		"abilities": ["Chain Hook", "Earthsplitter", "Bull Rush"],
 		"super": "Execution Chain",
 		"trait": "Unbroken: his heavies shrug off one hit.",
+		"ability_details": ["Throws a chain 9 m and drags the target point-blank. Follow with a string or grab.", "Slow overhead slam with a 6 m shockwave.", "Charge that carries the target; into a wall for extra damage."],
+		"super_detail": "Close-range command grab: jump or dodge to escape it.",
 		"color": Color(0.78, 0.72, 0.66),
 	},
 	{
@@ -61,6 +67,8 @@ const FIGHTERS: Array[Dictionary] = [
 		"abilities": ["Oathfire Lunge", "Brand Rise", "Bulwark Charge"],
 		"super": "Pyre of the Forsworn",
 		"trait": "Oathkeeper: wider parry; a parry ignites its blade.",
+		"ability_details": ["Dashing thrust. Absorbs one hit; unsafe if blocked.", "Rising flame slash. Jump on hit to chase in the air.", "Shield bash that staggers, crushes guard and eats projectiles."],
+		"super_detail": "Plants the sword: a flame pillar, then a fire wave 10 m forward.",
 		"color": Color(0.85, 0.3, 0.12),
 	},
 ]

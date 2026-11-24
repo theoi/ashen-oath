@@ -23,12 +23,15 @@ const SCREENS: Dictionary[StringName, String] = {
 	&"settings": "res://ui/menus/settings_screen.tscn",
 	&"pause": "res://ui/match/pause_screen.tscn",
 	&"results": "res://ui/match/results_screen.tscn",
+	&"move_list": "res://ui/movelist/move_list_screen.tscn",
 }
 
 ## The match being played or last played (rematch uses it).
 var current_match: MatchConfig
 ## How the last match ended (the results screen shows it).
 var last_result: MatchResult
+## Fighter the "move_list" screen shows.
+var move_list_fighter: StringName = &"aldric"
 ## The story run in progress (a StoryDirector), kept here across scene changes. A static
 ## var would outlive the engine's resource teardown at quit.
 var story_director: RefCounted
@@ -83,6 +86,12 @@ func take_pending_menu() -> Array[StringName]:
 	var stack := _pending_menu
 	_pending_menu = [&"title"]
 	return stack
+
+
+## Opens the move list for fighter `id`.
+func open_move_list(id: StringName) -> void:
+	move_list_fighter = id
+	open_screen(&"move_list")
 
 
 func open_screen(id: StringName) -> void:

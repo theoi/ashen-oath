@@ -23,6 +23,7 @@ only those files are committed.
 | KayKit Character Pack: Skeletons 1.0 | Kay Lousberg | CC0 1.0 | [GitHub](https://github.com/KayKit-Game-Assets/KayKit-Character-Pack-Skeletons-1.0) · [itch.io](https://kaylousberg.itch.io/kaykit-skeletons) | Hollowed models, skeleton blade, and the shared character animations (`assets/kaykit-skeletons/`) |
 | Sci-fi Sounds | Kenney (kenney.nl) | CC0 1.0 | https://kenney.nl/assets/sci-fi-sounds | Fire, flame pillars, bursts and explosions (`assets/kenney-sci-fi-sounds/`) |
 | Swishes Sound Pack | artisticdude | CC0 1.0 | https://opengameart.org/content/swishes-sound-pack | Weapon swings and launches, converted to Ogg (`assets/oga-swishes/`) |
+| Input Prompts | Kenney (kenney.nl) | CC0 1.0 | https://kenney.nl/assets/input-prompts | Button glyphs for Xbox, PlayStation, keyboard and mouse in prompts, the HUD and the move list (`assets/kenney-input-prompts/`) |
 | KayKit Halloween Bits 1.0 | Kay Lousberg | CC0 1.0 | [GitHub](https://github.com/KayKit-Game-Assets/KayKit-Halloween-Bits-1.0) · [itch.io](https://kaylousberg.itch.io/halloween-bits) | Arena coffins, shrine, arches, graves, bones, lanterns (`assets/kaykit-halloween-bits/`) |
 
 When you add a pack, add a row here in the same pull request.

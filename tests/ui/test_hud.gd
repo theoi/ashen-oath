@@ -42,14 +42,25 @@ func test_cooldowns_show_seconds_until_ready() -> void:
 	assert_eq(bar._counts[2].text, "0.4", "tenths under a second")
 
 
-func test_super_and_burst_readiness() -> void:
+func test_super_lights_at_100_soul_and_burst_at_50_in_hitstun() -> void:
 	var state := _state(2)
+	var bar := hud.ability_bar()
 	state.fighters[0].soul = 55.0
 	hud.apply(state)
-	assert_eq(hud.ability_bar()._super_label.text, "BURST")
+	assert_eq(bar.super_text(), "SUPER")
+	assert_false(bar.super_ready(), "55 Soul is not enough for the super")
+	state.fighters[0].burst_window = true
+	hud.apply(state)
+	assert_eq(bar.super_text(), "BURST", "in hitstun the button means Soul Burst")
+	assert_true(bar.super_ready(), "50+ Soul in hitstun lights Burst")
+	state.fighters[0].soul = 40.0
+	hud.apply(state)
+	assert_false(bar.super_ready())
+	state.fighters[0].burst_window = false
 	state.fighters[0].soul = 100.0
 	hud.apply(state)
-	assert_eq(hud.ability_bar()._super_label.text, "SUPER")
+	assert_eq(bar.super_text(), "SUPER")
+	assert_true(bar.super_ready())
 
 
 func test_round_events_queue_announcements() -> void:
@@ -71,5 +82,6 @@ func _state(count: int) -> HudState:
 		fighter.team = 0 if slot == 0 else 1
 		fighter.is_player = slot == 0
 		fighter.cooldown_total = [5.0, 4.0, 6.0]
+		fighter.ability_names = ["Oathfire Lunge", "Brand Rise", "Bulwark Charge"]
 		state.fighters.append(fighter)
 	return state

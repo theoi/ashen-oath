@@ -1,5 +1,5 @@
 extends MenuScreen
-## Pause menu inside a match: resume, controls, settings, or leave.
+## Pause menu inside a match: resume, move list, controls, settings, or leave.
 
 var _resume: Button
 
@@ -18,6 +18,9 @@ func _ready() -> void:
 	entries.add_theme_constant_override("separation", 4)
 	page.add_child(entries)
 	_resume = _entry(entries, "Resume", go_back)
+	if config != null and not config.fighters.is_empty():
+		var player: StringName = config.fighters[config.human_slots[0] if not config.human_slots.is_empty() else 0]
+		_entry(entries, "Move list", func() -> void: GameFlow.open_move_list(player))
 	_entry(entries, "Controls", func() -> void: GameFlow.open_screen(&"controls"))
 	_entry(entries, "Settings", func() -> void: GameFlow.open_screen(&"settings"))
 	_entry(entries, "Quit to menu", GameFlow.leave_match)
