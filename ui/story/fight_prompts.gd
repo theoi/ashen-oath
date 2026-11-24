@@ -129,10 +129,36 @@ static func binding_text(action: StringName) -> String:
 	return "%s  ·  %s" % [pad, _join_events(binding.keyboard_mouse)]
 
 
+## The tip's title: its own, or for an ability tip without one, the fighter's ability name.
+static func title_for(prompt: StoryPrompt, fighter: StringName) -> String:
+	if not prompt.title.is_empty():
+		return prompt.title
+	if prompt.goal == Goal.ABILITY and prompt.ability_slot >= 0:
+		var names := Roster.ability_names(fighter)
+		if prompt.ability_slot < names.size():
+			return names[prompt.ability_slot]
+		return "Ability %d" % (prompt.ability_slot + 1)
+	return ""
+
+
+## The actions whose buttons a tip shows: its own, or the input for its ability slot / super.
+static func actions_for(prompt: StoryPrompt) -> Array[StringName]:
+	if not prompt.actions.is_empty():
+		return prompt.actions
+	match prompt.goal:
+		Goal.ABILITY:
+			var slots: Array[StringName] = [DefaultBindings.ABILITY_1, DefaultBindings.ABILITY_2, DefaultBindings.ABILITY_3]
+			if prompt.ability_slot >= 0 and prompt.ability_slot < slots.size():
+				return [slots[prompt.ability_slot]]
+		Goal.SUPER, Goal.BURST:
+			return [DefaultBindings.SUPER]
+	return []
+
+
 ## One line with the buttons of every action of `prompt`.
 static func hint_for(prompt: StoryPrompt) -> String:
 	var parts := PackedStringArray()
-	for action in prompt.actions:
+	for action in actions_for(prompt):
 		var text := binding_text(action)
 		if not text.is_empty():
 			parts.append(text)
@@ -298,11 +324,11 @@ func _move_kind(event: SimEvent) -> int:
 
 
 func _complete() -> void:
-	completed.append(current().title)
+	completed.append(_title_of(current()))
 	done[active] = true
 	_done_ticks = 0
 	Sound.play(&"ui_confirm")
-	_title.text = "✓  %s" % current().title
+	_title.text = "✓  %s" % _title_of(current())
 	_title.add_theme_color_override("font_color", Palette.SOUL)
 	_text.modulate.a = 0.5
 	_buttons.modulate.a = 0.5
@@ -332,7 +358,7 @@ func _show() -> void:
 	var ordered := prompts.filter(func(p: StoryPrompt) -> bool: return p.trigger == Trigger.IN_ORDER and p.goal != Goal.NONE)
 	var position := ordered.find(prompt)
 	_counter.text = "Training  %d / %d" % [position + 1, ordered.size()] if position >= 0 else "Tip"
-	_title.text = prompt.title
+	_title.text = _title_of(prompt)
 	_title.add_theme_color_override("font_color", Palette.EMBER_BRIGHT)
 	_text.text = prompt.text
 	_text.modulate.a = 1.0
@@ -348,11 +374,16 @@ func _fill_buttons(prompt: StoryPrompt) -> void:
 	for child in _buttons.get_children():
 		_buttons.remove_child(child)
 		child.queue_free()
-	for action in prompt.actions:
+	var actions := actions_for(prompt)
+	for action in actions:
 		var label := _label(&"StrongLabel", _buttons)
 		label.text = binding_text(action)
 		label.add_theme_color_override("font_color", Palette.BONE)
-	_buttons.visible = not prompt.actions.is_empty()
+	_buttons.visible = not actions.is_empty()
+
+
+func _title_of(prompt: StoryPrompt) -> String:
+	return title_for(prompt, runner.sim.fighter_data[slot].id if runner != null else &"")
 
 
 func _label(variation: StringName, parent: Container) -> Label:

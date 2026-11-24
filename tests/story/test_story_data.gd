@@ -68,21 +68,22 @@ func test_fight_one_teaches_the_basics_and_fight_two_the_kit() -> void:
 		var goals: Array = []
 		for prompt in fights[f].prompts:
 			goals.append(prompt.goal)
-			assert_false(prompt.title.is_empty())
-			assert_true(prompt.text.length() <= 70, "%s is short (%d chars)" % [prompt.title, prompt.text.length()])
-			assert_true(prompt.goal == StoryPrompt.Goal.NONE or not FightPrompts.hint_for(prompt).is_empty(), "%s shows its buttons" % prompt.title)
+			assert_false(FightPrompts.title_for(prompt, &"aldric").is_empty())
+			assert_true(prompt.text.length() <= 70, "%s is short (%d chars)" % [FightPrompts.title_for(prompt, &"aldric"), prompt.text.length()])
+			assert_true(prompt.goal == StoryPrompt.Goal.NONE or not FightPrompts.hint_for(prompt).is_empty(), "%s shows its buttons" % FightPrompts.title_for(prompt, &"aldric"))
 			for action in prompt.actions:
 				assert_true(action == &"move" or InputMap.has_action(action), "%s is an input action" % action)
 		assert_eq(goals, expected[f], "fight %d tips" % (f + 1))
 	var kit := fights[1].prompts
 	assert_eq([kit[1].ability_slot, kit[2].ability_slot, kit[3].ability_slot], [0, 1, 2], "each ability with its own button")
-	assert_eq(Array(kit[1].actions), [DefaultBindings.ABILITY_1])
+	assert_eq(FightPrompts.actions_for(kit[1]), [DefaultBindings.ABILITY_1] as Array[StringName], "the button comes from the ability slot")
+	assert_true(kit[1].title.is_empty() and kit[1].actions.is_empty(), "ability tips read names and buttons from data, not hard-coded")
 	assert_eq(kit[4].trigger, StoryPrompt.Trigger.SOUL_FULL, "the super tip waits for full Soul")
 	assert_eq(kit[5].trigger, StoryPrompt.Trigger.IN_COMBO, "the burst tip waits for a combo")
 	for i in 4:
 		assert_eq(kit[i].trigger, StoryPrompt.Trigger.IN_ORDER)
 	for i in range(3):
-		assert_eq(kit[i + 1].title, Roster.ability_names(&"aldric")[i], "ability tips use Aldric's ability names")
+		assert_eq(FightPrompts.title_for(kit[i + 1], &"aldric"), Roster.ability_names(&"aldric")[i], "ability tips use the fighter's ability names")
 
 
 func test_scenes_are_playable() -> void:
