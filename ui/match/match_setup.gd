@@ -51,7 +51,7 @@ static func input_sources(config: MatchConfig, camera: Camera3D) -> Array[InputS
 			sources.append(DeviceInputSource.new(camera))
 	var wave_slots := wave_slot_count(config)
 	if wave_slots > 0:
-		var tokens := AiAttackTokens.new(cpu_difficulty(config).attack_tokens) if wave_slots >= 2 else null
+		var tokens := AiAttackTokens.new(cpu_difficulty(config).wave_attack_tokens) if wave_slots >= 2 else null
 		for i in wave_slots:
 			sources.append(AiInputSource.new(cpu_difficulty(config), null, tokens))
 	return sources

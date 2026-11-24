@@ -65,6 +65,10 @@ func test_story_waves_pass_through_to_the_sim_with_cpu_wave_slots() -> void:
 	assert_eq(screen.runner.sources.size(), 4)
 	for slot in range(1, 4):
 		assert_true(screen.runner.sources[slot] is AiInputSource, "wave slot %d is a CPU" % slot)
+	var pool := (screen.runner.sources[1] as AiInputSource).tokens
+	assert_not_null(pool)
+	assert_eq(pool.capacity, MatchSetup.cpu_difficulty(config).wave_attack_tokens, "wave pool sized for waves")
+	assert_eq((screen.runner.sources[3] as AiInputSource).tokens, pool, "one pool for every wave slot")
 
 	_step_until_fight()
 	screen.runner.paused = true
