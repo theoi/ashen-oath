@@ -1,0 +1,36 @@
+[gd_resource type="Resource" script_class="ArenaLook" format=3]
+
+[ext_resource type="Script" path="res://presentation/arenas/arena_look.gd" id="1_look"]
+
+[resource]
+script = ExtResource("1_look")
+background_color = Color(0.012, 0.01, 0.018, 1)
+ambient_color = Color(0.28, 0.27, 0.38, 1)
+ambient_energy = 0.4
+fog_color = Color(0.05, 0.04, 0.06, 1)
+fog_density = 0.024
+fog_height = 1.2
+fog_height_density = 0.25
+exposure = 1.05
+saturation = 0.8
+key_color = Color(0.48, 0.52, 0.85, 1)
+key_energy = 0.65
+key_rotation = Vector3(-38, -140, 0)
+rim_color = Color(0.45, 0.5, 0.85, 1)
+rim_energy = 0.45
+rim_rotation = Vector3(-15, 50, 0)
+prop_tint = Color(0.78, 0.76, 0.82, 1)
+prop_desaturate = 0.62
+prop_brightness = 0.68
+prop_contrast = 1.15
+grime_color = Color(0.04, 0.03, 0.03, 1)
+grime_amount = 0.5
+prop_rim = 0.25
+fire_color = Color(1, 0.4, 0.1, 1)
+fire_light_energy = 1.9
+flame_energy = 2.6
+shaft_color = Color(0.5, 0.55, 0.9, 1)
+shaft_intensity = 0.06
+ash_amount = 220
+ash_color = Color(0.5, 0.48, 0.5, 0.85)
+ember_amount = 60
