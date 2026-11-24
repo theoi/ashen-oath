@@ -37,6 +37,12 @@ enum Action {
 	KO,
 	## Soul Burst: invincible, pushes enemies away, ends the combo.
 	BURST,
+	## Skill-kit dash (FighterData.dash).
+	DASH,
+	## Interrupted by a ⚡Counter during a counter window.
+	COUNTER_STUN,
+	## Boss stagger bar broken: kneeling, hittable, does not react, takes extra damage.
+	STAGGERED,
 }
 
 var slot: int = 0
@@ -100,8 +106,17 @@ var guard_broken: bool = false
 ## Frames left in the current parry window.
 var parry_timer: int = 0
 var parry_lockout: int = 0
-## Ability cooldowns in frames, one per ability slot.
-var cooldowns: PackedInt32Array = PackedInt32Array([0, 0, 0])
+## Skill cooldowns in frames left, one per skill slot, and their length when they started.
+var cooldowns: PackedInt32Array = PackedInt32Array([0, 0, 0, 0, 0, 0])
+var cooldown_totals: PackedInt32Array = PackedInt32Array([0, 0, 0, 0, 0, 0])
+## Skill slot (0-5) that started the current move, -1 for other moves.
+var move_slot: int = -1
+## Skill-kit dash charges and frames until the next charge comes back (0 = full).
+var dash_charges: int = 0
+var dash_recharge: int = 0
+## Boss stagger bar (0 max = none).
+var stagger: int = 0
+var stagger_max: int = 0
 
 ## Input frame bits held this tick, bits newly pressed this tick, and the stick.
 var buttons: int = 0
@@ -172,4 +187,4 @@ func is_attacking() -> bool:
 ## True in states that can be juggled / comboed (hitstun of any kind).
 func in_hitstun() -> bool:
 	return action == Action.HITSTUN or action == Action.AIR_HITSTUN or action == Action.WALL_SPLAT \
-			or action == Action.GUARD_BREAK
+			or action == Action.GUARD_BREAK or action == Action.COUNTER_STUN or action == Action.STAGGERED

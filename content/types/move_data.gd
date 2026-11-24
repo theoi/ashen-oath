@@ -8,6 +8,8 @@ extends Resource
 
 enum Kind { LIGHT, HEAVY, AIR_LIGHT, AIR_HEAVY, GRAB, THROW, ABILITY, SUPER, GETUP_ATTACK, BURST }
 
+enum SkillType { TAP, HOLD, CHARGE, COMBO, CHAIN, DASH_STRIKE, STANCE }
+
 ## How the move picks its direction (see Sim.aim_point for how the aim is resolved).
 enum Aim {
 	## Face the lock-on / soft-lock target, else the stick; track the target during startup.
@@ -43,6 +45,10 @@ enum Aim {
 ## GROUND_TARGET / DASH_TO: farthest aim point from the caster, meters.
 @export var max_range: float = 8.0
 
+@export_group("Skill")
+## What kind of skill this is, for the HUD and AI; behavior comes from the other fields.
+@export var skill_type: SkillType = SkillType.TAP
+
 @export_group("Strings and cancels")
 ## Move id started by pressing light/heavy from the end of the active frames on.
 @export var next_light: StringName = &""
@@ -50,6 +56,13 @@ enum Aim {
 ## Extra cancel windows. Lights and heavies get an ability cancel on contact by default;
 ## abilities get a super cancel on hit (CombatRules).
 @export var cancels: Array[CancelData] = []
+## First frame another skill or the awakening can cancel this move. -1 = default (basics 1,
+## awakening / throws / burst never, others the frame after the last active frame); 0 = never.
+@export var skill_cancel_from: int = -1
+## First frame a dash can cancel this move (skill-kit fighters). -1 = default (1; awakening,
+## throws and burst never); 0 = never.
+@export var dash_cancel_from: int = -1
+@export var no_dash_cancel: bool = false
 
 @export_group("Defense")
 ## Fully invincible frames (inclusive, 0 = none).
@@ -60,6 +73,16 @@ enum Aim {
 @export var armor_end: int = 0
 @export var armor_hits: int = 0
 @export var armor_damage_percent: int = 100
+## Super armor windows with no hit cap and full damage. Flinch immune ignores STAGGER
+## reactions; push immune ignores every reaction, push, pull, carry, grab and wall splat.
+## ⚡Counters and boss stagger breaks go through both.
+@export var flinch_immune_start: int = 0
+@export var flinch_immune_end: int = 0
+@export var push_immune_start: int = 0
+@export var push_immune_end: int = 0
+## Frames in which a ⚡Counter hit interrupts this move (the blue flash).
+@export var counter_window_start: int = 0
+@export var counter_window_end: int = 0
 ## Invincible to projectiles only on these frames.
 @export var projectile_invuln_start: int = 0
 @export var projectile_invuln_end: int = 0
@@ -123,6 +146,10 @@ func last_active_frame() -> int:
 
 func is_ability() -> bool:
 	return kind == Kind.ABILITY
+
+
+func in_window(frame: int, start: int, end: int) -> bool:
+	return end > 0 and frame >= start and frame <= end
 
 
 func is_aimed() -> bool:

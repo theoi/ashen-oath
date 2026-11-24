@@ -45,7 +45,7 @@ func test_ability_cooldown_blocks_reuse_until_ready() -> void:
 
 func test_soul_gain_from_damage_dealt_and_taken() -> void:
 	F.play(sim, [F.L], [], 6)
-	assert_eq(me.soul, 35 * 8)
+	assert_eq(me.soul, 35 * 8 * 3 / 2, "basics earn 1.5x Soul")
 	assert_eq(foe.soul, 35 * 6)
 
 
@@ -59,10 +59,11 @@ func test_ability_cancels_a_light_on_hit() -> void:
 	assert_eq(starts, 1, "rising slash cancels the light after contact")
 
 
-func test_ability_does_not_cancel_a_whiffed_light() -> void:
+func test_skill_cancels_a_whiffed_light_on_any_frame() -> void:
 	_duel(4.0)
-	var ticks := F.play(sim, [F.L, 0, 0, 0, 0, 0, 0, A2], [], 12)
-	assert_eq(F.count_of(ticks, T.MOVE_START), 1)
+	var ticks := F.play(sim, [F.L, A2], [], 12)
+	assert_eq(F.count_of(ticks, T.MOVE_START), 2)
+	assert_eq(F.first(ticks.slice(1), T.MOVE_START).id, &"rising_slash", "cancels the light's startup")
 
 
 func test_jump_cancel_on_hit() -> void:
@@ -234,7 +235,7 @@ func test_command_grab_super_beats_attacks_and_cannot_be_teched() -> void:
 	assert_ne(F.tick_of(ticks, T.GRAB), -1)
 	assert_eq(F.tick_of(ticks, T.GRAB_TECH), -1)
 	assert_eq(F.count_of(ticks, T.HIT), 3)
-	assert_eq(foe.hp, foe.max_hp - (100 + 100 + 150 * 90 / 100))
+	assert_eq(foe.hp, foe.max_hp - (100 + 100 + 150), "hits 1-3 are unscaled")
 
 
 func test_super_flash_freezes_everyone() -> void:

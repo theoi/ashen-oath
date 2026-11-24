@@ -182,10 +182,60 @@ func is_invulnerable(f: FighterState) -> bool:
 			return f.action_tick >= data.dodge_invuln_start and f.action_tick <= data.dodge_invuln_end
 		Action.AIR_DODGE:
 			return f.action_tick >= data.air_dodge_invuln_start and f.action_tick <= data.air_dodge_invuln_end
+		Action.DASH:
+			return f.action_tick >= data.dash.invuln_start and f.action_tick <= data.dash.invuln_end
 		Action.ATTACK:
 			var move := current_move(f)
 			return move.invuln_end > 0 and f.move_frame >= move.invuln_start and f.move_frame <= move.invuln_end
 	return false
+
+
+## Whether `f` is in a counter window of its current move (the blue flash).
+func in_counter_window(f: FighterState) -> bool:
+	if f.action != Action.ATTACK:
+		return false
+	var move := current_move(f)
+	return move.in_window(f.move_frame, move.counter_window_start, move.counter_window_end)
+
+
+## Dash charges `f` starts each round with (0 for fighters without FighterData.dash).
+func dash_max_charges(f: FighterState) -> int:
+	var dash := fighter_data[f.slot].dash
+	if dash == null:
+		return 0
+	return config.dash_charges if config.dash_charges >= 0 else dash.charges
+
+
+## Dash distance in units for `f` (SimConfig.dash_distance overrides the fighter's).
+func dash_distance(f: FighterState) -> int:
+	var dash := fighter_data[f.slot].dash
+	if dash == null:
+		return 0
+	return Fx.m(config.dash_distance if config.dash_distance >= 0.0 else dash.distance)
+
+
+## First frame of `move` from which a skill or the awakening may cancel it (0 = never).
+static func skill_cancel_frame(move: MoveData) -> int:
+	if move.skill_cancel_from >= 0:
+		return move.skill_cancel_from
+	match move.kind:
+		MoveData.Kind.SUPER, MoveData.Kind.THROW, MoveData.Kind.BURST:
+			return 0
+	if move.is_basic():
+		return 1
+	return move.last_active_frame() + 1
+
+
+## First frame of `move` from which a skill-kit dash may cancel it (0 = never).
+static func dash_cancel_frame(move: MoveData) -> int:
+	if move.no_dash_cancel:
+		return 0
+	if move.dash_cancel_from >= 0:
+		return move.dash_cancel_from
+	match move.kind:
+		MoveData.Kind.SUPER, MoveData.Kind.THROW, MoveData.Kind.BURST:
+			return 0
+	return 1
 
 
 ## Hazard `index` phase this tick: 0 idle, 1 warning, 2 active.
@@ -278,7 +328,12 @@ func _start_round() -> void:
 		f.soul = soul
 		f.hard_lock = hard_lock
 		f.guard = rules.guard_gauge * 100
-		f.cooldowns.resize(maxi(3, fighter_data[f.slot].abilities.size()))
+		var skills := maxi(SimInput.SKILLS.size(), fighter_data[f.slot].abilities.size())
+		f.cooldowns.resize(skills)
+		f.cooldown_totals.resize(skills)
+		f.dash_charges = dash_max_charges(f)
+		f.stagger_max = config.slots[f.slot].stagger_max
+		f.stagger = f.stagger_max
 		f.pos = Vector3i(Fx.m(spawn.x), 0, Fx.m(spawn.y))
 	for f in state.fighters:
 		f.facing = _spawn_facing(f)
@@ -598,6 +653,8 @@ func _update_fighter(f: FighterState) -> void:
 			_dodge(f)
 		Action.AIR_DODGE:
 			_air_dodge(f)
+		Action.DASH:
+			_dashing(f)
 		Action.GUARD:
 			_guarding(f)
 		Action.ATTACK:
@@ -618,6 +675,7 @@ func _set_action(f: FighterState, action: Action, length: int = 0) -> void:
 	if action != Action.ATTACK:
 		f.move_index = -1
 		f.move_frame = 0
+		f.move_slot = -1
 		f.charging = false
 
 
@@ -632,6 +690,9 @@ func _to_idle(f: FighterState) -> void:
 
 
 func _idle(f: FighterState) -> void:
+	if f.buffer == 0 and f.buttons & SimInput.BASIC and fighter_data[f.slot].is_skill_kit():
+		f.buffer = SimInput.BASIC
+		f.buffer_age = 0
 	if _try_action(f, false):
 		return
 	if f.buttons & SimInput.GUARD:
@@ -695,6 +756,11 @@ func _try_action(f: FighterState, airborne: bool) -> bool:
 				return _try_move(f, data.find_move(data.run_light), bit)
 			return _try_move(f, data.find_move(data.light), bit)
 		SimInput.DODGE:
+			if data.dash != null:
+				if airborne or f.dash_charges <= 0:
+					return false
+				_start_dash(f)
+				return true
 			if airborne:
 				if f.air_dodge_used:
 					return false
@@ -754,10 +820,12 @@ func start_move(f: FighterState, move_index: int, bit: int = 0) -> void:
 	f.armor_left = move.armor_hits
 	f.landing_recovery = 0
 	f.buffer = 0
-	if move.kind == MoveData.Kind.ABILITY:
-		var ability := data.abilities.find(move.id)
-		if ability >= 0 and move.cooldown > 0:
-			f.cooldowns[ability] = move.cooldown
+	f.move_slot = SimInput.SKILLS.find(bit) if bit != 0 else -1
+	if f.move_slot < 0 and move.kind == MoveData.Kind.ABILITY:
+		f.move_slot = data.abilities.find(move.id)
+	if f.move_slot >= 0 and move.cooldown > 0:
+		f.cooldowns[f.move_slot] = move.cooldown
+		f.cooldown_totals[f.move_slot] = move.cooldown
 	if move.soul_cost > 0:
 		f.soul -= move.soul_cost * 100
 	var target := attack_target(f)
@@ -802,6 +870,10 @@ func _attack(f: FighterState) -> void:
 		if move.chargeable and f.move_frame == move.charge_frame and (f.buttons & f.move_button):
 			f.charging = true
 	if f.move_frame > move.total_frames():
+		if move.next_light != &"" and f.buttons & SimInput.BASIC and move.is_basic() \
+				and fighter_data[f.slot].is_skill_kit() \
+				and _try_move(f, fighter_data[f.slot].find_move(move.next_light), SimInput.BASIC):
+			return
 		_to_idle(f)
 		return
 	if _try_chain_or_cancel(f, move):
@@ -823,6 +895,8 @@ func _try_chain_or_cancel(f: FighterState, move: MoveData) -> bool:
 			return _try_move(f, data.find_move(move.next_light), SimInput.LIGHT)
 		if f.buffer == SimInput.HEAVY and move.next_heavy != &"":
 			return _try_move(f, data.find_move(move.next_heavy), SimInput.HEAVY)
+	if _default_cancel_allows(f, move, f.buffer):
+		return _try_action(f, not f.grounded)
 	var allowed := _cancel_mask(f, move)
 	if allowed == 0:
 		return false
@@ -843,16 +917,25 @@ func _try_chain_or_cancel(f: FighterState, move: MoveData) -> bool:
 	return _try_action(f, not f.grounded)
 
 
-## Cancel targets allowed on the current frame of `move`.
+## The universal cancels: skills and the awakening from skill_cancel_frame (never into the
+## same slot), skill-kit dashes from dash_cancel_frame.
+func _default_cancel_allows(f: FighterState, move: MoveData, bit: int) -> bool:
+	var skill := SimInput.SKILLS.find(bit)
+	if skill >= 0 or bit == SimInput.SUPER:
+		if skill >= 0 and skill == f.move_slot:
+			return false
+		var from := skill_cancel_frame(move)
+		return from > 0 and f.move_frame >= from
+	if bit == SimInput.DODGE and fighter_data[f.slot].is_skill_kit():
+		var from := dash_cancel_frame(move)
+		return from > 0 and f.move_frame >= from
+	return false
+
+
+## Extra cancel targets (MoveData.cancels) allowed on the current frame of `move`.
 func _cancel_mask(f: FighterState, move: MoveData) -> int:
 	var frame := f.move_frame
 	var mask := 0
-	var window_end := move.last_active_frame() + rules.cancel_window_frames
-	if frame >= move.startup and frame <= window_end:
-		if move.is_basic() and f.move_contact >= 1:
-			mask |= CancelData.INTO_ABILITY
-		if move.kind == MoveData.Kind.ABILITY and f.move_contact >= 2:
-			mask |= CancelData.INTO_SUPER
 	for cancel in move.cancels:
 		if frame < cancel.start_frame or frame > cancel.end_frame:
 			continue
@@ -871,6 +954,8 @@ func _cancel_mask(f: FighterState, move: MoveData) -> int:
 func _move_frame_effects(f: FighterState, move: MoveData) -> void:
 	_move_motion(f, move)
 	var frame := f.move_frame
+	if move.counter_window_end > 0 and frame == move.counter_window_start:
+		_emit(EventType.COUNTER_WINDOW, f.slot, -1, move.id, f.pos, move.counter_window_end - frame + 1)
 	if move.teleport != null and frame == move.teleport.frame:
 		_teleport(f, move.teleport)
 	for i in move.effects.size():
@@ -1147,11 +1232,71 @@ func _air_dodge(f: FighterState) -> void:
 		_air(f)
 
 
+func _start_dash(f: FighterState) -> void:
+	var dash := fighter_data[f.slot].dash
+	f.buffer = 0
+	_spend_dash_charge(f, dash)
+	_set_action(f, Action.DASH, dash.frames)
+	if _stick_active(f):
+		f.move_dir = _stick_angle(f)
+	elif f.aim_point or f.aim_x != 0 or f.aim_z != 0:
+		f.move_dir = aim_angle(f)
+	else:
+		f.move_dir = f.facing
+	f.facing = f.move_dir
+	f.perfect_dodge_used = false
+	_emit(EventType.DASH, f.slot, -1, &"", f.pos, f.move_dir)
+	_dash_motion(f, dash)
+
+
+func _dashing(f: FighterState) -> void:
+	var dash := fighter_data[f.slot].dash
+	if f.action_tick > dash.frames:
+		_to_idle(f)
+		return
+	if f.action_tick >= dash.skill_cancel_frame and _try_action(f, false):
+		return
+	_dash_motion(f, dash)
+
+
+## Travel is spread so the total is exactly the dash distance.
+func _dash_motion(f: FighterState, dash: DashData) -> void:
+	var t := f.action_tick
+	var frames := maxi(1, dash.travel_frames)
+	if t > frames:
+		f.vel.x = 0
+		f.vel.z = 0
+		return
+	var dist := dash_distance(f)
+	var v := Fx.dir(f.move_dir, dist * t / frames - dist * (t - 1) / frames)
+	f.vel.x = v.x
+	f.vel.z = v.z
+
+
+func _spend_dash_charge(f: FighterState, dash: DashData) -> void:
+	f.dash_charges -= 1
+	if f.dash_recharge == 0:
+		f.dash_recharge = dash.recharge_frames
+
+
+func _quick_rise(f: FighterState, dash: DashData) -> void:
+	f.buffer = 0
+	_spend_dash_charge(f, dash)
+	_set_action(f, Action.GETUP, dash.rise_frames)
+	f.action_variant = 2
+	f.invuln = dash.rise_invuln
+	f.move_dir = _stick_angle(f) if _stick_active(f) else -1
+	if f.move_dir >= 0:
+		f.facing = f.move_dir
+	_emit(EventType.GET_UP, f.slot, -1, &"", f.pos, 3)
+
+
 ## Hit reactions and other non-player-controlled actions.
 func _reaction(f: FighterState) -> void:
 	match f.action:
-		Action.HITSTUN, Action.BLOCKSTUN, Action.GUARD_BREAK, Action.RECOVER:
-			if f.action == Action.HITSTUN and _try_burst(f):
+		Action.HITSTUN, Action.BLOCKSTUN, Action.GUARD_BREAK, Action.RECOVER, Action.COUNTER_STUN, \
+				Action.STAGGERED:
+			if (f.action == Action.HITSTUN or f.action == Action.COUNTER_STUN) and _try_burst(f):
 				return
 			if f.stun > 0:
 				f.stun -= 1
@@ -1183,7 +1328,10 @@ func _reaction(f: FighterState) -> void:
 				_set_action(f, Action.AIR_HITSTUN)
 				f.stun = 999
 		Action.KNOCKDOWN:
-			if f.action_tick > rules.knockdown_frames:
+			var dash := fighter_data[f.slot].dash
+			if dash != null and f.buffer == SimInput.DASH and f.action_tick > dash.rise_after and f.dash_charges > 0:
+				_quick_rise(f, dash)
+			elif f.action_tick > rules.knockdown_frames:
 				_get_up(f)
 		Action.GETUP:
 			if f.action_tick > f.action_len:
@@ -1191,6 +1339,11 @@ func _reaction(f: FighterState) -> void:
 			elif f.action_variant == 1:
 				var v := Fx.dir(f.move_dir, Fx.m(rules.getup_roll_distance) / maxi(1, rules.getup_roll_frames - 6))
 				f.vel = Vector3i(v.x, 0, v.z) if f.action_tick <= rules.getup_roll_frames - 6 else Vector3i.ZERO
+			elif f.action_variant == 2 and f.move_dir >= 0:
+				var rise := fighter_data[f.slot].dash
+				var travel := maxi(1, rise.rise_frames - 6)
+				var v := Fx.dir(f.move_dir, Fx.m(rise.rise_distance) / travel)
+				f.vel = Vector3i(v.x, 0, v.z) if f.action_tick <= travel else Vector3i.ZERO
 		Action.TECH:
 			match f.action_variant:
 				1:
@@ -1208,6 +1361,8 @@ func _reaction(f: FighterState) -> void:
 			if thrower == null or thrower.grab_partner != f.slot:
 				f.grab_partner = -1
 				_to_idle(f)
+			elif fighter_data[f.slot].is_skill_kit() and _try_burst(f):
+				return
 			elif f.grab_tech_left > 0:
 				if f.pressed & SimInput.GRAB:
 					_grab_tech(f, thrower)
@@ -1264,10 +1419,14 @@ func _get_up(f: FighterState) -> void:
 	_emit(EventType.GET_UP, f.slot, -1, &"", f.pos, f.action_variant)
 
 
-## Soul Burst out of hitstun, juggles and wall splats (not guard break or throws).
+## Soul Burst out of hitstun, juggles and wall splats (skill-kit fighters: also throws).
+## Skill-kit fighters burst with DASH, others with SUPER.
 func _try_burst(f: FighterState) -> bool:
-	if f.buffer != SimInput.SUPER or f.soul < rules.burst_cost * 100:
+	var button := SimInput.DASH if fighter_data[f.slot].is_skill_kit() else SimInput.SUPER
+	if f.buffer != button or f.soul < rules.burst_cost * 100:
 		return false
+	if f.grab_partner >= 0:
+		_release_grab(f)
 	f.buffer = 0
 	f.soul -= rules.burst_cost * 100
 	_set_action(f, Action.BURST, rules.burst_frames)
@@ -1580,6 +1739,8 @@ class Contact:
 	var source: Vector3i
 	var direction: int = 0
 	var charge: int = 0
+	## A ⚡Counter landing inside the victim's counter window.
+	var counter_attack: bool = false
 
 
 func _resolve_combat() -> void:
@@ -1603,7 +1764,7 @@ func _collect_hitbox_contacts(contacts: Array[Contact]) -> void:
 			continue
 		var group_counts := PackedInt32Array([0, 0, 0, 0, 0, 0, 0, 0])
 		for hb in move.hitboxes:
-			if hb.hit == null or not _hitbox_active(move, hb, a.move_frame):
+			if hb.hit == null or not hitbox_active(move, hb, a.move_frame):
 				continue
 			var group := clampi(hb.group, 0, 7)
 			for v in state.fighters:
@@ -1632,7 +1793,7 @@ func _collect_hitbox_contacts(contacts: Array[Contact]) -> void:
 				contacts.append(c)
 
 
-func _hitbox_active(move: MoveData, hb: HitboxData, frame: int) -> bool:
+static func hitbox_active(move: MoveData, hb: HitboxData, frame: int) -> bool:
 	var first := hb.start_frame if hb.start_frame >= 0 else move.startup
 	var last := hb.end_frame if hb.end_frame >= 0 else move.last_active_frame()
 	return frame >= first and frame <= last
@@ -1703,13 +1864,17 @@ func _check_perfect_dodge(v: FighterState, attacker: int) -> void:
 		return
 	var data := fighter_data[v.slot]
 	var first := 0
+	var window := rules.perfect_dodge_frames
 	if v.action == Action.DODGE:
 		first = data.dodge_invuln_start
 	elif v.action == Action.AIR_DODGE:
 		first = data.air_dodge_invuln_start
+	elif v.action == Action.DASH:
+		first = data.dash.invuln_start
+		window = data.dash.perfect_frames
 	else:
 		return
-	if v.action_tick < first or v.action_tick >= first + rules.perfect_dodge_frames:
+	if v.action_tick < first or v.action_tick >= first + window:
 		return
 	v.perfect_dodge_used = true
 	_gain_soul(v, rules.perfect_dodge_soul * 100)
@@ -1731,7 +1896,7 @@ func _destroy_effects_by_hitboxes() -> void:
 			continue
 		var move := current_move(a)
 		for hb in move.hitboxes:
-			if not hb.destroys_projectiles or not _hitbox_active(move, hb, a.move_frame):
+			if not hb.destroys_projectiles or not hitbox_active(move, hb, a.move_frame):
 				continue
 			var p := a.pos + Fx.rotate(Fx.v3(hb.offset), a.facing)
 			var r := Fx.m(hb.radius)
@@ -1820,7 +1985,7 @@ func _collect_throw_contacts(contacts: Array[Contact]) -> void:
 			continue
 		for hb in move.hitboxes:
 			var group := clampi(hb.group, 0, 7)
-			if hb.hit == null or not _hitbox_active(move, hb, a.move_frame) or a.move_hit_masks[group] & (1 << v.slot):
+			if hb.hit == null or not hitbox_active(move, hb, a.move_frame) or a.move_hit_masks[group] & (1 << v.slot):
 				continue
 			a.move_hit_masks[group] |= 1 << v.slot
 			var c := Contact.new()
@@ -1843,7 +2008,11 @@ func _apply_contact(c: Contact) -> void:
 		_connect_grab(c)
 		return
 	if not c.held:
-		if _try_parry(c) or _try_block(c) or _try_armor(c):
+		if _try_parry(c) or _try_block(c):
+			_after_contact(c)
+			return
+		c.counter_attack = c.hit.counter and c.attacker != null and in_counter_window(v)
+		if not c.counter_attack and (_try_super_armor(c) or _try_armor(c)):
 			_after_contact(c)
 			return
 	_land_hit(c)
@@ -1860,8 +2029,35 @@ func _kind_of(c: Contact) -> MoveData.Kind:
 
 
 func _hitstop_of(c: Contact) -> int:
+	return _scaled_hitstop(_base_hitstop(c))
+
+
+## Applies SimConfig.hitstop_percent (a non-zero hitstop stays at least 1 frame).
+func _scaled_hitstop(frames: int) -> int:
+	if frames <= 0 or config.hitstop_percent == 100:
+		return frames
+	return maxi(1, frames * config.hitstop_percent / 100)
+
+
+## HitData.Weight of a contact, with AUTO resolved: BASIC for basic moves, LIGHT otherwise.
+func _weight_of(c: Contact) -> int:
+	if c.hit.weight != HitData.Weight.AUTO:
+		return c.hit.weight
+	return HitData.Weight.BASIC if c.move != null and c.move.is_basic() else HitData.Weight.LIGHT
+
+
+func _stagger_of(c: Contact) -> int:
+	if c.hit.stagger >= 0:
+		return c.hit.stagger
+	var index := _weight_of(c) - 1
+	return rules.weight_stagger[index] if index < rules.weight_stagger.size() else 0
+
+
+func _base_hitstop(c: Contact) -> int:
 	if c.hit.hitstop >= 0:
 		return c.hit.hitstop
+	if c.hit.weight != HitData.Weight.AUTO and c.hit.weight - 1 < rules.weight_hitstop.size():
+		return rules.weight_hitstop[c.hit.weight - 1]
 	match _kind_of(c):
 		MoveData.Kind.LIGHT, MoveData.Kind.AIR_LIGHT, MoveData.Kind.GETUP_ATTACK:
 			return rules.hitstop_light
@@ -1922,7 +2118,7 @@ func _try_parry(c: Contact) -> bool:
 	if not _facing_source(v, c.source):
 		return false
 	v.parry_timer = 0
-	var hitstop := rules.hitstop_heavy
+	var hitstop := _scaled_hitstop(rules.hitstop_heavy)
 	v.hitstop = hitstop
 	var guard_max := rules.guard_gauge * 100
 	v.guard = mini(guard_max, v.guard + rules.parry_guard_refill * 100)
@@ -2009,6 +2205,92 @@ func _try_block(c: Contact) -> bool:
 	return true
 
 
+## Flinch-immune and push-immune windows: no hit cap, full damage, half hitstop, no reaction.
+func _try_super_armor(c: Contact) -> bool:
+	var v := c.victim
+	if v.action != Action.ATTACK:
+		return false
+	var move := current_move(v)
+	var push := move.in_window(v.move_frame, move.push_immune_start, move.push_immune_end)
+	var flinch := move.in_window(v.move_frame, move.flinch_immune_start, move.flinch_immune_end) \
+			and c.hit.reaction == HitData.Reaction.STAGGER and v.grounded
+	if not push and not flinch:
+		return false
+	var damage := _hit_damage(c)
+	v.hp -= damage
+	_deal_soul(c, damage)
+	_gain_soul(v, damage * rules.soul_per_100_taken)
+	if c.attacker != null and c.effect == null:
+		c.attacker.move_contact = maxi(c.attacker.move_contact, 1)
+	var hitstop := _hitstop_of(c)
+	if hitstop > 0:
+		hitstop = maxi(1, hitstop / 2)
+	_apply_hitstop(c, hitstop)
+	var e := _emit(EventType.ARMOR, c.attacker.slot if c.attacker != null else -1, v.slot,
+			c.move.id if c.move != null else &"", c.point, damage)
+	e.hitstop = hitstop
+	e.cue = c.hit.cue
+	e.weight = _weight_of(c)
+	if c.effect != null:
+		e.flags |= SimEvent.FLAG_PROJECTILE
+	_drain_stagger(v, c.attacker, _stagger_of(c))
+	if v.hp <= 0:
+		_ko(v)
+	return true
+
+
+## Outgoing damage of a contact before per-victim combo scaling: base, charge, counter hit,
+## buffs, trait, and the staggered bonus.
+func _hit_damage(c: Contact) -> int:
+	var v := c.victim
+	var a := c.attacker
+	var damage := c.hit.damage
+	if c.move != null and c.move.chargeable and c.effect == null and c.move.charge_max > 0:
+		damage += damage * c.move.charge_damage_percent * c.charge / (100 * c.move.charge_max)
+	if c.counter:
+		damage = damage * rules.counter_damage_percent / 100
+	if a != null:
+		damage = damage * (100 + _use_damage_buffs(a)) / 100
+		var hook := traits[a.slot]
+		if hook != null:
+			damage = damage * hook.damage_percent(self, a, v, c.move, c.hit) / 100
+	if v.action == Action.STAGGERED:
+		damage = damage * rules.stagger_damage_percent / 100
+	return damage
+
+
+## Soul for the attacker of a contact (basics earn basic_soul_percent).
+func _deal_soul(c: Contact, damage: int) -> void:
+	if c.attacker == null:
+		return
+	var rate := rules.soul_per_100_dealt
+	if c.move != null and c.move.is_basic():
+		rate = rate * rules.basic_soul_percent / 100
+	_gain_soul(c.attacker, damage * rate)
+
+
+## Drains a boss stagger bar; at 0 the fighter is STAGGERED and the bar refills, bigger.
+func _drain_stagger(v: FighterState, attacker: FighterState, amount: int) -> void:
+	if v.stagger_max <= 0 or v.ko or v.action == Action.STAGGERED or amount <= 0:
+		return
+	v.stagger -= amount
+	if v.stagger > 0:
+		return
+	v.stagger_max = v.stagger_max * rules.stagger_growth_percent / 100
+	v.stagger = v.stagger_max
+	_release_grab(v)
+	_set_action(v, Action.STAGGERED)
+	v.stun = rules.stagger_frames
+	v.vel = Vector3i(0, v.vel.y, 0)
+	v.knock_ticks = 0
+	v.carried_ticks = 0
+	v.bounce_pending = 0
+	v.splat_armed = false
+	if attacker != null:
+		_gain_soul(attacker, rules.stagger_soul * 100)
+	_emit(EventType.STAGGER_BREAK, attacker.slot if attacker != null else -1, v.slot, &"", v.pos, v.stagger_max)
+
+
 func _try_armor(c: Contact) -> bool:
 	var v := c.victim
 	if v.action != Action.ATTACK or v.armor_left <= 0:
@@ -2041,16 +2323,8 @@ func _land_hit(c: Contact) -> void:
 	var hit := c.hit
 	var kind := _kind_of(c)
 	var was_airborne := not v.grounded
-	var damage := hit.damage
-	if c.move != null and c.move.chargeable and c.effect == null and c.move.charge_max > 0:
-		damage += damage * c.move.charge_damage_percent * c.charge / (100 * c.move.charge_max)
-	if c.counter:
-		damage = damage * rules.counter_damage_percent / 100
-	if a != null:
-		damage = damage * (100 + _use_damage_buffs(a)) / 100
-		var hook := traits[a.slot]
-		if hook != null:
-			damage = damage * hook.damage_percent(self, a, v, c.move, hit) / 100
+	var staggered := v.action == Action.STAGGERED
+	var damage := _hit_damage(c)
 	var scale := 100
 	if v.combo_hits >= rules.scaling_free_hits:
 		var floor_percent := rules.super_scaling_floor_percent if kind == MoveData.Kind.SUPER \
@@ -2064,10 +2338,9 @@ func _land_hit(c: Contact) -> void:
 	v.last_attacker = a.slot if a != null else -1
 	v.guard_broken = false
 	v.parry_timer = 0
-	if a != null:
-		_gain_soul(a, damage * rules.soul_per_100_dealt)
-		if c.effect == null:
-			a.move_contact = 2
+	_deal_soul(c, damage)
+	if a != null and c.effect == null:
+		a.move_contact = 2
 	_gain_soul(v, damage * rules.soul_per_100_taken)
 	if v.grab_partner >= 0 and not c.held:
 		_release_grab(v)
@@ -2091,7 +2364,14 @@ func _land_hit(c: Contact) -> void:
 		flags |= SimEvent.FLAG_THROW
 	if c.move != null and c.move.chargeable and c.effect == null and c.charge >= c.move.charge_max:
 		flags |= SimEvent.FLAG_FULL_CHARGE
-	var launched := _react(c, hitstun, was_airborne)
+	var launched := false
+	if c.counter_attack:
+		flags |= SimEvent.FLAG_COUNTER_ATTACK
+		_counter_stun(c)
+	elif staggered:
+		flags |= SimEvent.FLAG_STAGGERED
+	else:
+		launched = _react(c, hitstun, was_airborne)
 	if launched:
 		flags |= SimEvent.FLAG_LAUNCH
 	var id := c.move.id if c.move != null else (arena.hazards[c.hazard].id if c.hazard >= 0 else &"")
@@ -2099,14 +2379,36 @@ func _land_hit(c: Contact) -> void:
 	e.flags = flags
 	e.hitstop = hitstop
 	e.cue = hit.cue
+	e.weight = _weight_of(c)
 	if launched:
 		_emit(EventType.LAUNCH, a.slot if a != null else -1, v.slot, id, v.pos, v.vel.y)
+	if c.counter_attack:
+		_emit(EventType.COUNTER_STUN, a.slot, v.slot, id, v.pos, v.stun)
+	_drain_stagger(v, a, _stagger_of(c) + (rules.counter_stagger if c.counter_attack else 0))
 	if a != null:
 		var hook := traits[a.slot]
 		if hook != null:
 			hook.on_hit_dealt(self, a, v, c.move, hit, false)
 	if v.hp <= 0:
 		_ko(v)
+
+
+## A ⚡Counter: the victim's move is interrupted into COUNTER_STUN; the attacker gains Soul
+## and its parry buff (Aldric's Oathkeeper).
+func _counter_stun(c: Contact) -> void:
+	var v := c.victim
+	var a := c.attacker
+	_set_action(v, Action.COUNTER_STUN)
+	v.stun = rules.counter_stun_boss_frames if v.stagger_max > 0 else rules.counter_stun_frames
+	v.vel = Vector3i(0, v.vel.y, 0)
+	v.bounce_pending = 0
+	var knock := Fx.m(c.hit.knockback)
+	v.knock = Fx.dir(c.direction, knock / KNOCK_TICKS)
+	v.knock_ticks = KNOCK_TICKS if knock > 0 else 0
+	_gain_soul(a, rules.counter_soul * 100)
+	var buff := fighter_data[a.slot].parry_buff
+	if buff != null:
+		apply_buff(a, buff, -1)
 
 
 ## Applies the hit reaction. Returns true if the victim was launched.
@@ -2197,6 +2499,10 @@ func _connect_grab(c: Contact) -> void:
 		return
 	if v.in_hitstun() or not v.grounded or v.action == Action.GRABBED:
 		return
+	if v.action == Action.ATTACK:
+		var guarded := current_move(v)
+		if guarded.in_window(v.move_frame, guarded.push_immune_start, guarded.push_immune_end):
+			return
 	var data := fighter_data[a.slot]
 	var throw_index := data.find_move(c.move.throw_move)
 	a.move_contact = 2
@@ -2267,6 +2573,12 @@ func _gain_soul(f: FighterState, hundredths: int) -> void:
 # --- Bookkeeping ------------------------------------------------------------------------
 
 func _post_tick(f: FighterState) -> void:
+	if f.dash_recharge > 0:
+		f.dash_recharge -= 1
+		if f.dash_recharge == 0:
+			f.dash_charges += 1
+			if f.dash_charges < dash_max_charges(f):
+				f.dash_recharge = fighter_data[f.slot].dash.recharge_frames
 	for i in f.cooldowns.size():
 		if f.cooldowns[i] > 0:
 			f.cooldowns[i] -= 1
@@ -2288,7 +2600,7 @@ func _post_tick(f: FighterState) -> void:
 	if f.guard_idle > rules.guard_regen_delay and f.guard < guard_max:
 		f.guard = mini(guard_max, f.guard + rules.guard_regen_per_second * 100 / 60)
 	match f.action:
-		Action.HITSTUN, Action.AIR_HITSTUN, Action.WALL_SPLAT:
+		Action.HITSTUN, Action.AIR_HITSTUN, Action.WALL_SPLAT, Action.COUNTER_STUN, Action.STAGGERED:
 			if f.hitstop == 0:
 				f.combo_ticks += 1
 		Action.KNOCKDOWN, Action.GUARD_BREAK, Action.GRABBED, Action.KO:
