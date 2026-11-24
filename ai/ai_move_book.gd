@@ -54,6 +54,8 @@ class Entry:
 	var damage: int = 0
 	## Frame advantage when blocked (negative = punishable), 0 when unknown (effects).
 	var on_block: int = 0
+	## Hitstun of its first hit (0 when unknown).
+	var hitstun: int = 0
 	var tags: int = 0
 	## Has hitboxes of its own (not only spawned effects or movement).
 	var melee: bool = false
@@ -149,6 +151,7 @@ func _analyze(index: int, move: MoveData) -> Entry:
 	e.low = 999999
 	e.high = -999999
 	var first_blockstun := 0
+	var first_hitstun := 0
 	var first_frame := 9999
 	for hb in move.hitboxes:
 		if hb.hit == null:
@@ -156,7 +159,8 @@ func _analyze(index: int, move: MoveData) -> Entry:
 		var start := hb.start_frame if hb.start_frame >= 0 else move.startup
 		var end := hb.end_frame if hb.end_frame >= 0 else move.last_active_frame()
 		var forward := maxf(hb.offset.z, hb.offset_end.z if hb.capsule else hb.offset.z) + hb.radius
-		e.reach = maxi(e.reach, Fx.m(forward) + _travel(move, start))
+		# Charges keep their hitbox out while moving, so they reach as far as they travel.
+		e.reach = maxi(e.reach, Fx.m(forward) + _travel(move, end + 1))
 		var bottom := minf(hb.offset.y, hb.offset_end.y if hb.capsule else hb.offset.y) - hb.radius
 		var top := maxf(hb.offset.y, hb.offset_end.y if hb.capsule else hb.offset.y) + hb.radius
 		e.low = mini(e.low, Fx.m(bottom))
@@ -167,12 +171,15 @@ func _analyze(index: int, move: MoveData) -> Entry:
 		if start < first_frame:
 			first_frame = start
 			first_blockstun = hb.hit.blockstun
+			first_hitstun = hb.hit.hitstun
 		e.tags |= _hit_tags(hb.hit)
 	if first_frame < 9999:
 		e.hit_frame = first_frame
 		e.on_block = first_blockstun - (e.total - first_frame)
+		e.hitstun = first_hitstun
 	for ed in move.effects:
-		if ed.hit == null:
+		# Effects past the move's last frame are only spawned by traits (Morrigan's shards).
+		if ed.hit == null or ed.spawn_frame > e.total:
 			continue
 		var start := ed.spawn_frame + ed.delay + 1
 		var range_m := 0.0
@@ -205,7 +212,7 @@ func _analyze(index: int, move: MoveData) -> Entry:
 		e.tags |= TAG_INVULN
 	if move.buff != null:
 		e.tags |= TAG_BUFF
-	if e.hit_frame > 0 and _travel(move, e.hit_frame) >= Fx.m(2.0):
+	if e.hit_frame > 0 and _travel(move, e.last_hit_frame + 1) >= Fx.m(2.0):
 		e.tags |= TAG_GAP_CLOSER
 	for cancel in move.cancels:
 		if cancel.into & CancelData.INTO_JUMP and cancel.condition == CancelData.Condition.ON_HIT:

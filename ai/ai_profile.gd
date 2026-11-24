@@ -34,6 +34,8 @@ const DEFAULT_PATH := "res://content/ai/profiles/default.tres"
 @export var grab: int = 30
 ## Chance to charge a heavy against a turtling opponent.
 @export var charge: int = 20
+## Chance to meet a seen attack with an armored move that absorbs it (Normal and up).
+@export var armor_answer: int = 30
 ## Weight of each ability slot when choosing moves (percent, slots 1-3).
 @export var ability_bias: PackedInt32Array = PackedInt32Array([100, 100, 100])
 ## Burst a little earlier (positive) or later (negative), in combo hits.

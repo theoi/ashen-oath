@@ -89,6 +89,8 @@ var _next_attack_tick: int = 0
 var _token_keep_until: int = 0
 var _punish_key: int = -1
 var _punish_ok: bool = false
+var _punish_counted: int = -1
+var _armor_key: int = -1
 ## Action entries whose chain / cancel decision was already made (one roll per move).
 var _chain_key: int = -1
 var _cancel_key: int = -1
@@ -421,7 +423,11 @@ func _neutral() -> void:
 		return
 	if _try_juggle():
 		return
+	if _try_armor_answer():
+		return
 	if _try_punish():
+		return
+	if intent != Intent.RETREAT and _check_approach(Fx.dist_xz(_me.pos, _target.pos), _angle_to_target()):
 		return
 	if _anticipate and _should_guard_preemptively():
 		_hold |= SimInput.GUARD
@@ -576,7 +582,10 @@ func _grabbed() -> void:
 
 
 func _in_hitstun() -> void:
-	if _me.soul >= _sim.rules.burst_cost * 100 and difficulty.burst_chance > 0:
+	# Nightmare keeps a full meter for its super unless the combo is threatening its life.
+	var saving := difficulty.super_use >= 3 and _book.super_entry != null \
+			and _me.soul >= _sim.rules.super_cost * 100 and _me.hp * 100 > _me.max_hp * 35
+	if _me.soul >= _sim.rules.burst_cost * 100 and difficulty.burst_chance > 0 and not saving:
 		var threshold := maxi(1, 3 - profile.burst_bias - (1 if _me.hp * 100 < _me.max_hp * 40 else 0))
 		if _me.combo_hits < threshold:
 			_burst_rolled = false
@@ -647,6 +656,12 @@ func _attacking() -> void:
 		var nl := _book.next_light(entry)
 		var nh := _book.next_heavy(entry)
 		if hit:
+			# Hard and up only chain into follow-ups that are still a true combo.
+			if level >= 2:
+				if nl != null and not _combos_into(entry, nl):
+					nl = null
+				if nh != null and not _combos_into(entry, nh):
+					nh = null
 			if level == 1:
 				follow = nl
 			elif level == 2:
@@ -690,6 +705,13 @@ func _attacking() -> void:
 		if sup != null and _usable(sup) and sup.reach + reach_pad >= dist:
 			_cancel_key = _action_entry
 			_press(SimInput.SUPER)
+
+
+## Whether chaining from `from` (on hit) into `next` hits before the victim's hitstun ends.
+## A chain starts on the frame after the last active frame.
+func _combos_into(from: Entry, next: Entry) -> bool:
+	var stun_left := from.hitstun - (from.move.last_active_frame() - from.hit_frame)
+	return next.hit_frame <= stun_left
 
 
 func _best_ability_followup(dist: int) -> Entry:
@@ -813,6 +835,8 @@ func _zone() -> void:
 	if dist < lo:
 		if _cornered() and dist < Fx.m(3.0):
 			_escape_corner()
+		elif dist < Fx.m(3.0) and _blink(angle + Fx.HALF_TURN + _circle_dir * Fx.deg(40.0)):
+			return
 		else:
 			_run_toward(angle + Fx.HALF_TURN)
 	elif dist > hi:
@@ -855,7 +879,42 @@ func _retreat() -> void:
 	if _cornered() and dist < Fx.m(3.0):
 		_escape_corner()
 		return
+	# Zoners keep shooting while they back off.
+	if dist >= Fx.m(3.5) and _fire_ranged(dist, angle):
+		return
+	if dist < Fx.m(3.0) and _blink(angle + Fx.HALF_TURN):
+		return
 	_run_toward(angle + Fx.HALF_TURN + _circle_dir * Fx.deg(30.0))
+
+
+func _fire_ranged(dist: int, angle: int) -> bool:
+	if not _may_attack() or not _can_hit_target(null):
+		return false
+	var ranged := _pick_attack(dist, Intent.ZONE, false)
+	if ranged == null or not (ranged.has(AiMoveBook.TAG_PROJECTILE) or ranged.has(AiMoveBook.TAG_ERUPTION)):
+		return false
+	_use(ranged, angle)
+	return true
+
+
+## Blinks (a ready teleport ability with no hitbox) toward the angle, steered off walls.
+func _blink(angle: int) -> bool:
+	for e in _book.abilities:
+		if e != null and e.has(AiMoveBook.TAG_TELEPORT) and not e.melee and _usable(e):
+			_press(e.button)
+			_stick(_steer(angle))
+			return true
+	return false
+
+
+## Whether backing off actually opens space: faster than the opponent, or a blink ready.
+func _can_outpace() -> bool:
+	if _sim.fighter_data[_me.slot].run_speed > _sim.fighter_data[_target.slot].run_speed:
+		return true
+	for e in _book.abilities:
+		if e != null and e.has(AiMoveBook.TAG_TELEPORT) and not e.melee and _usable(e):
+			return true
+	return false
 
 
 func _circle() -> void:
@@ -955,7 +1014,9 @@ func _try_punish() -> bool:
 			best = e
 			best_score = score
 	if best != null:
-		_count("punishes")
+		if _punish_counted != _punish_key:
+			_punish_counted = _punish_key
+			_count("punishes")
 		_use(best, _angle_to_target())
 		return true
 	# Too far for a standing punish: run in if the gap closes in time.
@@ -972,6 +1033,71 @@ func _try_punish() -> bool:
 		return true
 	return false
 
+
+## Answers a known incoming attack with an armored move whose armor covers the hit, or an
+## invincible super, that reaches the attacker. One decision per enemy move.
+func _try_armor_answer() -> bool:
+	if difficulty.combo_level < 1 or profile.armor_answer <= 0:
+		return false
+	for e in _sim.state.fighters:
+		if e.team == _me.team or e.ko or e.action != Action.ATTACK or e.move_frame <= difficulty.reaction_delay:
+			continue
+		var threat := _books[e.slot].entry(e.move_index)
+		if threat == null or not threat.melee or e.move_frame >= threat.hit_frame:
+			continue
+		var dist := Fx.dist_xz(e.pos, _me.pos)
+		if dist > threat.reach + _radius(_me) + Fx.m(0.3):
+			continue
+		var key := e.slot * 1000003 + _tick - e.move_frame
+		if key == _armor_key:
+			return false
+		_armor_key = key
+		if not rng.chance(profile.armor_answer):
+			return false
+		# The enemy hit lands on our move frame (frames_to_hit), counting our first frame as 1.
+		var lands := threat.hit_frame - e.move_frame
+		for mine in _candidates(false):
+			var m := mine.move
+			var armored := m.armor_hits > 0 and lands >= m.armor_start and lands <= m.armor_end
+			# Invincible supers work as reversals.
+			var reversal := mine.use == AiMoveBook.Use.SUPER and difficulty.super_use >= 2 \
+					and lands >= m.invuln_start and lands <= m.invuln_end
+			if not armored and not reversal:
+				continue
+			if mine.reach + _radius(e) < dist or not _may_attack(true):
+				continue
+			_count("armor_answers")
+			_use(mine, Fx.angle_of(e.pos.x - _me.pos.x, e.pos.z - _me.pos.z))
+			return true
+	return false
+
+
+## Meets an opponent running in with an armored move that reaches it (armored fighters bait
+## approaches this way). Uses the armor_answer habit; ignores the attack gap.
+func _check_approach(dist: int, angle: int) -> bool:
+	if profile.armor_answer <= 0 or _target.action != Action.IDLE or not _target.grounded:
+		return false
+	var closing := -((_target.vel.x * (_target.pos.x - _me.pos.x) + _target.vel.z * (_target.pos.z - _me.pos.z)) / maxi(1, dist))
+	if closing < Fx.mps(3.0):
+		return false
+	for e in _candidates(false):
+		# Only quick armored moves: slow armored heavies get parried or stepped around.
+		if e.move.armor_hits <= 0 or e.move.armor_start > 8 or e.hit_frame > 14 or e.has(AiMoveBook.TAG_THROW):
+			continue
+		# Where the opponent will be when the move lands.
+		var then := dist - closing * e.hit_frame
+		if then > e.reach + _radius(_target) or then < 0:
+			continue
+		var key := _target_entry
+		if key == _armor_key:
+			return false
+		_armor_key = key
+		if rng.chance(profile.armor_answer) and _may_attack(true):
+			_count("armor_checks")
+			_use(e, angle)
+			return true
+		return false
+	return false
 
 ## Frames the opponent cannot act or defend in a punishable state, -1 if none.
 func _vulnerable_frames(e: FighterState) -> int:
@@ -1108,8 +1234,8 @@ func _super_allowed(dist: int) -> bool:
 	match difficulty.super_use:
 		1:
 			return _super_ok
-		2:
-			return _target.action != Action.GUARD and _target.action != Action.DODGE and dist < Fx.m(3.0)
+		2, 3:
+			return _target.action != Action.GUARD and _target.action != Action.DODGE and _target.grounded
 	return false
 
 
@@ -1208,7 +1334,13 @@ func _strategy() -> void:
 			pressure += 30
 	scores[Intent.PRESSURE] = pressure
 	if ranged:
-		scores[Intent.ZONE] = 30 + (35 if dist >= pref_min and dist <= pref_max + 300 else 0)
+		var zone := 30
+		if dist >= pref_min and dist <= pref_max + 300:
+			zone += 35
+		elif dist >= 350:
+			# Ranged tools still work at mid range, short of the preferred band.
+			zone += 20
+		scores[Intent.ZONE] = zone
 	scores[Intent.BAIT] = 30 if dist >= threat and dist <= threat + 250 else 10
 	var defend := 15
 	if dist < threat + 80 and not target_busy:
@@ -1220,7 +1352,9 @@ func _strategy() -> void:
 	scores[Intent.DEFEND] = defend
 	var retreat := 0
 	if dist < pref_min:
-		retreat = 30 + (pref_min - dist) / 5
+		retreat = mini(60, 25 + (pref_min - dist) / 10)
+		if dist < 400 and not _can_outpace():
+			retreat /= 2
 	if lead > 25 and seconds >= 0 and seconds < 20:
 		retreat += 30
 	scores[Intent.RETREAT] = retreat
