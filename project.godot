@@ -13,10 +13,16 @@ config_version=5
 config/name="Ashen Oath"
 config/description="A dark fantasy realtime 3D arena brawler."
 config/version="0.1.0"
-run/main_scene="res://presentation/hello/hello.tscn"
+run/main_scene="res://ui/app/menu_app.tscn"
 config/features=PackedStringArray("4.7", "GL Compatibility")
 boot_splash/bg_color=Color(0.03, 0.025, 0.035, 1)
 config/icon="res://icon.svg"
+
+[autoload]
+
+Settings="*res://ui/settings/settings.gd"
+Sound="*res://presentation/audio/sound.gd"
+GameFlow="*res://ui/app/game_flow.gd"
 
 [debug]
 
@@ -28,6 +34,10 @@ window/size/viewport_width=1280
 window/size/viewport_height=720
 window/stretch/mode="canvas_items"
 window/stretch/aspect="expand"
+
+[gui]
+
+theme/custom="res://ui/theme/ashen_theme.tres"
 
 [input]
 

@@ -10,7 +10,7 @@ Ashen Chapel and the Drowned Crypt.
 
 **Play in the browser:** https://theoi.github.io/ashen-oath/ (built from `main`).
 
-Status: early development. The page currently shows a placeholder scene.
+Status: early development. The game boots to the title screen and menus; fights are on the way.
 
 ## Requirements
 
@@ -43,7 +43,10 @@ node tools/web_smoke/smoke.mjs build/web /tmp/shot.png
 node tools/web_smoke/smoke.mjs https://theoi.github.io/ashen-oath/ /tmp/pages.png
 
 # Record a scene to mp4 with Movie Maker (needs xvfb-run and ffmpeg)
-tools/capture_clip.sh res://presentation/hello/hello.tscn /tmp/clip.mp4 180
+tools/capture_clip.sh res://ui/app/menu_app.tscn /tmp/clip.mp4 180
+
+# Screenshot after N frames; --menu= opens a menu screen stack directly (ids in ui/app/game_flow.gd)
+tools/capture_screenshot.sh /tmp/settings.png 30 -- --menu=mode_select,settings
 ```
 
 After a fresh clone, or after adding assets or `class_name` scripts outside the editor, run
@@ -80,7 +83,7 @@ fail CI even without a dedicated test.
 | `sim/` | The deterministic combat simulation: `state(t+1) = step(state(t), inputs(t))` at 60 Hz. Plain data and pure logic, no scene tree, nodes, engine physics or rendering, so it runs and tests headless. |
 | `content/` | Data-driven content as Godot `Resource`s: moves, fighters, arenas, story. Adding a fighter or arena should be mostly data plus art. |
 | `presentation/` | Everything that *reads* simulation state and events: models, animation, VFX, camera, audio, arena scenes. Never writes simulation state. |
-| `ui/` | Menus, HUD, settings, story scene player. |
+| `ui/` | Menus, HUD, settings, controls screen, input bindings, theme, story scene player. See [ui/README.md](ui/README.md). |
 | `assets/` | Third-party CC0 assets, one folder per pack with its license file. Credit each in `CREDITS.md`. |
 | `tests/` | Headless tests (`test_*.gd`) and the runner (`runner.tscn`, `framework/`). Not exported. |
 | `tools/` | Scripts for headless runs, exports, smoke tests and clip capture. Ignored by Godot (`.gdignore`) and not exported. |

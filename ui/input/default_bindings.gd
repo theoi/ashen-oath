@@ -202,7 +202,7 @@ static func same_event(a: InputEvent, b: InputEvent) -> bool:
 ## Short display name for one event, e.g. "Left mouse", "Shift", "RB / R1".
 static func describe(event: InputEvent) -> String:
 	if event is InputEventKey:
-		return OS.get_keycode_string(_key_code(event))
+		return _KEY_NAMES.get(_key_code(event), OS.get_keycode_string(_key_code(event)))
 	if event is InputEventMouseButton:
 		match (event as InputEventMouseButton).button_index:
 			MOUSE_BUTTON_LEFT:
@@ -227,6 +227,8 @@ static func describe(event: InputEvent) -> String:
 				return "RT / R2"
 	return event.as_text()
 
+
+const _KEY_NAMES: Dictionary[Key, String] = {KEY_SEMICOLON: ";", KEY_ESCAPE: "Esc"}
 
 const _JOY_BUTTON_NAMES: Dictionary[JoyButton, String] = {
 	JOY_BUTTON_A: "A / Cross",
