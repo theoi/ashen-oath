@@ -22,3 +22,7 @@ hesitation_percent = 5
 hesitation_ticks = 14
 whiff_percent = 2
 aim_noise_degrees = 6
+aim_error_cm = 30
+stance_chance = 60
+counter_chance = 80
+charge_jitter = 5

@@ -18,7 +18,7 @@ extends InputSource
 ## In 1v2, CPU teammates share AiAttackTokens so only 1 (2 on Nightmare) attacks at a time.
 
 enum Intent { IDLE, APPROACH, PRESSURE, ZONE, BAIT, DEFEND, RETREAT, CIRCLE, PUNISH }
-enum Response { NONE, BLOCK, PARRY, DODGE, JUMP, COUNTER, ESCAPE }
+enum Response { NONE, BLOCK, PARRY, DODGE, JUMP, COUNTER, ESCAPE, STANCE }
 enum ThreatKind { MELEE, GRAB, PROJECTILE, ERUPTION }
 
 const INTENT_NAMES: PackedStringArray = ["idle", "approach", "pressure", "zone", "bait", "defend",
@@ -26,6 +26,8 @@ const INTENT_NAMES: PackedStringArray = ["idle", "approach", "pressure", "zone",
 const Action := FighterState.Action
 const Entry := AiMoveBook.Entry
 const WALL_MARGIN := 14000
+## Buttons skill-kit fighters have no binding for (design-lost-ark 1.5, 6.2).
+const KIT_UNUSED := SimInput.GUARD | SimInput.HEAVY | SimInput.GRAB | SimInput.JUMP
 const THREAT_TTL := 120
 
 
@@ -108,6 +110,26 @@ var _keep_guard: bool = false
 var _burst_ok: bool = false
 var _getup_attack: bool = false
 
+## Skill-kit fighter (FighterData.dash): dash instead of guard, aims every frame, no lock-on.
+var _kit: bool = false
+var _aim_target: Vector3i = Vector3i.ZERO
+var _aim_error: Vector3i = Vector3i.ZERO
+var _aim_set: bool = false
+## Ground-target error rolled when the current skill was cast (kept through a charge).
+var _cast_error: Vector3i = Vector3i.ZERO
+## Charge frames to hold the current charge skill for (0 = tap).
+var _charge_goal: int = 0
+var _charge_key: int = -1
+var _hold_key: int = -1
+var _hold_frames: int = 0
+## Per skill slot: the combo/chain part already decided on, and whether to cast it.
+var _seq_part: PackedInt32Array = PackedInt32Array([-1, -1, -1, -1, -1, -1])
+var _seq_ok: PackedByteArray = PackedByteArray([0, 0, 0, 0, 0, 0])
+var _counter_key: int = -1
+var _stance_key: int = -1
+var _whiff_key: int = -1
+var _dash_ok: bool = false
+
 ## Tick the fighter entered its current action (stable through hitstop, unlike action_tick).
 var _action_entry: int = 0
 var _prev_action: int = -1
@@ -186,6 +208,7 @@ func next_frame(sim: Sim, slot: int) -> int:
 	_target_prev_slot = _target.slot
 	_target_prev_action = _target.action
 	_target_prev_tick = _target.action_tick
+	_aim_set = false
 	_observe()
 	_manage_lock()
 	if _tick >= _next_strategy:
@@ -212,6 +235,7 @@ func _setup(slot: int) -> void:
 	for data in _sim.fighter_data:
 		_books.append(AiMoveBook.new(data))
 	_book = _books[slot]
+	_kit = _sim.fighter_data[slot].is_skill_kit()
 	if profile == null:
 		profile = AiProfile.for_fighter(_sim.fighter_data[slot])
 	_circle_dir = 1 if rng.chance(50) else -1
@@ -238,16 +262,51 @@ func _reset_round() -> void:
 
 func _finish() -> int:
 	var pulse := _pulse | _deferred
+	if _kit:
+		pulse &= ~KIT_UNUSED
+		_hold &= ~KIT_UNUSED
 	# A press needs the button up on the previous frame: re-press next frame instead.
 	var blocked := pulse & _last_buttons
 	_deferred = blocked & ~_hold if _me != null and not _me.ko else 0
 	var buttons := (_hold | pulse) & ~blocked
 	_last_buttons = buttons
-	if _stick_mag <= 0:
-		return SimInput.make(buttons)
-	var x := Fx.sin_q(_stick_angle) * _stick_mag / Fx.TRIG_ONE
-	var z := Fx.cos_q(_stick_angle) * _stick_mag / Fx.TRIG_ONE
-	return SimInput.make(buttons, x, z)
+	var frame := SimInput.make(buttons)
+	if _stick_mag > 0:
+		var x := Fx.sin_q(_stick_angle) * _stick_mag / Fx.TRIG_ONE
+		var z := Fx.cos_q(_stick_angle) * _stick_mag / Fx.TRIG_ONE
+		frame = SimInput.make(buttons, x, z)
+	if _kit and _me != null and _target != null:
+		var point := (_aim_target + _aim_error) if _aim_set else _predict(_target, 4)
+		frame = SimInput.with_aim_point(frame, Vector2(Fx.to_m(point.x - _me.pos.x), Fx.to_m(point.z - _me.pos.z)))
+	return frame
+
+
+## Aims this frame at `point` + `error` (skill-kit fighters).
+func _aim_at(point: Vector3i, error: Vector3i = Vector3i.ZERO) -> void:
+	_aim_target = point
+	_aim_error = error
+	_aim_set = true
+
+
+## Where `f` will be in `frames` ticks if it keeps moving (on the floor).
+func _predict(f: FighterState, frames: int) -> Vector3i:
+	return Vector3i(f.pos.x + f.vel.x * frames, 0, f.pos.z + f.vel.z * frames)
+
+
+## Aims a skill about to be cast: led to where the target will be when it hits. Ground
+## targets get the difficulty's error; dash-to skills aim past the target so they stop on it.
+func _aim_for(e: Entry) -> void:
+	var lead := e.hit_frame
+	var point := _predict(_target, lead)
+	var error := Vector3i.ZERO
+	if e.move.aim == MoveData.Aim.DASH_TO:
+		var angle := Fx.angle_of(point.x - _me.pos.x, point.z - _me.pos.z)
+		point += Fx.dir(angle, Fx.m(1.5))
+	elif e.move.aims_at_point() and difficulty.aim_error_cm > 0:
+		var err := difficulty.aim_error_cm * SimInput.AIM_UNIT
+		error = Vector3i(rng.range_i(-err, err), 0, rng.range_i(-err, err))
+	_cast_error = error
+	_aim_at(point, error)
 
 
 func _press(bit: int) -> void:
@@ -299,7 +358,8 @@ func _choose_target() -> FighterState:
 
 
 func _manage_lock() -> void:
-	if _tick % 4 != 0:
+	# Skill-kit fighters aim with the aim field; a hard lock would override it.
+	if _kit or _tick % 4 != 0:
 		return
 	if not _me.hard_lock:
 		_press(SimInput.LOCK)
@@ -353,6 +413,8 @@ func _on_enemy_move(e: FighterState) -> void:
 		t.kind = ThreatKind.GRAB
 		var roll := rng.below(100)
 		t.response = Response.JUMP if roll < 40 else (Response.DODGE if roll < 80 else Response.COUNTER)
+		if _kit and t.response == Response.JUMP:
+			t.response = _pick_defense(true)
 	else:
 		t.kind = ThreatKind.MELEE
 		t.response = _pick_defense(entry.has(AiMoveBook.TAG_UNBLOCKABLE))
@@ -381,6 +443,11 @@ func _on_effect(e: EffectState) -> void:
 
 
 func _pick_defense(unblockable: bool) -> Response:
+	if _kit:
+		# No guard: a stance skill when one is ready, else the dash.
+		if _stance_skill() != null and rng.chance(difficulty.stance_chance):
+			return Response.STANCE
+		return Response.DODGE
 	if rng.chance(difficulty.parry_percent) and not unblockable:
 		return Response.PARRY
 	if unblockable or rng.chance(difficulty.dodge_percent):
@@ -406,6 +473,11 @@ func _act() -> void:
 			_airborne()
 		Action.IDLE, Action.GUARD:
 			_neutral()
+		Action.DASH:
+			# Skills come out of a dash from its skill_cancel_frame (buffered presses too).
+			if _me.action_tick >= _sim.fighter_data[_me.slot].dash.skill_cancel_frame - 4:
+				if not _try_sequence() and not _try_punish() and _is_offensive(intent):
+					_pressure()
 		Action.LAND, Action.DODGE, Action.JUMP_SQUAT:
 			# Buffered presses (8 frames) come out as soon as the fighter can act.
 			if _me.action_len > 0 and _me.action_len - _me.action_tick <= 4:
@@ -422,6 +494,8 @@ func _neutral() -> void:
 		_hold |= SimInput.GUARD
 		return
 	if _try_juggle():
+		return
+	if _kit and (_try_sequence() or _try_counter_window() or _try_oki() or _try_stance_read()):
 		return
 	if _try_armor_answer():
 		return
@@ -484,6 +558,9 @@ func _respond(t: Threat) -> int:
 			return -1
 		if d > Fx.m(1.6) and absi(Fx.angle_diff(e.facing, _angle_from(e, _me))) > Fx.deg(50.0):
 			return -1
+		if e.charging and _kit:
+			# Nothing lands until the charge is released: keep playing (counter windows) meanwhile.
+			return -1
 		frames_to_hit = entry.hit_frame - e.move_frame
 		hit_end = entry.last_hit_frame - e.move_frame
 		source = e.pos
@@ -511,6 +588,8 @@ func _respond(t: Threat) -> int:
 			hit_end = frames_to_hit + 3
 	var data := _sim.fighter_data[_me.slot]
 	var away := Fx.angle_of(_me.pos.x - source.x, _me.pos.z - source.z)
+	if _kit:
+		return _respond_kit(t, frames_to_hit, source, away)
 	match t.response:
 		Response.BLOCK:
 			_hold |= SimInput.GUARD
@@ -562,6 +641,59 @@ func _respond(t: Threat) -> int:
 	return -1
 
 
+## Skill-kit responses: Bulwark-style stance timed so the hit lands in its window, else a
+## dash whose i-frames cover the hit, else running out of an eruption.
+func _respond_kit(t: Threat, frames_to_hit: int, source: Vector3i, away: int) -> int:
+	var dash := _sim.fighter_data[_me.slot].dash
+	if t.response == Response.STANCE:
+		var stance := _stance_skill()
+		# Pressed now, the stance's frame 1 is this tick: the hit lands on frame frames_to_hit + 1.
+		var lands := frames_to_hit + 1
+		if stance != null and lands > stance.move.stance_end:
+			return 0
+		if stance != null and lands >= stance.move.stance_start and _may_attack(true):
+			_count("stances")
+			_press(stance.button)
+			_stick_mag = 0
+			_aim_at(source)
+			_committed(stance)
+			return 1
+		t.response = Response.DODGE
+	match t.response:
+		Response.DODGE, Response.ESCAPE:
+			if frames_to_hit <= 0:
+				t.response = Response.NONE
+				return -1
+			if frames_to_hit > dash.invuln_end - 2:
+				if t.response == Response.ESCAPE:
+					_escape_until = _tick + frames_to_hit
+					_escape_angle = _steer(away)
+					_run_toward(away)
+				return 0
+			if _me.dash_charges <= 0:
+				if t.response == Response.ESCAPE:
+					_run_toward(away)
+				t.response = Response.NONE
+				return -1
+			_count("dashes")
+			_press(SimInput.DASH)
+			_stick(_dodge_angle(away))
+			return 1
+		Response.COUNTER:
+			if _book.light != null:
+				_press(SimInput.LIGHT)
+				_stick_mag = 0
+			return 1
+	return -1
+
+
+func _stance_skill() -> Entry:
+	for e in _book.abilities:
+		if e != null and e.stance and _usable(e):
+			return e
+	return null
+
+
 func _dodge_angle(away: int) -> int:
 	# Sidestep (beats slow-tracking heavies), toward the side with more room.
 	var left := Fx.wrap_angle(away + Fx.QUARTER_TURN)
@@ -570,6 +702,15 @@ func _dodge_angle(away: int) -> int:
 
 
 func _grabbed() -> void:
+	if _kit:
+		# No tech button: Burst (dash) out of the throw instead.
+		if _me.soul >= _sim.rules.burst_cost * 100 and difficulty.burst_chance > 0:
+			if _action_entry != _reaction_key:
+				_reaction_key = _action_entry
+				_reaction_ok = rng.chance(difficulty.burst_chance)
+			if _reaction_ok and _tick - _action_entry >= difficulty.reaction_delay / 2:
+				_press(SimInput.DASH)
+		return
 	if _me.grab_tech_left <= 0:
 		return
 	if _action_entry != _reaction_key:
@@ -594,13 +735,14 @@ func _in_hitstun() -> void:
 			_burst_rolled = true
 			_burst_ok = rng.chance(difficulty.burst_chance)
 		if _me.combo_hits >= threshold and _burst_ok:
-			_press(SimInput.SUPER)
+			_press(SimInput.DASH if _kit else SimInput.SUPER)
 			return
 	if _me.action == Action.AIR_HITSTUN:
 		if _action_entry != _reaction_key:
 			_reaction_key = _action_entry
 			_reaction_ok = rng.chance(difficulty.tech_chance)
-		if _reaction_ok:
+		# Skill-kit air tech shares the dash button with Burst: with the meter it would Burst.
+		if _reaction_ok and not (_kit and _me.soul >= _sim.rules.burst_cost * 100):
 			var falling_low := _me.vel.y < 0 and _me.pos.y <= -_me.vel.y * 5
 			if _me.stun <= 3 or falling_low:
 				_press(SimInput.DODGE)
@@ -613,6 +755,15 @@ func _knocked_down() -> void:
 		# Untrained fighters just stand up; trained ones mix rolls and get-up attacks.
 		_reaction_ok = rng.chance(difficulty.tech_chance)
 		_getup_attack = rng.chance(30)
+	if _kit and _reaction_ok and not _getup_attack and _me.dash_charges > 0:
+		# Quick rise (dash while down) as soon as it is allowed, after a reaction delay.
+		var rise_after := _sim.fighter_data[_me.slot].dash.rise_after
+		if _me.action_tick > rise_after + difficulty.reaction_delay / 3:
+			if _me.action_tick == rise_after + difficulty.reaction_delay / 3 + 1:
+				_count("quick_rises")
+			_press(SimInput.DASH)
+			_stick(_steer(_angle_from(_target, _me) + Fx.QUARTER_TURN * _circle_dir))
+		return
 	if _me.action_tick < _sim.rules.knockdown_frames - 6:
 		return
 	if not _reaction_ok:
@@ -637,6 +788,8 @@ func _blocking() -> void:
 func _attacking() -> void:
 	var entry := _book.entry(_me.move_index)
 	if entry == null:
+		return
+	if _kit and _kit_attacking(entry):
 		return
 	if entry.move.chargeable and _tick < _charge_until:
 		_hold |= _me.move_button
@@ -676,6 +829,10 @@ func _attacking() -> void:
 			var next := nl if nl != null else nh
 			if next != null and (next.on_block >= -4 if level >= 2 else rng.chance(40)):
 				follow = next
+		# Skill-kit basic strings loop (b3 → b1); stop after a string per level instead of
+		# looping a target to death.
+		if _kit and _target.combo_hits >= 3 * maxi(1, level):
+			follow = null
 		if follow != null and follow.reach + reach_pad + Fx.m(0.4) >= dist:
 			_cancel_key = _action_entry
 			_press(SimInput.LIGHT if follow == nl else SimInput.HEAVY)
@@ -688,6 +845,8 @@ func _attacking() -> void:
 		_cancel_key = _action_entry
 		_press(SimInput.JUMP)
 		_stick(_angle_to_target(), SimInput.STICK_MAX / 2)
+		return
+	if _kit:
 		return
 	# Ability and super cancels exist only within the sim's cancel window after the hit.
 	if frame <= entry.move.last_active_frame() \
@@ -718,7 +877,7 @@ func _best_ability_followup(dist: int) -> Entry:
 	var best: Entry = null
 	var best_score := 0
 	for e in _book.abilities:
-		if e == null or not _usable(e) or e.melee == false:
+		if e == null or e.stance or not _usable(e) or e.melee == false:
 			continue
 		if e.reach + _radius(_target) < dist or e.hit_frame > 16:
 			continue
@@ -772,6 +931,13 @@ func _approach() -> void:
 		var best := _pick_attack(dist, Intent.APPROACH, running)
 		if best != null:
 			_use(best, angle)
+			return
+		if _kit and _dash_ok and _me.dash_charges >= 2 and dist > Fx.m(4.5) and dist < Fx.m(9.0):
+			# Dash in, keeping a charge for defense; a skill follows from the dash.
+			_dash_ok = false
+			_count("dash_ins")
+			_press(SimInput.DASH)
+			_stick(_steer(angle))
 			return
 		if _jump_in_ok and dist > Fx.m(2.2) and dist < Fx.m(4.0) and _book.air_heavy != null:
 			_jump_in_ok = false
@@ -865,6 +1031,10 @@ func _bait() -> void:
 
 
 func _defend() -> void:
+	if _kit:
+		# Without guard, defending means staying at the edge of their reach.
+		_bait()
+		return
 	var dist := Fx.dist_xz(_me.pos, _target.pos)
 	if dist < _threat_range() + Fx.m(0.8):
 		_hold |= SimInput.GUARD
@@ -904,6 +1074,11 @@ func _blink(angle: int) -> bool:
 			_press(e.button)
 			_stick(_steer(angle))
 			return true
+	if _kit and _me.dash_charges >= 2:
+		_count("dashes")
+		_press(SimInput.DASH)
+		_stick(_steer(angle))
+		return true
 	return false
 
 
@@ -954,7 +1129,8 @@ func _escape_corner() -> void:
 			_press(e.button)
 			_stick(side)
 			return
-	if _me.dodge_lockout == 0 and rng.chance(30):
+	var can_dodge := _me.dash_charges > 0 if _kit else _me.dodge_lockout == 0
+	if can_dodge and rng.chance(30):
 		_press(SimInput.DODGE)
 		_stick(side)
 		return
@@ -962,6 +1138,8 @@ func _escape_corner() -> void:
 
 
 func _should_guard_preemptively() -> bool:
+	if _kit:
+		return false
 	if intent == Intent.APPROACH or intent == Intent.PUNISH:
 		return false
 	var dist := Fx.dist_xz(_me.pos, _target.pos)
@@ -992,6 +1170,8 @@ func _try_punish() -> bool:
 		lag += _me.stun
 	elif _me.action == Action.LAND or _me.action == Action.DODGE or _me.action == Action.JUMP_SQUAT:
 		lag += maxi(0, _me.action_len - _me.action_tick)
+	elif _me.action == Action.DASH:
+		lag += maxi(0, _sim.fighter_data[_me.slot].dash.skill_cancel_frame - _me.action_tick)
 	var best: Entry = null
 	var best_score := 0
 	for e in _candidates(false):
@@ -1058,7 +1238,7 @@ func _try_armor_answer() -> bool:
 		var lands := threat.hit_frame - e.move_frame
 		for mine in _candidates(false):
 			var m := mine.move
-			var armored := m.armor_hits > 0 and lands >= m.armor_start and lands <= m.armor_end
+			var armored := _armored_on(m, lands)
 			# Invincible supers work as reversals.
 			var reversal := mine.use == AiMoveBook.Use.SUPER and difficulty.super_use >= 2 \
 					and lands >= m.invuln_start and lands <= m.invuln_end
@@ -1082,7 +1262,8 @@ func _check_approach(dist: int, angle: int) -> bool:
 		return false
 	for e in _candidates(false):
 		# Only quick armored moves: slow armored heavies get parried or stepped around.
-		if e.move.armor_hits <= 0 or e.move.armor_start > 8 or e.hit_frame > 14 or e.has(AiMoveBook.TAG_THROW):
+		var early := (e.move.armor_hits > 0 and e.move.armor_start <= 8) or _armored_on(e.move, mini(8, e.hit_frame))
+		if not early or e.hit_frame > 14 or e.has(AiMoveBook.TAG_THROW):
 			continue
 		# Where the opponent will be when the move lands.
 		var then := dist - closing * e.hit_frame
@@ -1115,6 +1296,8 @@ func _vulnerable_frames(e: FighterState) -> int:
 			return e.stun
 		Action.HITSTUN:
 			return e.stun if e.combo_hits == 0 else -1
+		Action.COUNTER_STUN, Action.STAGGERED:
+			return e.stun
 	return -1
 
 
@@ -1162,17 +1345,24 @@ func _candidates(running: bool) -> Array[Entry]:
 			if e != null:
 				list.append(e)
 	for e in _book.abilities:
-		if e != null and _usable(e) and e.hits_anything():
+		if e != null and not e.stance and _usable(e) and e.hits_anything():
 			list.append(e)
 	var sup := _book.super_entry
-	if sup != null and _usable(sup) and difficulty.super_use > 0:
+	if sup != null and _usable(sup) and (difficulty.super_use > 0 or _kit):
 		list.append(sup)
 	return list
 
 
 func _usable(e: Entry) -> bool:
-	if e.ability_slot >= 0 and (e.ability_slot >= _me.cooldowns.size() or _me.cooldowns[e.ability_slot] > 0):
-		return false
+	if e.ability_slot >= 0:
+		var s := e.ability_slot
+		if s >= _me.cooldowns.size():
+			return false
+		# Combo/chain parts come out only while their window is open; it also blocks the root.
+		if e.part:
+			return _me.skill_next[s] == e.index
+		if _me.cooldowns[s] > 0 or _me.skill_next[s] >= 0 or _me.skill_window[s] > 0:
+			return false
 	if e.soul_cost > 0 and _me.soul < e.soul_cost * 100:
 		return false
 	if _me.grounded and not e.move.ground_ok:
@@ -1198,7 +1388,11 @@ func _pick_attack(dist: int, purpose: Intent, running: bool) -> Entry:
 			continue
 		if e.use == AiMoveBook.Use.SUPER and not _super_allowed(dist):
 			continue
-		var score := e.damage * 100 / maxi(4, e.hit_frame + 2)
+		# A charge needs room and time: only from range or on a target that is down.
+		if e.charged and dist < Fx.m(4.0) and _target.action != Action.KNOCKDOWN:
+			continue
+		var frames := e.hit_frame + (_neutral_charge_goal(e) if e.charged else 0)
+		var score := e.damage * 100 / maxi(4, frames + 2)
 		if e.on_block < -6 and not e.has(AiMoveBook.TAG_UNBLOCKABLE):
 			score += e.on_block * (12 if guarding else 4)
 		match purpose:
@@ -1231,6 +1425,13 @@ func _pick_attack(dist: int, purpose: Intent, running: bool) -> Entry:
 
 
 func _super_allowed(dist: int) -> bool:
+	if _kit:
+		# Skill-kit awakenings open with a blast around the user: be close. Easy and Normal
+		# spend it as soon as it is ready (design-lost-ark 5.6).
+		if dist > Fx.m(5.0) or not _target.grounded or _target.action == Action.DASH:
+			return false
+		if difficulty.super_use <= 1:
+			return true
 	match difficulty.super_use:
 		1:
 			return _super_ok
@@ -1239,8 +1440,12 @@ func _super_allowed(dist: int) -> bool:
 	return false
 
 
-func _use(e: Entry, angle: int) -> void:
+func _use(e: Entry, angle: int, charge_goal: int = -1) -> void:
 	_press(e.button)
+	if _kit:
+		_aim_for(e)
+		if e.charged:
+			_charge_goal = charge_goal if charge_goal >= 0 else _neutral_charge_goal(e)
 	if e.use == AiMoveBook.Use.RUN_LIGHT:
 		_stick(angle)
 	elif e.has(AiMoveBook.TAG_TELEPORT):
@@ -1284,6 +1489,8 @@ func _known_threat() -> bool:
 func _can_hit_target(e: Entry) -> bool:
 	if _target.ko or _sim.is_invulnerable(_target):
 		return false
+	if _in_stance(_target):
+		return false
 	if _target.action == Action.KNOCKDOWN:
 		return e != null and e.has(AiMoveBook.TAG_OTG)
 	return true
@@ -1294,6 +1501,328 @@ func _is_running() -> bool:
 	return speed * 10 >= Fx.mps(_sim.fighter_data[_me.slot].run_speed) * 8
 
 
+# --- Skill kit -----------------------------------------------------------------------------
+
+## Charge, hold, follow-ups, combo routes and whiff dashes while a skill-kit move runs.
+## Returns true when it handled this frame.
+func _kit_attacking(entry: Entry) -> bool:
+	var m := entry.move
+	if entry.charged:
+		if _me.move_frame < m.charge_frame or (_me.charging and _me.charge < _charge_goal):
+			_hold |= _me.move_button
+			if _me.charging and m.aims_at_point():
+				# Ground-target charges re-aim on release: lead to the impact.
+				_aim_at(_predict(_target, entry.hit_frame), _cast_error)
+			return true
+		if _charge_key != _action_entry and _me.move_frame > m.charge_frame:
+			_charge_key = _action_entry
+			_count("charges")
+			if _me.charge_perfect:
+				_count("perfect_charges")
+	if m.hold_end > 0 and _me.move_frame <= m.hold_end:
+		if _hold_key != _action_entry:
+			_hold_key = _action_entry
+			_hold_frames = _pick_hold_frames(m)
+		var dist := Fx.dist_xz(_me.pos, _target.pos)
+		var keep := _me.move_frame < _hold_frames
+		if difficulty.combo_level >= 1 and (dist > entry.reach + _radius(_target) + Fx.m(1.0) \
+				or _target.action == Action.KNOCKDOWN or not _can_hit_target(entry)):
+			keep = false
+		if keep:
+			_hold |= _me.move_button
+			_stick(_steer(_angle_to_target()))
+	if _try_sequence():
+		return true
+	if _me.move_contact >= 2 and _kit_route(entry):
+		return true
+	if _me.move_contact == 0 and _kit_whiff_dash(entry):
+		return true
+	return false
+
+
+## Frames to keep channeling a hold skill: longer and steadier on higher levels.
+func _pick_hold_frames(m: MoveData) -> int:
+	var tick_frames := 8
+	for hb in m.hitboxes:
+		if hb.rehit_frames > 0:
+			tick_frames = hb.rehit_frames
+			break
+	var ticks := 0
+	match difficulty.combo_level:
+		0:
+			ticks = rng.range_i(1, 4)
+		1:
+			ticks = rng.range_i(2, 6)
+		_:
+			ticks = 99
+	return mini(m.hold_end, m.hold_start + ticks * tick_frames)
+
+
+## Charge to hold in neutral: the middle of the perfect zone with the difficulty's jitter.
+func _neutral_charge_goal(e: Entry) -> int:
+	var m := e.move
+	var middle := (m.perfect_start + m.perfect_end) / 2 if m.perfect_end > 0 else m.charge_levels[m.charge_levels.size() - 1]
+	var jitter := difficulty.charge_jitter
+	return clampi(middle + (rng.range_i(-jitter, jitter) if jitter > 0 else 0), 1, m.charge_max)
+
+
+## Casts the open combo / chain part of a skill slot when it will connect (one decision per
+## part). Chain parts that hit marked enemies (Rend Ignition) wait for a good moment.
+func _try_sequence() -> bool:
+	for s in _me.skill_next.size():
+		var index := _me.skill_next[s]
+		if index < 0 or _me.skill_window[s] <= 0:
+			_seq_part[s] = -1
+			continue
+		var part := _book.entry(index)
+		if part == null:
+			continue
+		if _seq_part[s] != index:
+			_seq_part[s] = index
+			var chance: int = [40, 80, 100, 100][difficulty.combo_level]
+			_seq_ok[s] = 1 if rng.chance(chance) else 0
+		if _seq_ok[s] == 0 or not _can_cast_now():
+			continue
+		if part.has(AiMoveBook.TAG_MARK_HIT):
+			if _target.marks[_me.slot] <= 0 or _sim.is_invulnerable(_target) or _in_stance(_target):
+				continue
+			var helpless := _target.in_hitstun() or _target.action == Action.KNOCKDOWN \
+					or _target.action == Action.COUNTER_STUN or _target.action == Action.ATTACK
+			if not helpless and _me.skill_window[s] > 20:
+				continue
+		else:
+			var dist := Fx.dist_xz(_me.pos, _target.pos)
+			if part.reach + _radius(_target) < dist or not _can_hit_target(part):
+				continue
+		_count("follow_ups")
+		_cancel_key = _action_entry
+		_press(part.button)
+		_stick_mag = 0
+		_aim_for(part)
+		return true
+	return false
+
+
+## Whether a skill pressed now comes out within the buffer (neutral, a dash past its cancel
+## frame, or a move at its skill-cancel frame).
+func _can_cast_now() -> bool:
+	match _me.action:
+		Action.IDLE:
+			return true
+		Action.DASH:
+			return _me.action_tick >= _sim.fighter_data[_me.slot].dash.skill_cancel_frame - 4
+		Action.ATTACK:
+			var from := Sim.skill_cancel_frame(_sim.current_move(_me))
+			return from > 0 and _me.move_frame >= from - 2
+	return false
+
+
+## On hit, cancels into the next skill of a route (design-lost-ark §4 signature routes):
+## launchers on a grounded target, hits that reach a juggled one, OTG skills on a downed one,
+## the awakening as a finisher. Normal only extends basic strings; Hard and up chain skills.
+func _kit_route(entry: Entry) -> bool:
+	var level := difficulty.combo_level
+	if level < 1 or _cancel_key == _action_entry or not _can_cast_now():
+		return false
+	if _me.move_frame >= entry.total - 1:
+		return false
+	var basic := entry.move.is_basic()
+	if basic and _target.combo_hits < 2:
+		return false
+	if not basic and level < 2:
+		return false
+	_cancel_key = _action_entry
+	if level == 1 and not rng.chance(50):
+		return false
+	var dist := Fx.dist_xz(_me.pos, _target.pos)
+	var sup := _book.super_entry
+	if not basic and difficulty.super_use >= 2 and sup != null and _usable(sup) and dist < Fx.m(4.0) \
+			and (_target.in_hitstun() or _target.action == Action.KNOCKDOWN):
+		_count("awakening_finishers")
+		_use(sup, _angle_to_target())
+		return true
+	var best: Entry = null
+	var best_score := 0
+	var goal := 0
+	var down := _target.action == Action.KNOCKDOWN
+	var airborne := _target.action == Action.AIR_HITSTUN
+	for e in _book.abilities:
+		if e == null or e.stance or not _usable(e) or e.ability_slot == _me.move_slot:
+			continue
+		if e.reach + _radius(_target) < dist or (down and not e.has(AiMoveBook.TAG_OTG)):
+			continue
+		var score := e.damage * 100 / maxi(4, e.hit_frame)
+		if e.charged:
+			# Verdict only lands on a target that stays put (down, or juggled after a spin).
+			if not down and not (airborne and entry.move.hold_end > 0):
+				continue
+			score = e.damage * 100 / (e.hit_frame + e.move.charge_levels[0])
+		elif e.hits_anything() and airborne and not _reaches_height(e, e.hit_frame):
+			continue
+		if e.has(AiMoveBook.TAG_LAUNCH) and not airborne and not down:
+			score += 300
+		if e.move.hold_end > 0 and airborne:
+			score += 200
+		if e.has(AiMoveBook.TAG_OTG) and down:
+			score += 200
+		score = score * profile.ability_weight(e.ability_slot) / 100
+		if best == null or score > best_score:
+			best = e
+			best_score = score
+	if best == null:
+		return false
+	if best.charged:
+		goal = best.move.charge_levels[0]
+	_count("route_cancels")
+	_use(best, _angle_to_target(), goal)
+	_stick_mag = 0
+	return true
+
+
+## Whether `e`'s hitboxes cover the target's height `frames` ticks from now (juggles).
+func _reaches_height(e: Entry, frames: int) -> bool:
+	var g := Fx.mps2(_sim.rules.juggle_gravity)
+	var y := maxi(0, _target.pos.y + _target.vel.y * frames - g * frames * frames / 2)
+	return e.high >= y and e.low <= y + _height(_target)
+
+
+## Hard and up dash out of a whiffed skill's recovery when the opponent is close.
+func _kit_whiff_dash(entry: Entry) -> bool:
+	var m := entry.move
+	if difficulty.combo_level < 2 or _whiff_key == _action_entry or _me.dash_charges <= 0:
+		return false
+	if _me.move_frame <= entry.last_hit_frame or entry.total - _me.move_frame < 10:
+		return false
+	if m.no_dash_cancel or Sim.dash_cancel_frame(m) <= 0 or _me.charging:
+		return false
+	var dist := Fx.dist_xz(_me.pos, _target.pos)
+	if dist > _threat_range() + Fx.m(1.5) or _target.in_hitstun() or _target.action == Action.KNOCKDOWN:
+		return false
+	_whiff_key = _action_entry
+	if not rng.chance(difficulty.dodge_percent * 2):
+		return false
+	_count("whiff_dashes")
+	_press(SimInput.DASH)
+	_stick(_dodge_angle(Fx.wrap_angle(_angle_to_target() + Fx.HALF_TURN)))
+	return true
+
+
+## Reads an incoming approach (a dash or a run straight at the CPU) and plants a stance
+## skill so the attack that follows lands in it. One decision per opponent action.
+func _try_stance_read() -> bool:
+	var stance := _stance_skill()
+	if stance == null or _target_entry == _stance_key:
+		return false
+	var dist := Fx.dist_xz(_me.pos, _target.pos)
+	if dist > Fx.m(4.5):
+		return false
+	var toward_me := Fx.angle_of(_me.pos.x - _target.pos.x, _me.pos.z - _target.pos.z)
+	var coming := false
+	if _target.action == Action.DASH:
+		coming = absi(Fx.angle_diff(_target.move_dir, toward_me)) < Fx.deg(40.0)
+	elif _target.action == Action.IDLE and dist < Fx.m(3.5):
+		var closing := (_target.vel.x * (_me.pos.x - _target.pos.x) + _target.vel.z * (_me.pos.z - _target.pos.z)) / maxi(1, dist)
+		coming = closing >= Fx.mps(3.0)
+	if not coming:
+		return false
+	_stance_key = _target_entry
+	if not rng.chance(difficulty.stance_chance / 2) or not _may_attack(true):
+		return false
+	_count("stance_reads")
+	_use(stance, _angle_to_target())
+	_aim_at(_target.pos)
+	return true
+
+
+## Fires a ready ⚡Counter skill into the target's counter window (blue flash) when it lands
+## before the window closes. Hard and up watch for it; Normal sometimes; Easy never.
+func _try_counter_window() -> bool:
+	if difficulty.counter_chance <= 0 or not _sim.in_counter_window(_target):
+		return false
+	if not _target.charging and _target.move_frame <= difficulty.reaction_delay:
+		return false
+	var key := _target.slot * 1000003 + _tick - _target.move_frame
+	if _target.charging:
+		key = _target.slot * 1000003 + _target.move_index * 1009 + _target_entry
+	if key == _counter_key:
+		return false
+	_counter_key = key
+	if not rng.chance(difficulty.counter_chance) or not _may_attack(true):
+		return false
+	var m := _sim.current_move(_target)
+	var left := 999 if _target.charging else m.counter_window_end - _target.move_frame
+	var dist := Fx.dist_xz(_me.pos, _target.pos)
+	for e in _book.abilities:
+		if e == null or not e.has(AiMoveBook.TAG_COUNTER) or not _usable(e):
+			continue
+		if e.reach + _radius(_target) < dist or _time_to_hit(e, dist) > left + 1:
+			continue
+		_count("counter_fires")
+		_use(e, _angle_to_target())
+		return true
+	return false
+
+
+## Frames until `e` reaches a target `dist` away (waves travel; dash-to skills run in).
+func _time_to_hit(e: Entry, dist: int) -> int:
+	if e.effect_speed > 0:
+		return e.hit_frame + maxi(0, dist - e.effect_offset - _radius(_target)) / e.effect_speed
+	if e.has(AiMoveBook.TAG_GAP_CLOSER) and dist > Fx.m(2.5):
+		return e.last_hit_frame
+	return e.hit_frame
+
+
+## A downed target: charge a ground-target skill so it lands as they rise (perfect when
+## there is time), else an OTG skill that reaches.
+func _try_oki() -> bool:
+	if _target.action != Action.KNOCKDOWN or _sim.is_invulnerable(_target) or not _may_attack(true):
+		return false
+	var left := _sim.rules.knockdown_frames - _target.action_tick
+	var dist := Fx.dist_xz(_me.pos, _target.pos)
+	for e in _book.abilities:
+		if e == null or not e.charged or not _usable(e) or not e.has(AiMoveBook.TAG_OTG):
+			continue
+		if dist > Fx.m(e.move.max_range) + _radius(_target):
+			continue
+		var goal := left - e.hit_frame - 2
+		if goal < e.move.charge_levels[0]:
+			continue
+		if e.move.perfect_end > 0 and goal >= e.move.perfect_start:
+			goal = mini(goal, _neutral_charge_goal(e))
+		_count("oki")
+		_use(e, _angle_to_target(), goal)
+		return true
+	var best: Entry = null
+	for e in _candidates(false):
+		if not e.has(AiMoveBook.TAG_OTG) or e.charged or e.use == AiMoveBook.Use.SUPER:
+			continue
+		if e.reach + _radius(_target) < dist or e.hit_frame >= left:
+			continue
+		if best == null or e.damage > best.damage:
+			best = e
+	if best == null:
+		return false
+	_count("oki")
+	_use(best, _angle_to_target())
+	return true
+
+
+## Whether `f` is in a stance skill that has not ended yet (hitting it triggers its counter).
+func _in_stance(f: FighterState) -> bool:
+	if f.action != Action.ATTACK:
+		return false
+	var m := _sim.current_move(f)
+	return m.stance_end > 0 and f.move_frame <= m.stance_end
+
+
+## Whether `m` shrugs off hits on move frame `frame`: hit-capped armor, flinch or push immunity.
+func _armored_on(m: MoveData, frame: int) -> bool:
+	if m.armor_hits > 0 and frame >= m.armor_start and frame <= m.armor_end:
+		return true
+	return m.in_window(frame, m.flinch_immune_start, m.flinch_immune_end) \
+			or m.in_window(frame, m.push_immune_start, m.push_immune_end)
+
+
 # --- Strategy ------------------------------------------------------------------------------
 
 func _strategy() -> void:
@@ -1301,6 +1830,7 @@ func _strategy() -> void:
 	_jump_in_ok = rng.chance(profile.jump_in)
 	_whiff_ok = rng.chance(difficulty.whiff_percent)
 	_super_ok = rng.chance(30)
+	_dash_ok = _kit and rng.chance(profile.dash_in)
 	var noise := difficulty.aim_noise_degrees
 	_aim_noise = Fx.deg(float(rng.range_i(-noise, noise))) if noise > 0 else 0
 	if _tick < _hesitate_until:

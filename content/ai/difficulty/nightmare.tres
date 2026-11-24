@@ -25,3 +25,7 @@ hesitation_ticks = 0
 whiff_percent = 0
 aim_noise_degrees = 0
 attack_tokens = 2
+aim_error_cm = 0
+stance_chance = 85
+counter_chance = 100
+charge_jitter = 0

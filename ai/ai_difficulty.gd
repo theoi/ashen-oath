@@ -48,6 +48,16 @@ const PRESET_PATHS: PackedStringArray = [
 ## Scales offensive intent scores, percent.
 @export var aggression: int = 100
 
+@export_group("Skill kit")
+## Ground-target aim error per axis, centimeters (design-lost-ark 1.10).
+@export var aim_error_cm: int = 80
+## Chance to answer a seen attack with a ready stance skill (Bulwark).
+@export_range(0, 100) var stance_chance: int = 30
+## Chance to fire a ready ⚡Counter skill into an opponent's counter window.
+@export_range(0, 100) var counter_chance: int = 30
+## Random error on the charge release, frames either side of the perfect zone's middle.
+@export var charge_jitter: int = 10
+
 @export_group("Noise")
 ## Frames between strategy decisions.
 @export var strategy_period: int = 6

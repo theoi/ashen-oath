@@ -46,7 +46,7 @@ func test_one_attacker_at_a_time_in_one_vs_two() -> void:
 	var sim := Sim.new(cfg)
 	var both := 0
 	var attacking := PackedInt32Array([0, 0, 0])
-	var inputs := PackedInt32Array([0, 0, 0])
+	var inputs := PackedInt64Array([0, 0, 0])
 	while not sim.is_over() and sim.state.tick < 4000:
 		for slot in range(1, 3):
 			inputs[slot] = sources[slot].next_frame(sim, slot)
