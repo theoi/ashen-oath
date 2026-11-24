@@ -1,0 +1,26 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://presentation/fighters/aldric/aldric_model.gd" id="1_script"]
+[ext_resource type="PackedScene" path="res://assets/kaykit-adventurers/Knight.glb" id="2_model"]
+
+[node name="OathShade" type="Node3D"]
+script = ExtResource("1_script")
+model = ExtResource("2_model")
+model_scale = 0.78
+hide_meshes = PackedStringArray("1H_Sword_Offhand", "Rectangle_Shield", "Round_Shield", "Spike_Shield", "2H_Sword")
+eye_color = Color(1, 0.35, 0.1, 1)
+tint = Color(0.7, 0.7, 0.75, 1)
+desaturate = 0.9
+brightness = 0.7
+rim_color = Color(1, 0.35, 0.1, 1)
+glow_cells = 4096
+glow_color = Color(1, 0.3, 0.06, 1)
+glow_energy = 2.6
+glow_pulse = 1.0
+shade = 1.0
+molten_mesh = &"1H_Sword"
+crack_color = Color(1, 0.3, 0.05, 1)
+trail_tip = Vector3(0, 1.4, 0)
+trail_color = Color(0.25, 0.08, 0.05, 0.75)
+spark_color = Color(1, 0.4, 0.12, 1)
+accent_color = Color(1, 0.3, 0.06, 1)

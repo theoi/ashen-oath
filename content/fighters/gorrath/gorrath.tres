@@ -1,0 +1,48 @@
+[gd_resource type="Resource" script_class="FighterData" format=3]
+
+[ext_resource type="Script" path="res://content/types/fighter_data.gd" id="1_fighter_data"]
+[ext_resource type="Script" path="res://content/types/move_data.gd" id="2_move_datagd"]
+[ext_resource type="Resource" path="res://content/fighters/gorrath/moves/gorrath_l1.tres" id="3_gorrath_l1tr"]
+[ext_resource type="Resource" path="res://content/fighters/gorrath/moves/gorrath_l2.tres" id="4_gorrath_l2tr"]
+[ext_resource type="Resource" path="res://content/fighters/gorrath/moves/gorrath_l3.tres" id="5_gorrath_l3tr"]
+[ext_resource type="Resource" path="res://content/fighters/gorrath/moves/gorrath_llh.tres" id="6_gorrath_llht"]
+[ext_resource type="Resource" path="res://content/fighters/gorrath/moves/gorrath_lh.tres" id="7_gorrath_lhtr"]
+[ext_resource type="Resource" path="res://content/fighters/gorrath/moves/gorrath_h1.tres" id="8_gorrath_h1tr"]
+[ext_resource type="Resource" path="res://content/fighters/gorrath/moves/gorrath_h2.tres" id="9_gorrath_h2tr"]
+[ext_resource type="Resource" path="res://content/fighters/gorrath/moves/gorrath_run_l.tres" id="10_gorrath_run_"]
+[ext_resource type="Resource" path="res://content/fighters/gorrath/moves/gorrath_air_l1.tres" id="11_gorrath_air_"]
+[ext_resource type="Resource" path="res://content/fighters/gorrath/moves/gorrath_air_h.tres" id="12_gorrath_air_"]
+[ext_resource type="Resource" path="res://content/fighters/gorrath/moves/gorrath_grab.tres" id="13_gorrath_grab"]
+[ext_resource type="Resource" path="res://content/fighters/gorrath/moves/gorrath_throw.tres" id="14_gorrath_thro"]
+[ext_resource type="Resource" path="res://content/fighters/gorrath/moves/gorrath_getup.tres" id="15_gorrath_getu"]
+[ext_resource type="Resource" path="res://content/fighters/gorrath/moves/chain_hook.tres" id="16_chain_hooktr"]
+[ext_resource type="Resource" path="res://content/fighters/gorrath/moves/earthsplitter.tres" id="17_earthsplitte"]
+[ext_resource type="Resource" path="res://content/fighters/gorrath/moves/bull_rush.tres" id="18_bull_rushtre"]
+[ext_resource type="Resource" path="res://content/fighters/gorrath/moves/execution_chain.tres" id="19_execution_ch"]
+[ext_resource type="Resource" path="res://content/fighters/gorrath/moves/execution_chain_slams.tres" id="20_execution_ch"]
+
+[resource]
+script = ExtResource("1_fighter_data")
+id = &"gorrath"
+display_name = "Gorrath"
+max_hp = 1150
+radius = 0.55
+height = 2.05
+weight = 0.8
+run_speed = 5.4
+parry_window = 6
+dodge_frames = 28
+dodge_invuln_start = 3
+dodge_invuln_end = 11
+dodge_move_frames = 20
+light = &"gorrath_l1"
+heavy = &"gorrath_h1"
+run_light = &"gorrath_run_l"
+air_light = &"gorrath_air_l1"
+air_heavy = &"gorrath_air_h"
+grab = &"gorrath_grab"
+getup_attack = &"gorrath_getup"
+abilities = Array[StringName]([&"chain_hook", &"earthsplitter", &"bull_rush"])
+super_move = &"execution_chain"
+scene = "res://presentation/fighters/gorrath/gorrath.tscn"
+moves = Array[ExtResource("2_move_datagd")]([ExtResource("3_gorrath_l1tr"), ExtResource("4_gorrath_l2tr"), ExtResource("5_gorrath_l3tr"), ExtResource("6_gorrath_llht"), ExtResource("7_gorrath_lhtr"), ExtResource("8_gorrath_h1tr"), ExtResource("9_gorrath_h2tr"), ExtResource("10_gorrath_run_"), ExtResource("11_gorrath_air_"), ExtResource("12_gorrath_air_"), ExtResource("13_gorrath_grab"), ExtResource("14_gorrath_thro"), ExtResource("15_gorrath_getu"), ExtResource("16_chain_hooktr"), ExtResource("17_earthsplitte"), ExtResource("18_bull_rushtre"), ExtResource("19_execution_ch"), ExtResource("20_execution_ch")])

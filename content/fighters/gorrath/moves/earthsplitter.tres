@@ -1,0 +1,46 @@
+[gd_resource type="Resource" script_class="MoveData" format=3]
+
+[ext_resource type="Script" path="res://content/types/move_data.gd" id="1_move_datagd"]
+[ext_resource type="Script" path="res://content/types/effect_data.gd" id="2_effect_datag"]
+[ext_resource type="Script" path="res://content/types/hit_data.gd" id="3_hit_datagd"]
+
+[sub_resource type="Resource" id="Hit_2"]
+script = ExtResource("3_hit_datagd")
+damage = 110
+hitstun = 26
+blockstun = 16
+guard_damage = 50
+reaction = 3
+launch_height = 1.8
+knockback = 0.4
+cue = &"hit_heavy"
+
+[sub_resource type="Resource" id="Effect_1"]
+script = ExtResource("2_effect_datag")
+id = &"earthsplitter_wave"
+spawn_frame = 24
+anchor = 0
+offset = Vector3(0, 0, 0.9)
+speed = 30
+travel = 5.2
+radius = 0.9
+height = 1
+lifetime = 20
+destroy_on_contact = true
+destroyable = false
+blocked_by_walls = true
+projectile = false
+cue = &"earthsplitter_wave"
+hit = SubResource("Hit_2")
+
+[resource]
+script = ExtResource("1_move_datagd")
+id = &"earthsplitter"
+kind = 6
+startup = 24
+active = 3
+recovery = 30
+cooldown = 480
+animation = &"2H_Melee_Attack_Chop"
+cue = &"earthsplitter"
+effects = Array[ExtResource("2_effect_datag")]([SubResource("Effect_1")])

@@ -1,0 +1,47 @@
+[gd_resource type="Resource" script_class="MoveData" format=3]
+
+[ext_resource type="Script" path="res://content/types/move_data.gd" id="1_move_datagd"]
+[ext_resource type="Script" path="res://content/types/effect_data.gd" id="2_effect_datag"]
+[ext_resource type="Script" path="res://content/types/hit_data.gd" id="3_hit_datagd"]
+
+[sub_resource type="Resource" id="Hit_2"]
+script = ExtResource("3_hit_datagd")
+damage = 280
+hitstun = 34
+blockstun = 18
+reaction = 2
+launch_height = 3
+knockback = 1
+juggle_cost = 0
+cue = &"hit_soul"
+
+[sub_resource type="Resource" id="Effect_1"]
+script = ExtResource("2_effect_datag")
+id = &"requiem_hands"
+spawn_frame = 30
+anchor = 0
+offset = Vector3(0, 0, 0)
+radius = 8
+height = 3
+lifetime = 10
+destroy_on_contact = false
+destroyable = false
+blocked_by_walls = false
+projectile = false
+cue = &"requiem_hands"
+hit = SubResource("Hit_2")
+
+[resource]
+script = ExtResource("1_move_datagd")
+id = &"requiem_of_the_drowned"
+kind = 7
+startup = 30
+active = 2
+recovery = 40
+soul_cost = 100
+flash_frames = 20
+invuln_start = 1
+invuln_end = 30
+animation = &"Spellcast_Summon"
+cue = &"requiem_rise"
+effects = Array[ExtResource("2_effect_datag")]([SubResource("Effect_1")])

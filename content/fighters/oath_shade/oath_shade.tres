@@ -1,0 +1,54 @@
+[gd_resource type="Resource" script_class="FighterData" format=3]
+
+[ext_resource type="Script" path="res://content/types/fighter_data.gd" id="1_fighter_data"]
+[ext_resource type="Script" path="res://content/types/buff_data.gd" id="2_buff_datagd"]
+[ext_resource type="Script" path="res://content/types/move_data.gd" id="3_move_datagd"]
+[ext_resource type="Resource" path="res://content/fighters/aldric/moves/aldric_l1.tres" id="4_aldric_l1tre"]
+[ext_resource type="Resource" path="res://content/fighters/aldric/moves/aldric_l2.tres" id="5_aldric_l2tre"]
+[ext_resource type="Resource" path="res://content/fighters/aldric/moves/aldric_l3.tres" id="6_aldric_l3tre"]
+[ext_resource type="Resource" path="res://content/fighters/aldric/moves/aldric_llh.tres" id="7_aldric_llhtr"]
+[ext_resource type="Resource" path="res://content/fighters/aldric/moves/aldric_lh.tres" id="8_aldric_lhtre"]
+[ext_resource type="Resource" path="res://content/fighters/aldric/moves/aldric_h1.tres" id="9_aldric_h1tre"]
+[ext_resource type="Resource" path="res://content/fighters/aldric/moves/aldric_h2.tres" id="10_aldric_h2tre"]
+[ext_resource type="Resource" path="res://content/fighters/aldric/moves/aldric_run_l.tres" id="11_aldric_run_l"]
+[ext_resource type="Resource" path="res://content/fighters/aldric/moves/aldric_air_l1.tres" id="12_aldric_air_l"]
+[ext_resource type="Resource" path="res://content/fighters/aldric/moves/aldric_air_l2.tres" id="13_aldric_air_l"]
+[ext_resource type="Resource" path="res://content/fighters/aldric/moves/aldric_air_h.tres" id="14_aldric_air_h"]
+[ext_resource type="Resource" path="res://content/fighters/aldric/moves/aldric_grab.tres" id="15_aldric_grabt"]
+[ext_resource type="Resource" path="res://content/fighters/aldric/moves/aldric_throw.tres" id="16_aldric_throw"]
+[ext_resource type="Resource" path="res://content/fighters/aldric/moves/aldric_getup.tres" id="17_aldric_getup"]
+[ext_resource type="Resource" path="res://content/fighters/aldric/moves/oathfire_lunge.tres" id="18_oathfire_lun"]
+[ext_resource type="Resource" path="res://content/fighters/aldric/moves/brand_rise.tres" id="19_brand_risetr"]
+[ext_resource type="Resource" path="res://content/fighters/aldric/moves/bulwark_charge.tres" id="20_bulwark_char"]
+[ext_resource type="Resource" path="res://content/fighters/aldric/moves/pyre_of_the_forsworn.tres" id="21_pyre_of_the_"]
+
+[sub_resource type="Resource" id="Buff_1"]
+script = ExtResource("2_buff_datagd")
+id = &"oathkeeper_ignite"
+duration = 180
+damage_bonus_percent = 30
+uses = 1
+cue = &"oathfire_ignite"
+
+[resource]
+script = ExtResource("1_fighter_data")
+id = &"oath_shade"
+display_name = "Oath-Shade"
+max_hp = 1000
+radius = 0.45
+height = 1.85
+weight = 1
+run_speed = 6.5
+parry_window = 8
+parry_buff = SubResource("Buff_1")
+light = &"aldric_l1"
+heavy = &"aldric_h1"
+run_light = &"aldric_run_l"
+air_light = &"aldric_air_l1"
+air_heavy = &"aldric_air_h"
+grab = &"aldric_grab"
+getup_attack = &"aldric_getup"
+abilities = Array[StringName]([&"oathfire_lunge", &"brand_rise", &"bulwark_charge"])
+super_move = &"pyre_of_the_forsworn"
+scene = "res://presentation/fighters/oath_shade/oath_shade.tscn"
+moves = Array[ExtResource("3_move_datagd")]([ExtResource("4_aldric_l1tre"), ExtResource("5_aldric_l2tre"), ExtResource("6_aldric_l3tre"), ExtResource("7_aldric_llhtr"), ExtResource("8_aldric_lhtre"), ExtResource("9_aldric_h1tre"), ExtResource("10_aldric_h2tre"), ExtResource("11_aldric_run_l"), ExtResource("12_aldric_air_l"), ExtResource("13_aldric_air_l"), ExtResource("14_aldric_air_h"), ExtResource("15_aldric_grabt"), ExtResource("16_aldric_throw"), ExtResource("17_aldric_getup"), ExtResource("18_oathfire_lun"), ExtResource("19_brand_risetr"), ExtResource("20_bulwark_char"), ExtResource("21_pyre_of_the_")])

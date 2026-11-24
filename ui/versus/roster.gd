@@ -52,6 +52,17 @@ const FIGHTERS: Array[Dictionary] = [
 		"trait": "No abilities or super: blade strings, a grab and nothing left to lose.",
 		"color": Color(0.55, 0.75, 0.9),
 	},
+	{
+		"id": &"oath_shade",
+		"data": "res://content/fighters/oath_shade/oath_shade.tres",
+		"name": "Oath-Shade",
+		"epithet": "The Broken Vow",
+		"style": "Story opponent · Aldric's own curse, wearing his face",
+		"abilities": ["Oathfire Lunge", "Brand Rise", "Bulwark Charge"],
+		"super": "Pyre of the Forsworn",
+		"trait": "Oathkeeper: wider parry; a parry ignites its blade.",
+		"color": Color(0.85, 0.3, 0.12),
+	},
 ]
 
 const ARENAS: Array[Dictionary] = [

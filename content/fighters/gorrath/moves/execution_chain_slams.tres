@@ -1,0 +1,68 @@
+[gd_resource type="Resource" script_class="MoveData" format=3]
+
+[ext_resource type="Script" path="res://content/types/move_data.gd" id="1_move_datagd"]
+[ext_resource type="Script" path="res://content/types/hitbox_data.gd" id="2_hitbox_datag"]
+[ext_resource type="Script" path="res://content/types/hit_data.gd" id="3_hit_datagd"]
+
+[sub_resource type="Resource" id="Hit_2"]
+script = ExtResource("3_hit_datagd")
+damage = 100
+hitstun = 40
+reaction = 0
+knockback = 0
+cue = &"hit_heavy_blade"
+
+[sub_resource type="Resource" id="Hitbox_1"]
+script = ExtResource("2_hitbox_datag")
+start_frame = 20
+end_frame = 20
+group = 0
+offset = Vector3(0, 1, 0.6)
+radius = 1
+hit = SubResource("Hit_2")
+
+[sub_resource type="Resource" id="Hit_4"]
+script = ExtResource("3_hit_datagd")
+damage = 100
+hitstun = 40
+reaction = 0
+knockback = 0
+cue = &"hit_heavy_blade"
+
+[sub_resource type="Resource" id="Hitbox_3"]
+script = ExtResource("2_hitbox_datag")
+start_frame = 42
+end_frame = 42
+group = 1
+offset = Vector3(0, 1, 0.6)
+radius = 1
+hit = SubResource("Hit_4")
+
+[sub_resource type="Resource" id="Hit_6"]
+script = ExtResource("3_hit_datagd")
+damage = 150
+hitstun = 40
+reaction = 2
+launch_height = 2
+knockback = 3
+wall_splat = true
+cue = &"hit_heavy_blade"
+
+[sub_resource type="Resource" id="Hitbox_5"]
+script = ExtResource("2_hitbox_datag")
+start_frame = 64
+end_frame = 64
+group = 2
+offset = Vector3(0, 1, 0.6)
+radius = 1
+hit = SubResource("Hit_6")
+
+[resource]
+script = ExtResource("1_move_datagd")
+id = &"execution_chain_slams"
+kind = 5
+startup = 20
+active = 45
+recovery = 30
+animation = &"2H_Melee_Attack_Chop"
+hitboxes = Array[ExtResource("2_hitbox_datag")]([SubResource("Hitbox_1"), SubResource("Hitbox_3"), SubResource("Hitbox_5")])

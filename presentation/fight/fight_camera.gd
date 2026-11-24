@@ -39,6 +39,12 @@ var _initialized := false
 var _arena: ArenaData
 ## Smoothed fraction of the wanted distance left free by walls and pillars.
 var _clear := 1.0
+## Yaw swung away from straight-behind so a cornered fighter is framed along the wall
+## instead of from inside it (radians, relative to the target-facing yaw).
+var _wall_bias := 0.0
+## Chest points of the focus fighter and its target this frame (line-of-sight checks).
+var _me_chest := Vector3.ZERO
+var _them_chest := Vector3.ZERO
 
 
 func setup(match_runner: MatchRunner, slot: int, camera_bounds: Rect2) -> void:
@@ -95,13 +101,8 @@ func _process(delta: float) -> void:
 		orbit_pitch = clampf(orbit_pitch - vertical * STICK_SPEED * 0.5 * delta, MIN_PITCH, MAX_PITCH)
 	var to := Vector3(them.x - me.x, 0.0, them.z - me.z)
 	var separation := to.length()
-	if has_target and separation > 0.5:
-		var desired := atan2(to.x, to.z) + (deg_to_rad(62.0) if spectator else 0.0)
-		var off := absf(angle_difference(yaw, desired))
-		var rate := 6.0 if f.hard_lock else (1.4 if off > deg_to_rad(40.0) else 0.0)
-		if spectator:
-			rate = 1.2 if off > deg_to_rad(25.0) else 0.4
-		yaw = lerp_angle(yaw, desired, 1.0 - exp(-rate * delta))
+	_me_chest = me + Vector3.UP * 1.0
+	_them_chest = them + Vector3.UP * 1.0
 	var focus := me + Vector3.UP * 1.15
 	if has_target and separation < 14.0:
 		focus = focus.lerp(them + Vector3.UP * 1.0, 0.5 if spectator else 0.42)
@@ -113,7 +114,18 @@ func _process(delta: float) -> void:
 		_initialized = true
 	_focus = _focus.lerp(focus, 1.0 - exp(-9.0 * delta))
 	_distance = lerpf(_distance, want_distance, 1.0 - exp(-3.0 * delta))
-	var forward := Vector3(sin(yaw) * cos(orbit_pitch), sin(orbit_pitch), cos(yaw) * cos(orbit_pitch))
+	if has_target and separation > 0.5:
+		var desired := atan2(to.x, to.z) + (deg_to_rad(62.0) if spectator else 0.0)
+		_update_wall_bias(desired, offset, delta)
+		var aim := desired + _wall_bias
+		var off := absf(angle_difference(yaw, aim))
+		var rate := 6.0 if f.hard_lock else (1.4 if off > deg_to_rad(40.0) else 0.0)
+		if spectator:
+			rate = 1.2 if off > deg_to_rad(25.0) else 0.4
+		if _wall_bias != 0.0:
+			rate = maxf(rate, 3.0)
+		yaw = lerp_angle(yaw, aim, 1.0 - exp(-rate * delta))
+	var forward := _forward(yaw)
 	var right := Vector3(-cos(yaw), 0.0, sin(yaw))
 	var wanted := _focus - forward * _distance + right * offset
 	var clear := _free_fraction(_focus, wanted)
@@ -132,12 +144,94 @@ func _process(delta: float) -> void:
 	_apply_shake(delta)
 
 
+func _forward(at_yaw: float) -> Vector3:
+	return Vector3(sin(at_yaw) * cos(orbit_pitch), sin(orbit_pitch), cos(at_yaw) * cos(orbit_pitch))
+
+
+## How good a camera yaw is: the free fraction toward its spot, capped low when a pillar
+## would hide either fighter from there.
+func _clear_at(at_yaw: float, offset: float) -> float:
+	var right := Vector3(-cos(at_yaw), 0.0, sin(at_yaw))
+	var wanted := _focus - _forward(at_yaw) * _distance + right * offset
+	var clear := _free_fraction(_focus, wanted)
+	var eye := _focus.lerp(wanted, lerpf(0.55, 1.0, clear))
+	if _hugs_pillar(eye) or not (_sees(eye, _me_chest) and _sees(eye, _them_chest)):
+		return minf(clear, 0.5)
+	return clear
+
+
+## True when `eye` is so close to a pillar that it would fill the screen.
+func _hugs_pillar(eye: Vector3) -> bool:
+	if _arena == null:
+		return false
+	var e := Vector2(eye.x, eye.z)
+	for o in _arena.obstacles:
+		if eye.y < o.height and _segment_distance(e, o.a, o.b) < o.radius + 1.0:
+			return true
+	return false
+
+
+## False when a pillar taller than the sight line stands between `eye` and `point`.
+func _sees(eye: Vector3, point: Vector3) -> bool:
+	if _arena == null:
+		return true
+	var e := Vector2(eye.x, eye.z)
+	var p := Vector2(point.x, point.z)
+	var low := minf(eye.y, point.y)
+	for o in _arena.obstacles:
+		if o.height < low:
+			continue
+		if _segments_distance(e, p, o.a, o.b) < o.radius + 0.3:
+			return false
+	return true
+
+
+static func _segments_distance(p1: Vector2, p2: Vector2, q1: Vector2, q2: Vector2) -> float:
+	if Geometry2D.segment_intersects_segment(p1, p2, q1, q2) != null:
+		return 0.0
+	return minf(minf(_segment_distance(p1, q1, q2), _segment_distance(p2, q1, q2)),
+			minf(_segment_distance(q1, p1, p2), _segment_distance(q2, p1, p2)))
+
+
+## Swings the camera around a fighter backed against a wall or pillar until it has room
+## behind it, and eases back to straight-behind once that is clear again.
+func _update_wall_bias(desired: float, offset: float, delta: float) -> void:
+	const ENOUGH := 0.9
+	const MAX_BIAS := 1.75
+	const STEP := 0.22
+	if _clear_at(desired + _wall_bias, offset) < ENOUGH:
+		var best := _wall_bias
+		var best_clear := -1.0
+		for k in range(1, 9):
+			for side: float in [1.0, -1.0]:
+				var bias := clampf(_wall_bias + side * STEP * k, -MAX_BIAS, MAX_BIAS)
+				var c := _clear_at(desired + bias, offset)
+				if c > best_clear + 0.02:
+					best = bias
+					best_clear = c
+			if best_clear >= ENOUGH:
+				break
+		_wall_bias = best
+	elif _wall_bias != 0.0:
+		var eased := move_toward(_wall_bias, 0.0, delta * 0.6)
+		if _clear_at(desired + eased, offset) >= 0.98:
+			_wall_bias = eased
+
+
 ## How far (0..1) the camera can go from `from` toward `to` before it would enter a wall or
 ## pillar (with a margin), so it pulls in instead of clipping through scenery.
 func _free_fraction(from: Vector3, to: Vector3) -> float:
 	const STEPS := 24
 	const WALL_MARGIN := 0.7
-	const PILLAR_MARGIN := 0.55
+	const PILLAR_MARGIN := 0.9
+	# A pillar the focus point is inside (fighters on both sides of it) is left to the
+	# line-of-sight check; counting it would block every direction alike.
+	var start := Vector2(from.x, from.z)
+	var pillars: Array[ArenaObstacle] = []
+	if _arena != null:
+		for o in _arena.obstacles:
+			if _segment_distance(start, o.a, o.b) >= o.radius + 0.1:
+				pillars.append(o)
 	for i in range(1, STEPS + 1):
 		var t := float(i) / STEPS
 		var p := from.lerp(to, t)
@@ -145,7 +239,7 @@ func _free_fraction(from: Vector3, to: Vector3) -> float:
 		var blocked := not bounds.has_point(p2)
 		if _arena != null and not blocked:
 			blocked = _outside_floor(p2, WALL_MARGIN)
-			for o in _arena.obstacles:
+			for o in pillars:
 				if blocked:
 					break
 				if p.y < o.height + 0.5 and _segment_distance(p2, o.a, o.b) < o.radius + PILLAR_MARGIN:
