@@ -1,0 +1,12 @@
+{
+  "name": "ashen-oath-web-smoke",
+  "private": true,
+  "type": "module",
+  "description": "Headless Chrome smoke test for the Ashen Oath web build",
+  "scripts": {
+    "smoke": "node smoke.mjs"
+  },
+  "dependencies": {
+    "playwright-core": "1.65.1"
+  }
+}
