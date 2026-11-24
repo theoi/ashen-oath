@@ -138,7 +138,8 @@ void fragment() {
 	}
 	float facing = clamp(dot(NORMAL, VIEW), 0.0, 1.0);
 	float fres = pow(1.0 - facing, 3.0);
-	float rim = pow(1.0 - facing, 2.2);
+	// A wide falloff: from the high fight camera the silhouette edges are thin.
+	float rim = pow(1.0 - facing, 1.4);
 	if (shade_amount > 0.0) {
 		// Smoke drifting over the body breaks the ember edge into licks of flame.
 		float smoke = fbm(rest_pos * 3.0 + vec3(0.0, -TIME * 0.8, 0.0));
@@ -148,7 +149,7 @@ void fragment() {
 	}
 	// A coloured rim that does not depend on scene lights keeps the silhouette readable
 	// against dark arenas.
-	emission += rim_color * rim * rim_strength * 0.55;
+	emission += rim_color * rim * rim_strength * 0.7;
 	// The flash reads as a rim-weighted glow so the model keeps its shape.
 	emission += flash_color * flash_amount * (0.35 + 1.6 * fres);
 	if (dissolve > 0.0) {
