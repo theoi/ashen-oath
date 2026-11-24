@@ -33,7 +33,7 @@ static func input_sources(config: MatchConfig, camera: Camera3D) -> Array[InputS
 	var sources: Array[InputSource] = []
 	for slot in config.slot_count():
 		if config.attract:
-			sources.append(AttractInputSource.new())
+			sources.append(cpu_source(config, slot))
 		else:
 			sources.append(DeviceInputSource.new(camera) if config.is_human(slot) else cpu_source(config, slot))
 	return sources

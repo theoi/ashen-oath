@@ -17,7 +17,7 @@ var fighters: Array[StringName] = []
 var teams: Array[int] = []
 ## Which slots a local player controls; the rest are CPU.
 var human_slots: Array[int] = [0]
-## Demo / capture: every slot plays itself with AttractInputSource (the HUD still follows slot 0).
+## Demo / capture: every slot is a CPU (MatchSetup.cpu_source; the HUD still follows slot 0).
 var attract := false
 var arena: StringName = &"ashen_chapel"
 var difficulty := Difficulty.NORMAL
