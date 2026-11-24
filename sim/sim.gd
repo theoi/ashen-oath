@@ -2741,6 +2741,8 @@ func _land_hit(c: Contact) -> void:
 		_counter_stun(c)
 	elif staggered:
 		flags |= SimEvent.FLAG_STAGGERED
+	elif v.combo_ticks >= rules.combo_max_frames:
+		_flip_out(v, a)
 	else:
 		launched = _react(c, hitstun, was_airborne)
 	if launched:
@@ -2831,12 +2833,7 @@ func _react(c: Contact, hitstun: int, was_airborne: bool) -> bool:
 			var stun := UNTIL_LANDING if reaction == HitData.Reaction.KNOCKDOWN else hitstun
 			_launch(v, pop, stun)
 		if v.juggle_used >= rules.juggle_points:
-			_set_action(v, Action.TECH)
-			v.action_variant = 3
-			v.invuln = UNTIL_LANDING
-			v.knock_ticks = 0
-			v.bounce_pending = 0
-			_emit(EventType.JUGGLE_LIMIT, a.slot if a != null else -1, v.slot, &"", v.pos, v.juggle_used)
+			_flip_out(v, a)
 			return false
 		return height > 0 and reaction == HitData.Reaction.LAUNCH
 	match reaction:
@@ -2854,6 +2851,22 @@ func _react(c: Contact, hitstun: int, was_airborne: bool) -> bool:
 			_set_action(v, Action.HITSTUN)
 			v.stun = hitstun
 	return false
+
+
+## The juggle-limit flip: `v` pops up (if grounded) and flips out, invincible until it
+## lands. Ends the combo (juggle limit or CombatRules.combo_max_frames).
+func _flip_out(v: FighterState, a: FighterState) -> void:
+	if v.grounded:
+		_launch(v, KNOCKDOWN_POP, 0)
+	_set_action(v, Action.TECH)
+	v.action_variant = 3
+	v.invuln = UNTIL_LANDING
+	v.stun = 0
+	v.knock_ticks = 0
+	v.carried_ticks = 0
+	v.bounce_pending = 0
+	v.combo_ticks = 0
+	_emit(EventType.JUGGLE_LIMIT, a.slot if a != null else -1, v.slot, &"", v.pos, v.juggle_used)
 
 
 ## Sends `f` up so its apex is `height` units above the current position.
@@ -2995,14 +3008,19 @@ func _post_tick(f: FighterState) -> void:
 		Action.HITSTUN, Action.AIR_HITSTUN, Action.WALL_SPLAT, Action.COUNTER_STUN, Action.STAGGERED:
 			if f.hitstop == 0:
 				f.combo_ticks += 1
+			f.combo_free_ticks = 0
 		Action.KNOCKDOWN, Action.GUARD_BREAK, Action.GRABBED, Action.KO:
-			pass
+			f.combo_free_ticks = 0
 		_:
 			f.combo_hits = 0
 			f.combo_damage = 0
-			f.combo_ticks = 0
 			f.juggle_used = 0
 			f.wall_splat_used = false
+			f.combo_free_ticks += 1
+			if f.combo_free_ticks >= rules.combo_reset_frames:
+				f.combo_ticks = 0
+			elif f.combo_ticks > 0:
+				f.combo_ticks += 1
 	if f.knock_ticks == 0 and f.carried_ticks == 0:
 		f.splat_armed = false
 	var i := 0

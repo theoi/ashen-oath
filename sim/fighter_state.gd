@@ -158,7 +158,10 @@ var perfect_dodge_used: bool = false
 ## Combo state as a victim (per victim, so scaling is per victim in 1v2).
 var combo_hits: int = 0
 var combo_damage: int = 0
+## Combo clock (CombatRules.combo_decay_frames / combo_max_frames): stun ticks outside
+## hitstop plus short free gaps; reset after combo_reset_frames free ticks in a row.
 var combo_ticks: int = 0
+var combo_free_ticks: int = 0
 var juggle_used: int = 0
 var wall_splat_used: bool = false
 var last_attacker: int = -1
