@@ -4,7 +4,8 @@ extends FighterModel
 ## Oathkeeper's parry buff or a fire ability is active, and leans for his abilities.
 
 const EMBER_BONES: Array[StringName] = [&"chest", &"lowerarm.l", &"lowerarm.r", &"lowerleg.l", &"lowerleg.r"]
-const FIRE_MOVES: Array[StringName] = [&"oathfire_lunge", &"brand_rise", &"pyre_of_the_forsworn"]
+const FIRE_MOVES: Array[StringName] = [&"oathfire_lunge", &"brand_rise", &"brand_rise_slam", &"flame_rend",
+		&"rend_ignition", &"retribution", &"cinder_wheel", &"verdict", &"pyre_of_the_forsworn"]
 
 var _embers: Array[CPUParticles3D] = []
 var _blade_fire: CPUParticles3D
@@ -48,16 +49,26 @@ func adjust_pose(sim: Sim, f: FighterState, pose: FighterPose, sub: float) -> vo
 	var frame := float(f.move_frame - 1) + sub
 	match move.id:
 		&"oathfire_lunge":
-			var dash := clampf((frame - 3.0) / 4.0, 0.0, 1.0) * clampf((22.0 - frame) / 4.0, 0.0, 1.0)
-			pose.pitch += deg_to_rad(22.0) * dash
+			var dash := clampf((frame - 1.0) / 2.0, 0.0, 1.0) * clampf((16.0 - frame) / 4.0, 0.0, 1.0)
+			pose.pitch += deg_to_rad(24.0) * dash
 			pose.lift -= 0.12 * dash
 		&"brand_rise":
-			var rise := clampf((frame - 6.0) / 5.0, 0.0, 1.0) * clampf((26.0 - frame) / 8.0, 0.0, 1.0)
-			pose.lift += 0.45 * rise
+			var rise := clampf((frame - 3.0) / 3.0, 0.0, 1.0) * clampf((18.0 - frame) / 8.0, 0.0, 1.0)
+			pose.lift += 0.35 * rise
 			pose.pitch -= deg_to_rad(12.0) * rise
-		&"bulwark_charge":
-			var charge := clampf((frame - 4.0) / 3.0, 0.0, 1.0) * clampf((22.0 - frame) / 4.0, 0.0, 1.0)
-			pose.pitch += deg_to_rad(12.0) * charge
+		&"brand_rise_slam":
+			# A 2 m leap that comes down on the first active frame.
+			var t := clampf(frame / float(move.startup), 0.0, 1.0)
+			pose.lift += 2.0 * 4.0 * t * (1.0 - t)
+			pose.pitch += deg_to_rad(18.0) * t
+		&"verdict":
+			if f.charging:
+				pose.lift -= 0.1
+				pose.pitch -= deg_to_rad(8.0)
+			else:
+				var leap := clampf((frame - 2.0) / 12.0, 0.0, 1.0)
+				pose.lift += 2.6 * 4.0 * leap * (1.0 - leap)
+				pose.pitch += deg_to_rad(16.0) * leap
 		&"pyre_of_the_forsworn":
 			if frame >= float(move.startup - 1):
 				var kneel := clampf((float(move.total_frames()) - frame) / 10.0, 0.0, 1.0)

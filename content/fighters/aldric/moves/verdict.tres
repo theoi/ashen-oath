@@ -1,0 +1,93 @@
+[gd_resource type="Resource" script_class="MoveData" format=3]
+
+[ext_resource type="Script" path="res://content/types/move_data.gd" id="1_move_datagd"]
+[ext_resource type="Script" path="res://content/types/motion_data.gd" id="2_motion_datag"]
+[ext_resource type="Script" path="res://content/types/hitbox_data.gd" id="3_hitbox_datag"]
+[ext_resource type="Script" path="res://content/types/hit_data.gd" id="4_hit_datagd"]
+[ext_resource type="Script" path="res://content/types/effect_data.gd" id="5_effect_datag"]
+
+[sub_resource type="Resource" id="Motion_1"]
+script = ExtResource("2_motion_datag")
+start_frame = 3
+end_frame = 14
+aim_travel = 1
+
+[sub_resource type="Resource" id="Hit_3"]
+script = ExtResource("4_hit_datagd")
+damage = 120
+weight = 4
+hitstun = 30
+reaction = 1
+knockback = 1.6
+otg = true
+cue = &"verdict_impact"
+
+[sub_resource type="Resource" id="Hitbox_2"]
+script = ExtResource("3_hitbox_datag")
+offset = Vector3(0, 0.5, 0)
+radius = 3.5
+hit = SubResource("Hit_3")
+
+[sub_resource type="Resource" id="Hit_5"]
+script = ExtResource("4_hit_datagd")
+damage = 20
+weight = 2
+hitstun = 20
+knockback = 0.3
+otg = true
+cue = &"hit_fire"
+
+[sub_resource type="Resource" id="Effect_4"]
+script = ExtResource("5_effect_datag")
+id = &"verdict_eruption"
+spawn_frame = 15
+anchor = 1
+max_range = 7
+offset = Vector3(0, 0, 0)
+count = 3
+spread_degrees = 240
+speed = 12
+travel = 1.8
+radius = 0.9
+height = 3
+lifetime = 12
+requires_perfect = true
+destroy_on_contact = false
+destroyable = false
+blocked_by_walls = false
+projectile = false
+hits_per_target = 1
+cue = &"verdict_eruption"
+hit = SubResource("Hit_5")
+
+[resource]
+script = ExtResource("1_move_datagd")
+id = &"verdict"
+kind = 6
+skill_type = 2
+aim = 2
+max_range = 7
+startup = 14
+active = 4
+recovery = 18
+cooldown = 720
+push_immune_start = 1
+push_immune_end = 14
+counter_window_start = 1
+counter_window_end = 2
+chargeable = true
+charge_frame = 2
+charge_max = 50
+charge_levels = PackedInt32Array(15, 35)
+charge_level_damage_percent = PackedInt32Array(100, 125)
+perfect_start = 35
+perfect_end = 45
+perfect_damage_percent = 158
+perfect_weight = 5
+perfect_stagger = 80
+early_release_move = &"verdict_smash"
+animation = &"1H_Melee_Attack_Jump_Chop"
+cue = &"verdict_leap"
+motions = Array[ExtResource("2_motion_datag")]([SubResource("Motion_1")])
+hitboxes = Array[ExtResource("3_hitbox_datag")]([SubResource("Hitbox_2")])
+effects = Array[ExtResource("5_effect_datag")]([SubResource("Effect_4")])

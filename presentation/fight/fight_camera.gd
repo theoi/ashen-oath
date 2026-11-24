@@ -1,16 +1,15 @@
 class_name FightCamera
 extends Camera3D
 ## The fight camera (design-lost-ark §3): high, wide and stable. A fixed yaw per arena
-## (ArenaData.camera_yaw when the arena has it), ~52° pitch, 15–20 m out, 40° FOV, a
-## critically damped follow of the player with a small lead toward the aim, and a distance
-## that pulls back only when framing needs it (with hysteresis so it does not breathe).
-## Values come from Feel (FeelTuning when present) every frame.
+## (ArenaData.camera_yaw when the arena has it), 48° pitch, 14–20 m out, 35° FOV, a
+## critically damped spring follow of the player (ω ≈ 14 rad/s) with a small lead toward
+## the cursor (none on gamepad), and a distance that pulls back only when framing needs it
+## (with hysteresis so it does not breathe). Values come from Feel every frame.
 ##
-## Hooks: add_trauma() for shake, punch() for a zoom punch, cinematic() for awakening and
+## Hooks: shake() for impact shake, punch() for a zoom punch, cinematic() for awakening and
 ## other authored shots. Presentation only: DeviceInputSource reads this camera's basis to
 ## make movement camera-relative.
 
-const MAX_DISTANCE := 20.0
 const FAR_ENEMY := 16.0
 const WAVE_RADIUS := 12.0
 ## Framing hysteresis: pull back when the frame is this full, return below the second.
@@ -26,14 +25,16 @@ var yaw: float = 0.0
 var player_control: bool = true
 var spectator: bool = false
 
-var _trauma := 0.0
+var _shake_amp := 0.0
+var _shake_tau := 0.1
+var _shake_dir := Vector2.RIGHT
+var _shake_sign := 1.0
 var _punch := 0.0
-var _time := 0.0
 var _focus := Vector3.ZERO
 var _focus_vel := Vector3.ZERO
-var _distance := 15.0
+var _distance := 14.0
 var _distance_vel := 0.0
-var _want_distance := 15.0
+var _want_distance := 14.0
 var _shot_left := 0.0
 var _shot_total := 0.0
 var _shot_position := Vector3.ZERO
@@ -52,14 +53,26 @@ func setup(match_runner: MatchRunner, slot: int, camera_bounds: Rect2) -> void:
 	_initialized = false
 
 
-## Adds screen shake (0..1, accumulates, decays over ~0.6 s). Scaled by Feel.shake_scale.
-func add_trauma(amount: float) -> void:
-	_trauma = clampf(_trauma + amount, 0.0, 1.0)
+## High-frequency impact shake (design-lost-ark §1.12): the view jumps `amplitude` metres,
+## alternating direction every frame and decaying exponentially to ~5% over `decay_frames`
+## (60 fps frames). A weaker shake never cuts a stronger one short. Scaled by
+## Feel.shake_scale.
+func shake(amplitude: float, decay_frames: float) -> void:
+	if amplitude <= 0.0 or amplitude < _shake_amp:
+		return
+	_shake_amp = amplitude
+	_shake_tau = maxf(1.0, decay_frames) / 60.0 / 3.0
+	_shake_dir = Vector2.from_angle(randf_range(-0.6, 0.6) + (0.0 if randf() < 0.5 else PI * 0.5))
 
 
-## A quick zoom toward the focus (metres of the FOV-equivalent push, decays in ~0.2 s).
-func punch(amount: float) -> void:
-	_punch = maxf(_punch, amount)
+## Current shake amplitude in metres (before Feel.shake_scale).
+func shake_amplitude() -> float:
+	return _shake_amp
+
+
+## A quick push of `metres` toward the focus that springs back in ~0.2 s.
+func punch(metres: float) -> void:
+	_punch = maxf(_punch, metres)
 
 
 ## Short authored shot: moves to `at` looking at `look` for `seconds`, blending in and out.
@@ -82,9 +95,8 @@ func focus_point() -> Vector3:
 func _process(delta: float) -> void:
 	if runner == null or runner.sim == null:
 		return
-	_time += delta
 	var pitch := Feel.camera_pitch()
-	fov = Feel.camera_fov() - 6.0 * _punch
+	fov = Feel.camera_fov()
 	var target := _target_focus()
 	var want := _framing_distance(target, pitch)
 	if not _initialized:
@@ -92,10 +104,10 @@ func _process(delta: float) -> void:
 		_distance = want
 		_want_distance = want
 		_initialized = true
-	_focus = _smooth_v(_focus, target, delta, Feel.camera_smoothing())
+	_focus = _smooth_v(_focus, target, delta, Feel.camera_follow())
 	_distance = _smooth_f(_distance, _want_distance, delta, 0.6)
 	var forward := Vector3(sin(yaw) * cos(pitch), -sin(pitch), cos(yaw) * cos(pitch))
-	var eye := _focus - forward * _distance
+	var eye := _focus - forward * (_distance - _punch)
 	var xf := Transform3D(Basis.looking_at(forward, Vector3.UP), eye)
 	if _shot_left > 0.0:
 		_shot_left -= delta
@@ -108,11 +120,11 @@ func _process(delta: float) -> void:
 		xf = xf.interpolate_with(shot, w)
 	global_transform = xf
 	_apply_shake(delta)
-	_punch = move_toward(_punch, 0.0, delta * 5.0)
+	_punch = move_toward(_punch, 0.0, delta * 1.5)
 
 
 ## Player × 0.6 + enemies × 0.4 (enemies within reach), plus a lead toward the aim or the
-## move direction, clamped to the camera bounds.
+## move direction (Feel.camera_lead metres), clamped to the camera bounds.
 func _target_focus() -> Vector3:
 	var sim := runner.sim
 	var me := runner.fighter_position(focus_slot)
@@ -153,6 +165,7 @@ func _lead(f: FighterState) -> Vector3:
 func _framing_distance(focus: Vector3, pitch: float) -> float:
 	var sim := runner.sim
 	var base := Feel.camera_distance()
+	var max_distance := Feel.camera_distance_max()
 	var half_v := tan(deg_to_rad(Feel.camera_fov()) * 0.5)
 	var aspect := get_viewport().get_visible_rect().size.aspect() if is_inside_tree() else 16.0 / 9.0
 	var right := Vector3(cos(yaw), 0.0, -sin(yaw))
@@ -175,29 +188,29 @@ func _framing_distance(focus: Vector3, pitch: float) -> float:
 		need = maxf(need, maxf(sx / (0.8 * aspect * half_v), sz * sin(pitch) / (0.8 * half_v)))
 	var fill := need / maxf(1.0, _want_distance)
 	if fill > PULL_BACK_AT:
-		_want_distance = clampf(need / (PULL_BACK_AT - 0.05), base, MAX_DISTANCE)
+		_want_distance = clampf(need / (PULL_BACK_AT - 0.05), base, max_distance)
 	elif fill < RETURN_AT:
-		_want_distance = clampf(maxf(base, need / RETURN_AT), base, MAX_DISTANCE)
-	_want_distance = clampf(_want_distance, base, maxf(base, MAX_DISTANCE))
+		_want_distance = clampf(maxf(base, need / RETURN_AT), base, max_distance)
+	_want_distance = clampf(_want_distance, base, maxf(base, max_distance))
 	return _want_distance
 
 
 func _apply_shake(delta: float) -> void:
-	if _trauma <= 0.0:
+	if _shake_amp < 0.001:
+		_shake_amp = 0.0
 		h_offset = 0.0
 		v_offset = 0.0
 		return
-	var s := _trauma * _trauma * Feel.shake_scale()
-	var t := _time * 38.0
-	h_offset = s * 0.35 * (sin(t * 1.3) + sin(t * 2.9) * 0.5)
-	v_offset = s * 0.3 * (cos(t * 1.7) + sin(t * 3.3) * 0.5)
-	rotate_object_local(Vector3.FORWARD, s * 0.02 * sin(t * 2.1))
-	_trauma = maxf(0.0, _trauma - delta * 1.8)
+	_shake_sign = -_shake_sign
+	var offset := _shake_dir * (_shake_amp * Feel.shake_scale() * _shake_sign)
+	h_offset = offset.x
+	v_offset = offset.y
+	_shake_amp *= exp(-delta / _shake_tau)
 
 
-## Critically damped smoothing toward `target` with time constant `smoothing` seconds.
-func _smooth_v(current: Vector3, target: Vector3, delta: float, smoothing: float) -> Vector3:
-	var omega := 2.0 / maxf(0.01, smoothing)
+## Critically damped spring toward `target` with stiffness `omega` rad/s.
+func _smooth_v(current: Vector3, target: Vector3, delta: float, omega: float) -> Vector3:
+	omega = maxf(0.5, omega)
 	var x := omega * delta
 	var e := 1.0 / (1.0 + x + 0.48 * x * x + 0.235 * x * x * x)
 	var change := current - target

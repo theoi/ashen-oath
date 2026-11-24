@@ -300,7 +300,7 @@ func _event_matches(prompt: StoryPrompt, event: SimEvent) -> bool:
 		Goal.PARRY:
 			return event.type == Type.PARRY and event.source == slot
 		Goal.DODGE:
-			return event.type == Type.DODGE and event.source == slot
+			return (event.type == Type.DODGE or event.type == Type.DASH) and event.source == slot
 		Goal.GRAB:
 			return (event.type == Type.MOVE_START and event.source == slot and _move_kind(event) == MoveData.Kind.GRAB) \
 					or (event.type == Type.GRAB and event.source == slot)

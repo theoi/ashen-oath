@@ -6,6 +6,7 @@ extends Node3D
 ##   --p1=aldric --p2=hollowed     fighter ids (content/fighters/<id>/<id>.tres)
 ##   --arena=res://content/arenas/ashen_chapel.tres
 ##   --cpu1                        slot 0 is a sparring CPU too (attract mode, clips)
+##   --demo                        slot 0 plays Aldric's kit on a loop (ShowcaseInputSource)
 ##   --seed=N                      RNG seed for the sim and the sparring CPUs
 ##   --soul=N                      starting Soul for both fighters (super demos)
 ##   --shot=PATH --frames=N        save a PNG after N frames, then quit
@@ -39,8 +40,10 @@ func _ready() -> void:
 		slot.start_soul = int(args.get("soul", "0"))
 		config.slots.append(slot)
 	var sources: Array[InputSource] = []
-	var cpu1 := args.has("cpu1")
-	if cpu1:
+	var cpu1 := args.has("cpu1") or args.has("demo")
+	if args.has("demo"):
+		sources.append(ShowcaseInputSource.aldric())
+	elif cpu1:
 		sources.append(SparringInputSource.new(config.seed * 31 + 1))
 	else:
 		sources.append(DeviceInputSource.new())

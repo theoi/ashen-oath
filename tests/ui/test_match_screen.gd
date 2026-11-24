@@ -36,8 +36,8 @@ func test_one_vs_two_hud_follows_the_sim() -> void:
 		assert_not_null(hud.plate_for(slot), "plate for slot %d" % slot)
 	assert_almost_eq(hud.plate_for(2).soul_shown(), 0.5, 0.001, "starting Soul reaches the HUD")
 	assert_true(hud.skill_bar().visible, "the player's skill bar is shown")
-	assert_eq(hud.skill_bar().slot_count(), 3, "one slot per ability of the fighter")
 	var sim := screen.runner.sim
+	assert_eq(hud.skill_bar().slot_count(), sim.fighter_data[0].abilities.size(), "one slot per ability of the fighter")
 	assert_eq(sim.fighter(0).hp, sim.fighter(0).max_hp)
 	assert_almost_eq(hud.plate_for(0).health_shown(), 1.0, 0.001)
 

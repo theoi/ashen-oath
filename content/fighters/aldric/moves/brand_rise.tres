@@ -1,45 +1,41 @@
 [gd_resource type="Resource" script_class="MoveData" format=3]
 
 [ext_resource type="Script" path="res://content/types/move_data.gd" id="1_move_datagd"]
-[ext_resource type="Script" path="res://content/types/cancel_data.gd" id="2_cancel_datag"]
-[ext_resource type="Script" path="res://content/types/hitbox_data.gd" id="3_hitbox_datag"]
-[ext_resource type="Script" path="res://content/types/hit_data.gd" id="4_hit_datagd"]
+[ext_resource type="Script" path="res://content/types/hitbox_data.gd" id="2_hitbox_datag"]
+[ext_resource type="Script" path="res://content/types/hit_data.gd" id="3_hit_datagd"]
 
-[sub_resource type="Resource" id="Cancel_1"]
-script = ExtResource("2_cancel_datag")
-start_frame = 9
-end_frame = 30
-condition = 2
-into = 6
-
-[sub_resource type="Resource" id="Hit_3"]
-script = ExtResource("4_hit_datagd")
+[sub_resource type="Resource" id="Hit_2"]
+script = ExtResource("3_hit_datagd")
 damage = 70
-hitstun = 26
-blockstun = 14
+weight = 2
+hitstun = 24
 reaction = 2
-launch_height = 2.6
+launch_height = 2.4
 knockback = 0.2
 juggle_cost = 1
 cue = &"hit_fire"
 
-[sub_resource type="Resource" id="Hitbox_2"]
-script = ExtResource("3_hitbox_datag")
+[sub_resource type="Resource" id="Hitbox_1"]
+script = ExtResource("2_hitbox_datag")
 offset = Vector3(0, 0.6, 0.6)
-offset_end = Vector3(0, 2, 1.2)
+offset_end = Vector3(0, 2, 1.3)
 capsule = true
-radius = 0.6
-hit = SubResource("Hit_3")
+radius = 0.65
+hit = SubResource("Hit_2")
 
 [resource]
 script = ExtResource("1_move_datagd")
 id = &"brand_rise"
 kind = 6
-startup = 8
+skill_type = 3
+aim = 1
+startup = 4
 active = 4
-recovery = 22
-cooldown = 240
-animation = &"2H_Melee_Attack_Slice"
+recovery = 16
+skill_cancel_from = 8
+follow_up = &"brand_rise_slam"
+follow_up_window = 30
+cooldown = 360
+animation = &"1H_Melee_Attack_Slice_Diagonal"
 cue = &"brand_rise"
-cancels = Array[ExtResource("2_cancel_datag")]([SubResource("Cancel_1")])
-hitboxes = Array[ExtResource("3_hitbox_datag")]([SubResource("Hitbox_2")])
+hitboxes = Array[ExtResource("2_hitbox_datag")]([SubResource("Hitbox_1")])
