@@ -41,4 +41,4 @@ obstacles = Array[ExtResource("2_obstacle")]([SubResource("Resource_obstacle_0")
 spawn_points = PackedVector2Array(-4, 0, 4, 0, 7, -3, -7, 3)
 scene = "res://presentation/arenas/ashen_chapel/ashen_chapel.tscn"
 camera_bounds = Rect2(-11, -9, 22, 18)
-camera_yaw = 180.0
+camera_yaw = 0.0

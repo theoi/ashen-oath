@@ -50,6 +50,8 @@ var _halloween_material: ShaderMaterial
 var _flames: Array[Transform3D] = []
 var _flame_multimesh: MultiMesh
 var _overhead: Array[Node3D] = []
+## Pieces apply_gameplay_camera() stopped drawing (they still cast shadows).
+var hidden_for_camera: Array[Node3D] = []
 var _shafts: Array[MeshInstance3D] = []
 var _cut_edges: Array[Vector4] = []
 var _runner: MatchRunner
@@ -115,7 +117,7 @@ func apply_gameplay_camera(data: ArenaData) -> void:
 		material.set_shader_parameter("cut_edge_count", _cut_edges.size())
 		material.set_shader_parameter("cut_height", CUT_HEIGHT)
 	for node in _overhead:
-		node.visible = false
+		_hide(node)
 	# Seen from above, shafts read as bright discs on the floor; the pool light does that job.
 	for shaft in _shafts:
 		var material := shaft.material_override as ShaderMaterial
@@ -123,7 +125,7 @@ func apply_gameplay_camera(data: ArenaData) -> void:
 	for child in _props.get_children():
 		var node := child as Node3D
 		if node != null and node.position.y > CUT_HEIGHT and _is_cut(Vector2(node.position.x, node.position.z), CUT_REACH):
-			node.visible = false
+			_hide(node)
 	if _flame_multimesh != null:
 		for i in _flames.size():
 			var origin := _flames[i].origin
@@ -134,6 +136,17 @@ func apply_gameplay_camera(data: ArenaData) -> void:
 	_rim.rotation_degrees = Vector3(look.rim_camera_pitch, camera_light_yaw + 180.0 + look.rim_camera_offset, 0.0)
 	if _fill != null:
 		_fill.rotation_degrees = Vector3(look.fill_camera_pitch, camera_light_yaw + look.fill_camera_offset, 0.0)
+
+
+## Stops drawing `node` but keeps its shadows, so hiding roofs and walls for the camera
+## does not change the arena's lighting.
+func _hide(node: Node3D) -> void:
+	hidden_for_camera.append(node)
+	var meshes: Array[Node] = node.find_children("*", "GeometryInstance3D", true, false)
+	if node is GeometryInstance3D:
+		meshes.append(node)
+	for mesh: GeometryInstance3D in meshes:
+		mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_SHADOWS_ONLY
 
 
 ## Floor edges whose outward normal faces `toward_camera`, as (point x, point z, normal x,

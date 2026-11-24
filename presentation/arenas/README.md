@@ -19,19 +19,21 @@ with slot 0) and
 
 The fight camera is a fixed-yaw high three-quarter view (`design-lost-ark.md` §3). Each
 `ArenaData` has `camera_yaw` (degrees, the direction the camera looks on the floor:
-(sin, cos) in (x, z); all four slice arenas use 180, looking along −z from the +z side,
-so the long nave runs left to right and the Chapel altar is on the right). `attach(runner)`
-calls `apply_gameplay_camera(data)`, which:
+(sin, cos) in (x, z), the `FightCamera` convention). All four slice arenas use 0: the camera
+sits on the north (−z) side looking along +z, the long nave runs across the screen and the
+Chapel altar is on the left. `attach(runner)` calls `apply_gameplay_camera(data)`, which:
 
 - cuts the walls whose outward normal faces the camera down to ragged ~1.1 m stubs (in
   `grim_prop.gdshader`; back faces draw as a dark cap) and hides props on those walls,
-- hides roofs, beams, the crypt vault and upper pillar drums (`overhead()`),
+- hides roofs, beams, the crypt vault and upper pillar drums (`overhead()`); hidden pieces
+  keep casting shadows so the lighting does not change,
 - turns the rim light so it backlights fighters as seen from the camera, with the
   fighter-only fill from the camera side,
 - dithers props within ~1.5 m (on screen) of each fighter down to 25 % when they are
   between the camera and the fighter.
 
-Story stills don't call it and keep the full set. To preview:
+Story stills don't call it and keep the full set. `ArenaCutaway` (the generic cutaway in
+`presentation/fight/`) skips `ArenaView` scenes, which cut themselves. To preview:
 `tools/arena_shot.sh /tmp/a.png --arena=res://content/arenas/drowned_crypt.tres --game`
 (capsules) or `--real=aldric,gorrath` (real fighters sparring through `FightView`).
 

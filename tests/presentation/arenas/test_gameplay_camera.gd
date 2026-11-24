@@ -36,14 +36,14 @@ func test_gameplay_setup_hides_camera_side_and_overhead() -> void:
 		for edge in arena._cut_edges:
 			assert_true(Vector2(edge.z, edge.w).dot(toward_camera) > 0.25, "%s cuts only camera-side walls" % path)
 		for node in arena._overhead:
-			assert_false(node.visible, "%s hides overhead pieces" % path)
+			assert_has(arena.hidden_for_camera, node, "%s hides overhead pieces" % path)
 		var hidden := 0
 		var far_side_hidden := 0
-		for child in arena.get_node("Props").get_children():
-			var node := child as Node3D
-			if not node.visible:
+		for node in arena.hidden_for_camera:
+			assert_eq(_drawn_meshes(node), 0, "%s: %s still draws" % [path, node.name])
+			if not node in arena._overhead:
 				hidden += 1
-				if Vector2(node.position.x, node.position.z).dot(toward_camera) < -6.0 and not node in arena._overhead:
+				if Vector2(node.position.x, node.position.z).dot(toward_camera) < -6.0:
 					far_side_hidden += 1
 		assert_true(hidden > 0, "%s hides camera-side wall pieces" % path)
 		assert_eq(far_side_hidden, 0, "%s keeps the far walls" % path)
@@ -51,3 +51,14 @@ func test_gameplay_setup_hides_camera_side_and_overhead() -> void:
 		var rim: DirectionalLight3D = arena.get_node("RimLight")
 		var shine := -rim.global_transform.basis.z
 		assert_true(Vector2(shine.x, shine.z).normalized().dot(toward_camera) > 0.5, "%s rim light backlights fighters" % path)
+
+
+func _drawn_meshes(node: Node3D) -> int:
+	var count := 0
+	var meshes: Array[Node] = node.find_children("*", "GeometryInstance3D", true, false)
+	if node is GeometryInstance3D:
+		meshes.append(node)
+	for mesh: GeometryInstance3D in meshes:
+		if mesh.cast_shadow != GeometryInstance3D.SHADOW_CASTING_SETTING_SHADOWS_ONLY:
+			count += 1
+	return count

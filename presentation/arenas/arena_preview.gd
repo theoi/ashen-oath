@@ -8,9 +8,9 @@ extends Node3D
 ## User args (after `--`):
 ##   --arena=res://content/arenas/NAME.tres   ArenaData to show (default: Ashen Chapel)
 ##   --real=aldric,gorrath   real fighters sparring (CPU sparring partners, --seed=N)
-##   --game                  the gameplay camera (design-lost-ark.md §3: 52° pitch, 15-20 m,
-##                           40° FOV, ArenaData.camera_yaw) with camera-side cutaways; on by
-##                           default with --real
+##   --game                  the gameplay camera set-up (camera-side cutaways, fixed
+##                           ArenaData.camera_yaw); with --real the real FightCamera, with
+##                           capsules an approximation using the same Feel values
 ##   --view=NAME             free camera preset: overview, fight, low, east, west, top
 ##   --cam=px,py,pz,tx,ty,tz custom camera position and look target
 ##   --orbit                 slowly orbit the arena (clips)
@@ -24,10 +24,6 @@ extends Node3D
 const DEFAULT_ARENA := "res://content/arenas/ashen_chapel.tres"
 const RULES := "res://content/rules/default_rules.tres"
 const FIGHTERS := "res://content/fighters/%s/%s.tres"
-const GAME_PITCH := 52.0
-const GAME_FOV := 40.0
-const GAME_DISTANCE := 15.0
-const GAME_MAX_DISTANCE := 20.0
 ## name -> [camera position, look target]
 const VIEWS := {
 	"overview": [Vector3(0.0, 7.2, 9.6), Vector3(0.0, 0.0, -2.5)],
@@ -77,6 +73,8 @@ func _ready() -> void:
 			arena.apply_gameplay_camera(data)
 	if args.has("debug"):
 		add_child(ArenaDebugDraw.build(data))
+	if _fight != null and not args.has("cam"):
+		return
 	_camera = Camera3D.new()
 	_camera.fov = 55.0
 	add_child(_camera)
@@ -93,7 +91,7 @@ func _ready() -> void:
 	if args.has("cam"):
 		_game_camera = false
 	if _game and _game_camera:
-		_camera.fov = GAME_FOV
+		_camera.fov = Feel.camera_fov()
 		_focus = _wanted_focus()
 		_place_game_camera(1.0)
 	_camera.make_current()
@@ -108,7 +106,9 @@ func _physics_process(_delta: float) -> void:
 
 func _process(delta: float) -> void:
 	_time += delta
-	if _orbit:
+	if _camera == null:
+		pass
+	elif _orbit:
 		var angle := _time * 0.18
 		_camera.position = Vector3(sin(angle) * 11.0, 4.5, cos(angle) * 9.0)
 		_camera.look_at(Vector3(0.0, 1.2, 0.0))
@@ -130,9 +130,11 @@ func _place_game_camera(blend: float) -> void:
 	var points := _fighter_points()
 	_focus = _focus.lerp(_wanted_focus(), blend)
 	var separation := points[0].distance_to(points[1]) if points.size() > 1 else 0.0
-	var distance := clampf(GAME_DISTANCE + (separation - 6.0) * 0.6, GAME_DISTANCE, GAME_MAX_DISTANCE)
+	var near := Feel.camera_distance()
+	var far := Feel.camera_distance_max()
+	var distance := clampf(near + (separation - 6.0) * 0.6, near, far)
 	var yaw := deg_to_rad(data.camera_yaw)
-	var pitch := deg_to_rad(GAME_PITCH)
+	var pitch := Feel.camera_pitch()
 	var back := Vector3(-sin(yaw), 0.0, -cos(yaw)) * cos(pitch) * distance
 	_camera.position = _focus + back + Vector3.UP * sin(pitch) * distance
 	_camera.look_at(_focus)

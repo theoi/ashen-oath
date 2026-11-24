@@ -13,6 +13,10 @@ const NEAR_MARGIN := 0.3
 ## Applies the cutaway to every mesh under `root`. `yaw` is the camera yaw (radians;
 ## 0 looks along +Z); `floor` is the arena's floor polygon. Returns the nodes it changed.
 static func apply(root: Node, yaw: float, floor: PackedVector2Array) -> Array[GeometryInstance3D]:
+	# Arena scenes cut themselves (ArenaView.apply_gameplay_camera: ragged wall stubs that
+	# keep the floor's edge readable, plus occluder dithering).
+	if root is ArenaView:
+		return []
 	var back := Vector2(-sin(yaw), -cos(yaw))
 	var near_edge := -INF
 	for p in floor:
