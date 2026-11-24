@@ -7,10 +7,11 @@ extends Node
 ## node keep running. Leaving goes back to MatchConfig.menu_stack.
 
 const RESULTS_DELAY := 2.2
+const ROUND_FLOW_SOUNDS: Array[StringName] = [MatchEvents.ROUND_INTRO, MatchEvents.FIGHT, MatchEvents.TIME_UP]
 
 var config: MatchConfig
 var runner: MatchRunner
-var view: MatchView
+var view: FightView
 var hud: Hud
 
 var _hud_state := HudState.new()
@@ -34,11 +35,13 @@ func _ready() -> void:
 	runner = MatchRunner.new()
 	runner.process_mode = Node.PROCESS_MODE_PAUSABLE
 	add_child(runner)
-	view = MatchView.new()
+	view = FightView.new()
 	view.process_mode = Node.PROCESS_MODE_PAUSABLE
 	add_child(view)
 	runner.start(sim_config, [])
-	view.setup(runner, MatchSetup.arena_scene(config.arena, sim_config.arena), config.human_slots[0] if not config.human_slots.is_empty() else 0)
+	var focus_slot := config.human_slots[0] if not config.human_slots.is_empty() else 0
+	view.show_match(runner, focus_slot, Roster.arena(config.arena).get("scene", ""))
+	view.camera.player_control = not config.attract
 	runner.sources = MatchSetup.input_sources(config, view.camera)
 	runner.stepped.connect(_on_stepped)
 
@@ -117,7 +120,10 @@ func _on_stepped(events: Array[SimEvent]) -> void:
 		if event.is_empty():
 			continue
 		hud.on_event(event)
-		MatchSounds.play_for(event)
+		# FightView's FightFx voices combat events (hits, blocks, abilities...) with
+		# per-move cues; the match screen voices only the round flow.
+		if event["type"] in ROUND_FLOW_SOUNDS:
+			MatchSounds.play_for(event)
 		if event["type"] == MatchEvents.MATCH_WON:
 			_on_match_won()
 

@@ -19,6 +19,10 @@ only those files are committed.
 | Impact Sounds | Kenney (kenney.nl) | CC0 1.0 | https://kenney.nl/assets/impact-sounds | Bell toll and combat impacts (`assets/kenney-impact-sounds/`) |
 | RPG Audio | Kenney (kenney.nl) | CC0 1.0 | https://kenney.nl/assets/rpg-audio | Dodge, blade and ability whooshes (`assets/kenney-rpg-audio/`) |
 | KayKit Dungeon Remastered 1.0 | Kay Lousberg | CC0 1.0 | [GitHub](https://github.com/KayKit-Game-Assets/KayKit-Dungeon-Remastered-1.0) · [itch.io](https://kaylousberg.itch.io/kaykit-dungeon-pack) | Arena walls, floors, pillars, candles, torches, banners (`assets/kaykit-dungeon-remastered/`) |
+| KayKit Character Pack: Adventurers 1.0 | Kay Lousberg | CC0 1.0 | [GitHub](https://github.com/KayKit-Game-Assets/KayKit-Character-Pack-Adventures-1.0) · [itch.io](https://kaylousberg.itch.io/kaykit-adventurers) | Aldric (Knight), Morrigan (Mage), Gorrath (Barbarian) models (`assets/kaykit-adventurers/`) |
+| KayKit Character Pack: Skeletons 1.0 | Kay Lousberg | CC0 1.0 | [GitHub](https://github.com/KayKit-Game-Assets/KayKit-Character-Pack-Skeletons-1.0) · [itch.io](https://kaylousberg.itch.io/kaykit-skeletons) | Hollowed models, skeleton blade, and the shared character animations (`assets/kaykit-skeletons/`) |
+| Sci-fi Sounds | Kenney (kenney.nl) | CC0 1.0 | https://kenney.nl/assets/sci-fi-sounds | Fire, flame pillars, bursts and explosions (`assets/kenney-sci-fi-sounds/`) |
+| Swishes Sound Pack | artisticdude | CC0 1.0 | https://opengameart.org/content/swishes-sound-pack | Weapon swings and launches, converted to Ogg (`assets/oga-swishes/`) |
 | KayKit Halloween Bits 1.0 | Kay Lousberg | CC0 1.0 | [GitHub](https://github.com/KayKit-Game-Assets/KayKit-Halloween-Bits-1.0) · [itch.io](https://kaylousberg.itch.io/halloween-bits) | Arena coffins, shrine, arches, graves, bones, lanterns (`assets/kaykit-halloween-bits/`) |
 
 When you add a pack, add a row here in the same pull request.

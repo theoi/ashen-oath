@@ -41,6 +41,17 @@ const FIGHTERS: Array[Dictionary] = [
 		"trait": "Unbroken: his heavies shrug off one hit.",
 		"color": Color(0.78, 0.72, 0.66),
 	},
+	{
+		"id": &"hollowed",
+		"data": "res://content/fighters/hollowed/hollowed.tres",
+		"name": "Hollowed",
+		"epithet": "The Lost",
+		"style": "Story opponent · a soldier of Vael, hollowed by the Oath",
+		"abilities": [],
+		"super": "",
+		"trait": "No abilities or super: blade strings, a grab and nothing left to lose.",
+		"color": Color(0.55, 0.75, 0.9),
+	},
 ]
 
 const ARENAS: Array[Dictionary] = [

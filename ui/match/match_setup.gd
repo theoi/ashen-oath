@@ -39,9 +39,10 @@ static func input_sources(config: MatchConfig, camera: Camera3D) -> Array[InputS
 	return sources
 
 
-## The CPU opponent for `slot`. Until the AI lands this is null (the fighter stands still).
-static func cpu_source(_config: MatchConfig, _slot: int) -> InputSource:
-	return null
+## The CPU opponent for `slot`. Until the AI lands this is the fight sandbox's sparring
+## partner (scripted strings, abilities, guards), so matches can be played.
+static func cpu_source(config: MatchConfig, slot: int) -> InputSource:
+	return SparringInputSource.new(config.seed * 17 + slot)
 
 
 static func fighter_data(id: StringName) -> FighterData:

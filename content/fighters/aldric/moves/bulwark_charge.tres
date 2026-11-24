@@ -1,0 +1,45 @@
+[gd_resource type="Resource" script_class="MoveData" format=3]
+
+[ext_resource type="Script" path="res://content/types/move_data.gd" id="1_move_datagd"]
+[ext_resource type="Script" path="res://content/types/motion_data.gd" id="2_motion_datag"]
+[ext_resource type="Script" path="res://content/types/hitbox_data.gd" id="3_hitbox_datag"]
+[ext_resource type="Script" path="res://content/types/hit_data.gd" id="4_hit_datagd"]
+
+[sub_resource type="Resource" id="Motion_1"]
+script = ExtResource("2_motion_datag")
+start_frame = 6
+end_frame = 19
+forward_speed = 12.8
+stop_at_distance = 0.8
+
+[sub_resource type="Resource" id="Hit_3"]
+script = ExtResource("4_hit_datagd")
+damage = 50
+hitstun = 30
+blockstun = 16
+guard_damage = 40
+knockback = 1.2
+block_pushback = 1
+cue = &"hit_shield"
+
+[sub_resource type="Resource" id="Hitbox_2"]
+script = ExtResource("3_hitbox_datag")
+offset = Vector3(0, 1, 0.75)
+radius = 0.7
+destroys_projectiles = true
+hit = SubResource("Hit_3")
+
+[resource]
+script = ExtResource("1_move_datagd")
+id = &"bulwark_charge"
+kind = 6
+startup = 14
+active = 6
+recovery = 22
+cooldown = 360
+animation = &"Block_Attack"
+cue = &"bulwark_charge"
+projectile_invuln_start = 1
+projectile_invuln_end = 19
+motions = Array[ExtResource("2_motion_datag")]([SubResource("Motion_1")])
+hitboxes = Array[ExtResource("3_hitbox_datag")]([SubResource("Hitbox_2")])
