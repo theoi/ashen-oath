@@ -63,6 +63,22 @@ func test_one_attacker_at_a_time_in_one_vs_two() -> void:
 	assert_true(attacking[1] > 0 and attacking[2] > 0, "the token rotates: %s" % attacking)
 
 
+func test_match_setup_cpu_drives_any_slot() -> void:
+	# Story playthroughs drive the player's slot 0 with the CPU too.
+	var config := MatchConfig.versus(&"aldric", &"hollowed", &"ashen_chapel", MatchConfig.Difficulty.NIGHTMARE)
+	config.rounds_to_win = 1
+	config.round_seconds = 60
+	var cfg := MatchSetup.sim_config(config)
+	var cpu := MatchSetup.cpu_source(config, 0) as AiInputSource
+	assert_not_null(cpu)
+	assert_eq(cpu.difficulty.level, X)
+	var sources: Array[InputSource] = [cpu, null]
+	var bout := AiBout.new(cfg, sources).run()
+	assert_eq(bout.winner_team, 0, "the CPU in slot 0 beats a standing opponent")
+	config.ai_cap = E
+	assert_eq((MatchSetup.cpu_source(config, 1) as AiInputSource).difficulty.level, E, "ai_cap applies")
+
+
 func test_nightmare_crowd_gets_two_tokens() -> void:
 	var sources := AiInputSource.for_match(A.config([0, 1, 1], 1), PackedInt32Array([1, 2]), X)
 	assert_null(sources[0])
